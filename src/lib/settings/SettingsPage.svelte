@@ -276,10 +276,28 @@
 	function applyModel(key: string) {
 		const i = key.indexOf('::');
 		if (i < 0) return;
-		const p = allProviders.find((x) => x.id === key.slice(0, i));
+		let p = allProviders.find((x) => x.id === key.slice(0, i));
 		if (!p) return;
+		const name = key.slice(i + 2);
+		// Picking a model of a provider with no credentials (the builtin
+		// openai group, or the dead lynshen account gateway
+		// api.lynshen.net) would strand the engine on that provider.
+		// When the keyed monoize entry serves the same model, route there.
+		if (p.builtin && !keyed.includes(p.id)) {
+			const mz = allProviders.find((x) => x.id === 'monoize');
+			if (mz && keyed.includes('monoize') && mz.models.some((m) => m.name === name)) {
+				p = mz;
+			}
+		}
 		selectProvider(p);
-		cfg.model = key.slice(i + 2);
+		cfg.model = name;
+		// A gateway model the stored list has not synced yet still works:
+		// keep it as a name-only entry so the effort/window logic sees it.
+		if (!p.models.some((m) => m.name === cfg.model)) {
+			p.models = [...p.models, { name: cfg.model }];
+			custom = [...custom];
+			persistCustom();
+		}
 	}
 
 	// Keep reasoning effort valid for the selected model.
