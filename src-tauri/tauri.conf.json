@@ -41,9 +41,9 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/LynShen-Team/LynShen-Desktop/releases/latest/download/latest.json"
+        "https://github.com/Libra1337/LynShen_Agent/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI2MkRDQTQ5NTA2NkI4NzMKUldSenVHWlFTY290Sm4xNUZDTmFocXpxRmFTOW14NDFKaWRiby9RdFFPQnNKQ2o0L05KSHhTVE0K"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMwRjhBNzY0NDJGREYxMjEKUldRaDhmMUNaS2Y0d0RXRjBZK3BtQjl4UXRhV3J3TTBtU2c4YzAvRWkxUk4zOGx3bFRqOFVRakMK"
     },
     "deep-link": {
       "desktop": {

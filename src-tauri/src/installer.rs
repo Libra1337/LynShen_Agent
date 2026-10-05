@@ -218,9 +218,12 @@ pub fn plan(dep: Dep, os: &str, has: &dyn Fn(&str) -> bool) -> Plan {
             }
         }
         Dep::Claude => {
-            if os == "windows" {
-                // Official Windows installer (PowerShell). `powershell.exe` (5.1)
-                // is always present; irm/iex are built in.
+            // claude.ai's native installer is region-blocked in some networks
+            // (302 → app-unavailable-in-region); the npm package carries the
+            // same versions and installs everywhere npm does.
+            if has("npm") {
+                npm_global("@anthropic-ai/claude-code")
+            } else if os == "windows" {
                 Plan::Run {
                     program: "powershell".to_string(),
                     args: vec![
@@ -232,7 +235,6 @@ pub fn plan(dep: Dep, os: &str, has: &dyn Fn(&str) -> bool) -> Plan {
                     ],
                 }
             } else {
-                // Official macOS/Linux installer — user-local, no sudo.
                 Plan::Run {
                     program: "sh".to_string(),
                     args: vec![
