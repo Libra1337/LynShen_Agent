@@ -359,6 +359,49 @@ export async function fetchMonoizeModels(): Promise<MonoizeModel[]> {
 	const v = await invoke<{ data?: MonoizeModel[] }>('fetch_monoize_models');
 	return Array.isArray(v.data) ? v.data : [];
 }
+
+// Monoize 账号体系：与 web 网关同一套登录/注册。登录成功后网关会话由桌面端
+// 保管，并自动创建一条仅客户端使用的 API key（界面不展示、退出即吊销）。
+export type MonoizeUser = {
+	id: string;
+	username: string;
+	role: string;
+	balance_usd?: string;
+	balance_unlimited?: boolean;
+};
+export async function monoizeRegister(username: string, password: string): Promise<{ user: MonoizeUser }> {
+	return invoke('monoize_register', { username, password });
+}
+export async function monoizeLogin(username: string, password: string): Promise<{ user: MonoizeUser }> {
+	return invoke('monoize_login', { username, password });
+}
+export async function monoizeLogout(): Promise<void> {
+	return invoke('monoize_logout');
+}
+export async function monoizeSession(): Promise<{ logged_in: boolean; session?: { user: MonoizeUser } }> {
+	return invoke('monoize_session');
+}
+/** 模型广场：登录用户各分组内可调用的模型（服务端已按分组过滤）。
+ *  `groups` 是该模型出现的分组；跨分组同名模型以 `模型@分组` 区分。 */
+export type MonoizeMarketplaceModel = {
+	model_id: string;
+	models_dev_provider?: string | null;
+	mode?: string | null;
+	input_cost_per_token_nano?: number | string | null;
+	output_cost_per_token_nano?: number | string | null;
+	max_input_tokens?: number | null;
+	max_output_tokens?: number | null;
+	groups?: string[];
+};
+/** 模型在广场里的展示名：单分组用原名，多分组每个分组一条 `原名@分组`。 */
+export function monoizeModelEntries(m: MonoizeMarketplaceModel): string[] {
+	const groups = m.groups ?? [];
+	return groups.length > 1 ? groups.map((g) => `${m.model_id}@${g}`) : [m.model_id];
+}
+export async function monoizeMarketplace(): Promise<MonoizeMarketplaceModel[]> {
+	const v = await invoke<MonoizeMarketplaceModel[] | { data?: MonoizeMarketplaceModel[] }>('monoize_marketplace');
+	return Array.isArray(v) ? v : Array.isArray((v as { data?: unknown }).data) ? (v as { data: MonoizeMarketplaceModel[] }).data : [];
+}
 export function fetchUsage(): Promise<PlanUsage> {
 	return invoke('fetch_usage');
 }

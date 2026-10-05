@@ -18,6 +18,7 @@ mod claude_history;
 mod native_import;
 mod installer;
 mod plugins;
+mod monoize_auth;
 mod secrets;
 mod shell_env;
 mod tool_switch;
@@ -386,12 +387,12 @@ fn daemon_endpoint(
     })
 }
 
-fn lynshen_dir() -> PathBuf {
+pub(crate) fn lynshen_dir() -> PathBuf {
     let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));
     PathBuf::from(home.unwrap_or_default()).join(".lynshen")
 }
 
-fn read_json(path: &std::path::Path) -> serde_json::Value {
+pub(crate) fn read_json(path: &std::path::Path) -> serde_json::Value {
     std::fs::read_to_string(path)
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
@@ -416,7 +417,7 @@ fn read_json_strict(path: &std::path::Path) -> Result<serde_json::Value, String>
     }
 }
 
-fn write_json(path: &std::path::Path, value: &serde_json::Value) -> Result<(), String> {
+pub(crate) fn write_json(path: &std::path::Path, value: &serde_json::Value) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
@@ -615,8 +616,8 @@ fn read_auth_providers() -> Vec<String> {
     providers
 }
 
-#[tauri::command]
-fn set_auth_key(provider: String, key: String) -> Result<(), String> {
+/// Writes a provider key into auth.json (shared with monoize_auth's login flow).
+pub(crate) fn store_provider_key(provider: String, key: String) -> Result<(), String> {
     let mut current = read_auth_strict()?;
     let root = current
         .as_object_mut()
@@ -630,11 +631,14 @@ fn set_auth_key(provider: String, key: String) -> Result<(), String> {
     write_auth(&mut current)
 }
 
-/// Removes a provider's stored credential — logout (lynshen) / clear key (others).
-/// For lynshen, `lynshen logout` revokes this computer's device authorization
-/// and drops the OAuth tokens.
-#[tauri::command(async)]
-fn remove_auth_key(provider: String) -> Result<(), String> {
+#[tauri::command]
+fn set_auth_key(provider: String, key: String) -> Result<(), String> {
+    store_provider_key(provider, key)
+}
+
+/// Removes a provider's stored credential — logout (lynshen) / clear key
+/// (others). Shared with monoize_auth's sign-out.
+pub(crate) fn remove_provider_credential(provider: String) -> Result<(), String> {
     if provider == "lynshen" {
         *lynshen_session_cache() = None;
         let mut cmd = Command::new(resolve_bin());
@@ -655,6 +659,11 @@ fn remove_auth_key(provider: String) -> Result<(), String> {
         map.remove(&provider);
     }
     write_auth(&mut current)
+}
+
+#[tauri::command(async)]
+fn remove_auth_key(provider: String) -> Result<(), String> {
+    remove_provider_credential(provider)
 }
 
 fn unix_now() -> u64 {
@@ -3219,6 +3228,11 @@ pub fn run() {
             fetch_deepseek_balance,
             fetch_monoize_balance,
             fetch_monoize_models,
+            monoize_auth::monoize_register,
+            monoize_auth::monoize_login,
+            monoize_auth::monoize_logout,
+            monoize_auth::monoize_session,
+            monoize_auth::monoize_marketplace,
             transcribe_audio,
             generate_text,
             git_checkpoint_capture,

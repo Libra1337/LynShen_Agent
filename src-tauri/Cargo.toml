@@ -41,6 +41,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 portable-pty = "0.8"
 ureq = { version = "2", features = ["json"] }
+# Monoize 网关内置 PoW 验证码的解算（见 src/monoize_auth.rs）。
+sha2 = "0.10"
 # auth.json 凭据静态加密（见 docs/secrets.md）。纯 Rust、无 C 依赖，
 # default-features 关掉以免多带一份 std/stream 支持。
 chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc", "getrandom"] }

@@ -43,6 +43,7 @@
 		monoizeBal,
 		monoizeTotal,
 		monoizeModelsMsg,
+		monoizeUser,
 		keyInput = $bindable(),
 		cap,
 		onCardClick,
@@ -51,7 +52,10 @@
 		onSaveKey,
 		onSetDefault,
 		onDelete,
-		onRefreshModels
+		onRefreshModels,
+		onOpenMonoizeLogin,
+		onMonoizeLogout,
+		onOpenSquare
 	}: {
 		provider: Provider;
 		authed: boolean;
@@ -64,6 +68,7 @@
 		monoizeBal: DeepseekBalance | null;
 		monoizeTotal: { total_balance: string; currency: string } | null;
 		monoizeModelsMsg: string;
+		monoizeUser: { username: string } | null;
 		keyInput: string;
 		cap: (s: string) => string;
 		onCardClick: (p: Provider, authed: boolean) => void;
@@ -73,6 +78,9 @@
 		onSetDefault: (p: Provider) => void;
 		onDelete: (id: string) => void;
 		onRefreshModels: () => void;
+		onOpenMonoizeLogin: () => void;
+		onMonoizeLogout: () => void;
+		onOpenSquare: () => void;
 	} = $props();
 	import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
 	import { modelSetup } from '$lib/modelSetupState.svelte';
@@ -95,14 +103,18 @@
 				<span class="bal"><WalletIcon size={12} /> {fmtBalance(lynshenBal.balance)} {lynshenBal.currency ?? ''}</span>
 			{:else if authed && provider.id === 'deepseek' && deepseekTotal}
 				<span class="bal"><WalletIcon size={12} /> {fmtBalance(deepseekTotal.total_balance)} {deepseekTotal.currency}</span>
+			{:else if provider.id === 'monoize' && monoizeUser && monoizeTotal}
+				<span class="bal"><WalletIcon size={12} /> {monoizeUser.username} · {fmtBalance(monoizeTotal.total_balance)} {monoizeTotal.currency}</span>
 			{:else if authed && provider.id === 'monoize' && monoizeTotal}
 				<span class="bal"><WalletIcon size={12} /> {fmtBalance(monoizeTotal.total_balance)} {monoizeTotal.currency}</span>
+			{:else if provider.id === 'monoize' && !monoizeUser && !authed}
+				<span class="stat">{t('settings.account.notLoggedIn')}</span>
 			{:else if authed}
 				<span class="stat ok">{provider.id === 'lynshen' ? t('settings.account.loggedIn') : t('settings.account.keyed')}</span>
 			{:else}
 				<span class="stat">{provider.id === 'lynshen' ? t('settings.account.notLoggedIn') : t('settings.account.notKeyed')}</span>
 			{/if}
-			{#if provider.id === 'lynshen' && !authed}
+			{#if (provider.id === 'lynshen' || (provider.id === 'monoize' && !monoizeUser)) && !authed}
 				<SignInIcon size={15} class="dimx" />
 			{:else}
 				<CaretDownIcon size={16} class="chev {open ? 'up' : ''}" />
@@ -120,16 +132,33 @@
 					<Button variant="primary" size="sm" onclick={onLogin}><SignInIcon size={13} /> {t('settings.account.relogin')}</Button>
 					<Button variant="danger" size="sm" onclick={() => onLogout('lynshen')}><SignOutIcon size={13} /> {t('settings.account.logout')}</Button>
 				</div>
-			{:else}
-				{#if provider.id === 'deepseek' && authed}
-					<ProviderBalance balance={deepseekBal} />
-				{/if}
-				{#if provider.id === 'monoize' && authed}
+			{:else if provider.id === 'monoize'}
+				{#if monoizeUser}
+					<ProviderBalance balance={monoizeBal} />
+					{#if monoizeModelsMsg}<p class="mmsg">{monoizeModelsMsg}</p>{/if}
+					<div class="cardact">
+						{#if !isDefault}<Button variant="secondary" size="sm" onclick={() => onSetDefault(provider)}>{t('settings.account.setDefault')}</Button>{/if}
+						<Button size="sm" onclick={onOpenSquare}><ListChecksIcon size={13} /> {t('settings.monoize.square')}</Button>
+						<Button size="sm" onclick={onRefreshModels}><ArrowClockwiseIcon size={13} /> {t('settings.account.refreshModels')}</Button>
+						<Button variant="danger" size="sm" onclick={onMonoizeLogout}><SignOutIcon size={13} /> {t('settings.account.logout')}</Button>
+					</div>
+					<p class="mmsg">{t('settings.monoize.managedKey')}</p>
+				{:else if authed}
 					<ProviderBalance balance={monoizeBal} />
 					<div class="mrow">
 						<Button variant="secondary" size="sm" onclick={onRefreshModels}><ArrowClockwiseIcon size={13} /> {t('settings.account.refreshModels')}</Button>
 						{#if monoizeModelsMsg}<span class="mmsg">{monoizeModelsMsg}</span>{/if}
 					</div>
+					<p class="mmsg">{t('settings.monoize.managedKeyOptional')}</p>
+				{:else}
+					<p class="mmsg">{t('settings.monoize.loginHint')}</p>
+					<div class="cardact">
+						<Button variant="primary" size="sm" onclick={onOpenMonoizeLogin}><SignInIcon size={13} /> {t('settings.monoize.loginRegister')}</Button>
+					</div>
+				{/if}
+			{:else}
+				{#if provider.id === 'deepseek' && authed}
+					<ProviderBalance balance={deepseekBal} />
 				{/if}
 				<div class="ekey">
 					<TextField bind:value={keyInput} type="password" placeholder={t('settings.account.keyPlaceholder', { id: provider.id })} mono />

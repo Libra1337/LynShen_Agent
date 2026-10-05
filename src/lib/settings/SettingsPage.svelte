@@ -37,8 +37,16 @@
 		fetchDeepseekBalance,
 		fetchMonoizeBalance,
 		fetchMonoizeModels,
+		monoizeRegister,
+		monoizeLogin,
+		monoizeLogout,
+		monoizeSession,
+		monoizeMarketplace,
 		type AccountInfo,
-		type DeepseekBalance
+		type DeepseekBalance,
+		type MonoizeUser,
+		type MonoizeMarketplaceModel,
+		monoizeModelEntries
 	} from '$lib/protocol';
 	import { dispatch } from '$lib/backends/router';
 	import { caps } from '$lib/backends';
@@ -346,6 +354,7 @@
 		loaded = true;
 		keyed = (await readAuthProviders()) ?? [];
 		loadBalances();
+		loadMonoizeSession();
 		builtin = (await listProviders().catch(() => [])) ?? [];
 		try {
 			custom = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]');
@@ -530,12 +539,118 @@
 		}
 	}
 
+	// ---------- Monoize account: login / register / model square ----------
+	// 登录成功后由 Rust 侧自动创建仅客户端使用的 key（providers.monoize），
+	// 界面不展示也不可复制；退出登录时在网关侧吊销。
+	let monoizeUser = $state<MonoizeUser | null>(null);
+	let monoizeForm = $state<{ mode: 'login' | 'register'; username: string; password: string; error: string; busy: boolean }>({
+		mode: 'login',
+		username: '',
+		password: '',
+		error: '',
+		busy: false
+	});
+	let squareOpen = $state(false);
+	let squareModels = $state<MonoizeMarketplaceModel[] | null>(null);
+	let squareBusy = $state(false);
+	let squareSyncMsg = $state('');
+
+	async function loadMonoizeSession() {
+		try {
+			const s = await monoizeSession();
+			monoizeUser = s.logged_in && s.session ? s.session.user : null;
+		} catch {
+			monoizeUser = null;
+		}
+	}
+
+	async function doMonoizeAuth() {
+		if (monoizeForm.busy) return;
+		if (!monoizeForm.username.trim() || !monoizeForm.password) {
+			monoizeForm.error = t('settings.monoize.needCredentials');
+			return;
+		}
+		monoizeForm.busy = true;
+		monoizeForm.error = '';
+		try {
+			const r =
+				monoizeForm.mode === 'login'
+					? await monoizeLogin(monoizeForm.username.trim(), monoizeForm.password)
+					: await monoizeRegister(monoizeForm.username.trim(), monoizeForm.password);
+			monoizeUser = r.user;
+			keyed = (await readAuthProviders()) ?? [];
+			loadBalances();
+			editing = null;
+			monoizeForm = { ...monoizeForm, password: '', busy: false };
+		} catch (e) {
+			monoizeForm = { ...monoizeForm, error: String(e), busy: false };
+		}
+	}
+
+	async function doMonoizeLogout() {
+		try {
+			await monoizeLogout();
+		} catch {
+			/* 网关不可达也要清掉本地 */
+		}
+		monoizeUser = null;
+		keyed = (await readAuthProviders()) ?? [];
+		loadBalances();
+	}
+
+	async function openMonoizeSquare() {
+		squareOpen = true;
+		squareSyncMsg = '';
+		if (!squareModels) {
+			squareBusy = true;
+			try {
+				squareModels = await monoizeMarketplace();
+			} catch (e) {
+				squareModels = [];
+				squareSyncMsg = String(e);
+			} finally {
+				squareBusy = false;
+			}
+		}
+	}
+
+	// 把模型广场的分组内模型同步为 provider 的模型列表（保留已有的窗口/efforts）。
+	// 跨分组同名模型展开为多条 `模型@分组`；网关侧重写规则会剥掉 @后缀。
+	async function syncSquareModels() {
+		if (!squareModels?.length) return;
+		const entry = custom.find((c) => c.id === 'monoize');
+		if (!entry) {
+			squareSyncMsg = t('settings.account.refreshNeedProvider');
+			return;
+		}
+		const known = new Map(entry.models.map((m) => [m.name, m]));
+		entry.models = squareModels.flatMap((m) =>
+			monoizeModelEntries(m).map((name) => {
+				const existing = known.get(name) ?? known.get(m.model_id);
+				if (existing && known.has(name)) return existing;
+				return {
+					name,
+					...(m.max_input_tokens ? { context_window: m.max_input_tokens } : {}),
+					...(m.max_output_tokens ? { max_output_tokens: m.max_output_tokens } : {})
+				};
+			})
+		);
+		custom = [...custom];
+		persistCustom();
+		squareSyncMsg = t('settings.account.refreshed', { count: entry.models.length });
+	}
+
 	// Card click: not-logged-in lynshen kicks off OAuth directly (no expand); other
 	// (key-based) providers expand to reveal the key input. Logged-in cards expand
 	// to show details.
 	function cardClick(p: Provider, authed: boolean) {
 		if (p.id === 'lynshen' && !authed) {
 			if (!loggingIn) login();
+			return;
+		}
+		if (p.id === 'monoize' && !authed && !monoizeUser) {
+			monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false };
+			editing = '__monoize__';
 			return;
 		}
 		toggleEdit(p.id);
@@ -773,6 +888,7 @@
 								{monoizeBal}
 								{monoizeTotal}
 								{monoizeModelsMsg}
+								{monoizeUser}
 								bind:keyInput
 								{cap}
 								onCardClick={cardClick}
@@ -782,6 +898,12 @@
 								onSetDefault={selectProvider}
 								onDelete={deleteProvider}
 								onRefreshModels={refreshMonoizeModels}
+								onOpenMonoizeLogin={() => {
+									monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false };
+									editing = '__monoize__';
+								}}
+								onMonoizeLogout={doMonoizeLogout}
+								onOpenSquare={openMonoizeSquare}
 							/>
 						{/each}
 						<button class="addrow" id="set-provider-add" onclick={openCreate}><PlusIcon size={16} /> {t('settings.custom.add')}</button>
@@ -827,7 +949,67 @@
 							{/if}
 						</Modal>
 					{/if}
-				{:else if current === 'models'}
+					{#if editing === '__monoize__'}
+						<Modal title={monoizeForm.mode === 'login' ? t('settings.monoize.loginTitle') : t('settings.monoize.registerTitle')} width={440} padded={false} onClose={() => (editing = null)}>
+							<div class="keystep">
+								<div class="keyhead">
+									<span class="tile"><Vendor provider="monoize" size={18} /></span>
+									<span class="keytxt">
+										<span class="keyname">{t('settings.monoize.account')}</span>
+										<span class="keyurl">https://www.lynshen.org</span>
+									</span>
+								</div>
+								<TextField bind:value={monoizeForm.username} mono placeholder={t('settings.monoize.username')} />
+								<TextField bind:value={monoizeForm.password} type="password" mono placeholder={t('settings.monoize.password')} />
+								{#if monoizeForm.error}<p class="mferr">{monoizeForm.error}</p>{/if}
+								<p class="mfhint">{t('settings.monoize.keyHint')}</p>
+								<div class="keyfoot">
+									<Button variant="ghost" size="sm" onclick={() => (monoizeForm = { ...monoizeForm, mode: monoizeForm.mode === 'login' ? 'register' : 'login', error: '' })}>
+										{monoizeForm.mode === 'login' ? t('settings.monoize.toRegister') : t('settings.monoize.toLogin')}
+									</Button>
+									<Button variant="primary" size="sm" disabled={monoizeForm.busy} onclick={doMonoizeAuth}>
+										{monoizeForm.busy ? t('settings.monoize.working') : monoizeForm.mode === 'login' ? t('settings.monoize.login') : t('settings.monoize.register')}
+									</Button>
+								</div>
+							</div>
+						</Modal>
+					{/if}
+					{#if squareOpen}
+						<Modal title={t('settings.monoize.squareTitle')} width={620} padded={false} onClose={() => (squareOpen = false)}>
+							<div class="square">
+								<p class="mfhint">{t('settings.monoize.squareHint')}</p>
+								{#if squareBusy}
+									<p class="mfhint">{t('settings.account.refreshing')}</p>
+								{:else if squareModels?.length}
+									<div class="sqhead">
+										<span>{t('settings.monoize.modelCount', { count: squareModels.reduce((n, m) => n + monoizeModelEntries(m).length, 0) })}</span>
+										<span class="sqactions">
+											<Button variant="secondary" size="sm" onclick={syncSquareModels}>{t('settings.monoize.syncModels')}</Button>
+										</span>
+									</div>
+								<div class="sqgrid">
+									{#each squareModels as m (m.model_id)}
+										{#each monoizeModelEntries(m) as name}
+											<div class="sqrow">
+												<span class="sqname"><Vendor model={m.model_id} size={14} /> {name}</span>
+												<span class="sqmeta">
+													{#if m.max_input_tokens}{fmt(m.max_input_tokens)}{/if}
+													{#if m.input_cost_per_token_nano != null && m.output_cost_per_token_nano != null}
+														 · ${(Number(m.input_cost_per_token_nano) / 1e9 * 1e6).toFixed(2)} / ${(Number(m.output_cost_per_token_nano) / 1e9 * 1e6).toFixed(2)} /M
+													{/if}
+												</span>
+											</div>
+										{/each}
+									{/each}
+								</div>
+								{:else}
+									<p class="mfhint">{squareSyncMsg || t('settings.account.noBalance')}</p>
+								{/if}
+								{#if squareSyncMsg && squareModels?.length}<p class="mfhint">{squareSyncMsg}</p>{/if}
+							</div>
+						</Modal>
+					{/if}
+					{:else if current === 'models'}
 					<SettingsSection title={t('settings.page.defaults')} description={t('settings.footHint')}>
 						<SettingsRow id="default-model" title={t('settings.behavior.defaultModel')} description={allModelOpts.length ? t('settings.page.defaultModelDesc') : t('settings.behavior.noModels')}>
 							<div class="w-lg">
@@ -1250,6 +1432,68 @@
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
+	}
+
+	/* Monoize 登录 / 模型广场 */
+	.mferr {
+		margin: 0;
+		font-size: var(--fs-xs);
+		color: var(--danger, #e5484d);
+		word-break: break-all;
+	}
+	.mfhint {
+		margin: 0;
+		font-size: var(--fs-xs);
+		color: var(--dim);
+	}
+	.square {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		padding: 14px 18px 16px;
+	}
+	.sqhead {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-size: var(--fs-xs);
+		color: var(--dim);
+	}
+	.sqgrid {
+		display: flex;
+		flex-direction: column;
+		max-height: 340px;
+		overflow: auto;
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-md);
+	}
+	.sqrow {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 7px 12px;
+		border-bottom: 1px solid var(--hairline);
+		font-size: var(--fs-sm);
+	}
+	.sqrow:last-child {
+		border-bottom: none;
+	}
+	.sqname {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-family: var(--font-mono);
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.sqmeta {
+		font-size: var(--fs-2xs);
+		color: var(--dim);
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
 	}
 
 	/* option rows in the model / provider pickers */
