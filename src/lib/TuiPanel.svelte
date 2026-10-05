@@ -1,5 +1,5 @@
 <script lang="ts">
-	// A native TUI panel: the real interactive CLI (jucode / codex / claude)
+	// A native TUI panel: the real interactive CLI (lynshen / codex / claude)
 	// running in a pty, rendered by xterm. Two uses: a standalone `tui:*` tab
 	// (no args, independent of any GUI session) and a session handoff, where
 	// the chat tile hands its conversation over via resume argv / a `/resume`
@@ -32,7 +32,7 @@
 		/** Session-handoff resume argv (must match the Rust TUI allowlist,
 		 *  e.g. `['--resume', '<id>']`). Empty for standalone TUI tabs. */
 		args?: string[];
-		/** Line written into the pty once it is running — the jucode TUI has
+		/** Line written into the pty once it is running — the lynshen TUI has
 		 *  no resume argv and resumes via `/resume <id>\n` instead. */
 		resumeCommand?: string;
 		/** Present only for session handoffs: hand the conversation back to
@@ -81,7 +81,7 @@
 				return;
 			}
 			status = 'running';
-			// Session handoff into the jucode TUI: resume the conversation with
+			// Session handoff into the lynshen TUI: resume the conversation with
 			// its slash command (the pty buffers the line until the TUI reads).
 			if (resumeCommand) ptyWrite(launchId, resumeCommand).catch(() => {});
 		} catch (e) {

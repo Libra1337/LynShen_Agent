@@ -1,7 +1,7 @@
 <script lang="ts">
 	// The desk's content: questions and pending actions waiting for the user,
 	// which agents are working, the next scheduled runs, and their reports. Everything comes from the
-	// jucode daemon through agentDirectory. Shown on the desktop's workbench
+	// lynshen daemon through agentDirectory. Shown on the desktop's workbench
 	// and on the remote page. With `agent`, only that agent's pending items
 	// (its page shows the rest as activity).
 	import FileTextIcon from 'phosphor-svelte/lib/FileTextIcon';

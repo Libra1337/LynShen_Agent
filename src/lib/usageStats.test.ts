@@ -13,20 +13,20 @@ function makeStorage(initial: Record<string, string> = {}) {
 const tokens = (input: number, output: number, cost?: string) => ({ ...EMPTY_TOKENS, input_tokens: input, output_tokens: output, turns: 1, ...(cost ? { cost } : {}) });
 
 describe('groupChannels', () => {
-	it('groups by kind, JuCode by group, the rest by provider', () => {
+	it('groups by kind, LynShen by group, the rest by provider', () => {
 		const groups = groupChannels([
-			{ channel_kind: 'jucode', channel: 'jucode', group: 'claude-max', ...tokens(10, 1, '0.5') },
-			{ channel_kind: 'jucode', channel: 'jucode', group: '', ...tokens(30, 3, '0.25') },
+			{ channel_kind: 'lynshen', channel: 'lynshen', group: 'claude-max', ...tokens(10, 1, '0.5') },
+			{ channel_kind: 'lynshen', channel: 'lynshen', group: '', ...tokens(30, 3, '0.25') },
 			{ channel_kind: 'local', channel: 'anthropic', ...tokens(5, 5) },
 			{ channel_kind: 'third_party', channel: 'kimi-code', ...tokens(7, 0) },
 			{ channel_kind: 'legacy', channel: 'anthropic', ...tokens(2, 0) }
 		]);
-		expect(groups.map((g) => g.kind)).toEqual(['jucode', 'third_party', 'local', 'legacy']);
-		const jucode = groups[0];
-		expect(jucode.rows.map((r) => r.key)).toEqual(['', 'claude-max']);
-		expect(jucode.usage.input_tokens).toBe(40);
-		expect(Number(jucode.usage.cost)).toBeCloseTo(0.75);
-		expect(jucode.usage.turns).toBe(2);
+		expect(groups.map((g) => g.kind)).toEqual(['lynshen', 'third_party', 'local', 'legacy']);
+		const lynshen = groups[0];
+		expect(lynshen.rows.map((r) => r.key)).toEqual(['', 'claude-max']);
+		expect(lynshen.usage.input_tokens).toBe(40);
+		expect(Number(lynshen.usage.cost)).toBeCloseTo(0.75);
+		expect(lynshen.usage.turns).toBe(2);
 		expect(groups[2].rows[0].key).toBe('anthropic');
 	});
 });
@@ -39,19 +39,19 @@ describe('dayRange', () => {
 
 describe('importLegacyUsage', () => {
 	it('hands the old counts to the daemon once and forgets them', async () => {
-		const days = { '2026-09-30': { in: 10, out: 2, prov: { jucode: { in: 10, out: 2 } } } };
-		(globalThis as { localStorage: Storage }).localStorage = makeStorage({ 'jucode-usage-daily': JSON.stringify(days) });
+		const days = { '2026-09-30': { in: 10, out: 2, prov: { lynshen: { in: 10, out: 2 } } } };
+		(globalThis as { localStorage: Storage }).localStorage = makeStorage({ 'lynshen-usage-daily': JSON.stringify(days) });
 		const request = vi.fn(async () => ({ imported: true }));
 		await importLegacyUsage(request);
 		expect(request).toHaveBeenCalledWith({ op: 'usage_import_legacy', days });
-		expect(localStorage.getItem('jucode-usage-daily')).toBeNull();
+		expect(localStorage.getItem('lynshen-usage-daily')).toBeNull();
 		await importLegacyUsage(request);
 		expect(request).toHaveBeenCalledTimes(1);
 	});
 
 	it('keeps the old counts when the daemon cannot take them', async () => {
-		(globalThis as { localStorage: Storage }).localStorage = makeStorage({ 'jucode-usage-daily': '{"2026-09-30":{"in":1,"out":1}}' });
+		(globalThis as { localStorage: Storage }).localStorage = makeStorage({ 'lynshen-usage-daily': '{"2026-09-30":{"in":1,"out":1}}' });
 		await expect(importLegacyUsage(async () => Promise.reject(new Error('offline')))).rejects.toThrow('offline');
-		expect(localStorage.getItem('jucode-usage-daily')).not.toBeNull();
+		expect(localStorage.getItem('lynshen-usage-daily')).not.toBeNull();
 	});
 });

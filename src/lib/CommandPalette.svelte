@@ -126,8 +126,8 @@
 			{ id: 'settings', label: t('shell.cmd.settings'), keys: shortcutLabel('settings'), icon: SettingsIcon, keywords: t('shell.cmd.settingsKw'), run: wrap(onSettings) },
 			{ id: 'feedback', label: t('shell.cmd.feedback'), icon: ChatCircleTextIcon, keywords: t('shell.cmd.feedbackKw'), run: wrap(onFeedback) },
 			{ id: 'setup', label: t('shell.cmd.setup'), hint: t('shell.cmd.setupHint'), icon: WrenchIcon, keywords: t('shell.cmd.setupKw'), run: wrap(() => onSetup()) },
-			// Debug builds only: VITE_JUCODE_DEBUG=1 when running or building.
-			...(import.meta.env.VITE_JUCODE_DEBUG === '1'
+			// Debug builds only: VITE_LYNSHEN_DEBUG=1 when running or building.
+			...(import.meta.env.VITE_LYNSHEN_DEBUG === '1'
 				? [{ id: 'setup-login', label: t('shell.cmd.setupLogin'), hint: t('shell.cmd.setupLoginHint'), icon: WrenchIcon, keywords: t('shell.cmd.setupLoginKw'), run: wrap(() => onSetup('login')) }]
 				: []),
 			{ id: 'sidebar', label: t('shell.cmd.sidebar'), keys: shortcutLabel('sidebar'), icon: SidebarSimpleIcon, keywords: t('shell.cmd.sidebarKw'), run: wrap(onToggleSidebar) },

@@ -1,12 +1,12 @@
 // Coding-agent usage. The daemon records every turn whatever engine ran it
-// (JuCode-CLI crates/daemon/src/usage.rs) and uploads it to the account, so
+// (LynShen-CLI crates/daemon/src/usage.rs) and uploads it to the account, so
 // the views read the daemon (this computer, with projects) or the account
 // (every computer). This module holds what they share, and hands the per-day
 // counts older versions kept in localStorage to the daemon once.
 
 import type { ChannelKind, UsageSummary, UsageTokens } from './protocol';
 
-const LEGACY_KEY = 'jucode-usage-daily';
+const LEGACY_KEY = 'lynshen-usage-daily';
 
 export const fmtTokens = (n: number) =>
 	n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
@@ -60,12 +60,12 @@ function add(a: UsageTokens, b: UsageTokens): UsageTokens {
 }
 
 /** Display order of the channel kinds. */
-export const CHANNEL_KINDS: ChannelKind[] = ['jucode', 'third_party', 'local', 'legacy'];
+export const CHANNEL_KINDS: ChannelKind[] = ['lynshen', 'third_party', 'local', 'legacy'];
 
 export interface ChannelGroup {
 	kind: ChannelKind;
 	usage: UsageTokens;
-	/** JuCode: one row per group ('' = the gateway's default); the others:
+	/** LynShen: one row per group ('' = the gateway's default); the others:
 	 *  one per provider. Largest first. */
 	rows: { key: string; usage: UsageTokens }[];
 }
@@ -75,7 +75,7 @@ export function groupChannels(rows: UsageSummary['by_channel']): ChannelGroup[] 
 	const groups = new Map<ChannelKind, Map<string, UsageTokens>>();
 	for (const row of rows) {
 		const kind = CHANNEL_KINDS.includes(row.channel_kind) ? row.channel_kind : 'local';
-		const key = kind === 'jucode' ? (row.group ?? '') : row.channel;
+		const key = kind === 'lynshen' ? (row.group ?? '') : row.channel;
 		const sub = groups.get(kind) ?? new Map<string, UsageTokens>();
 		sub.set(key, add(sub.get(key) ?? EMPTY_TOKENS, row));
 		groups.set(kind, sub);

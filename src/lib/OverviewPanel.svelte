@@ -2,7 +2,7 @@
 	// Usage page: the coding agent's token usage over a chosen range — totals,
 	// a daily bar chart (hover for the day's numbers) and the split by channel,
 	// model, agent, device or project. "All devices" is the account's record of
-	// every computer (cost from the JuCode gateway); "This computer" is the
+	// every computer (cost from the LynShen gateway); "This computer" is the
 	// daemon's, which also knows the project of each turn.
 	import { onMount } from 'svelte';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
@@ -27,7 +27,7 @@
 	let hover = $state<number | null>(null);
 	let summary = $state<UsageSummary | null>(null);
 	let error = $state('');
-	let expanded = $state<Record<string, boolean>>({ jucode: true });
+	let expanded = $state<Record<string, boolean>>({ lynshen: true });
 	let ready = $state(false);
 
 	async function load(s: Scope, days: number) {
@@ -90,10 +90,10 @@
 	});
 	const rowsTotal = $derived(totalTokens(totals) || 1);
 
-	const ENGINE_NAMES: Record<string, string> = { jucode: 'JuCode', claude: 'Claude Code', codex: 'Codex', acp: 'ACP' };
+	const ENGINE_NAMES: Record<string, string> = { lynshen: 'LynShen', claude: 'Claude Code', codex: 'Codex', acp: 'ACP' };
 	const engineName = (key: string) => ENGINE_NAMES[key] ?? key;
 	const KIND_KEYS: Record<string, string> = {
-		jucode: 'settings.overview.kindJucode',
+		lynshen: 'settings.overview.kindLynShen',
 		third_party: 'settings.overview.kindThirdParty',
 		local: 'settings.overview.kindLocal',
 		legacy: 'settings.overview.kindLegacy'
@@ -232,8 +232,8 @@
 						{#each g.rows as r (r.key)}
 							<div class="tr sub">
 								<span class="name">
-									<span class="ico">{#if g.kind !== 'jucode'}<Vendor provider={r.key} size={16} />{/if}</span>
-									<span class="nm">{g.kind === 'jucode' ? r.key || t('settings.overview.defaultGroup') : r.key}</span>
+									<span class="ico">{#if g.kind !== 'lynshen'}<Vendor provider={r.key} size={16} />{/if}</span>
+									<span class="nm">{g.kind === 'lynshen' ? r.key || t('settings.overview.defaultGroup') : r.key}</span>
 								</span>
 								{@render cells(r.usage)}
 							</div>

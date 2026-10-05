@@ -113,11 +113,11 @@ describe('parseWorktreeList', () => {
 		'HEAD 1111111111111111111111111111111111111111',
 		'branch refs/heads/main',
 		'',
-		'worktree /Users/me/dev/.jucode-worktrees/repo/fix-login',
+		'worktree /Users/me/dev/.lynshen-worktrees/repo/fix-login',
 		'HEAD 2222222222222222222222222222222222222222',
 		'branch refs/heads/task/fix-login',
 		'',
-		'worktree /Users/me/dev/.jucode-worktrees/repo/gone-task',
+		'worktree /Users/me/dev/.lynshen-worktrees/repo/gone-task',
 		'HEAD 3333333333333333333333333333333333333333',
 		'detached',
 		'prunable gitdir file points to non-existent location',
@@ -129,7 +129,7 @@ describe('parseWorktreeList', () => {
 		expect(entries).toHaveLength(3);
 		expect(entries[0]).toMatchObject({ path: '/Users/me/dev/repo', branch: 'main', detached: false, prunable: false });
 		expect(entries[1]).toMatchObject({
-			path: '/Users/me/dev/.jucode-worktrees/repo/fix-login',
+			path: '/Users/me/dev/.lynshen-worktrees/repo/fix-login',
 			head: '2222222222222222222222222222222222222222',
 			branch: 'task/fix-login'
 		});
@@ -149,13 +149,13 @@ describe('parseWorktreeList', () => {
 	});
 
 	it('filters task worktrees by container dir and derives slugs', () => {
-		const tasks = taskWorktrees(parseWorktreeList(porcelain), '/Users/me/dev/.jucode-worktrees/repo');
+		const tasks = taskWorktrees(parseWorktreeList(porcelain), '/Users/me/dev/.lynshen-worktrees/repo');
 		expect(tasks.map((t) => t.slug)).toEqual(['fix-login', 'gone-task']);
 		// 主工作树不在容器目录下，被排除
 		expect(tasks.some((t) => t.path === '/Users/me/dev/repo')).toBe(false);
 		// 嵌套/非法 slug 路径被排除
-		const nested = parseWorktreeList('worktree /Users/me/dev/.jucode-worktrees/repo/a/b\nHEAD 4444\n');
-		expect(taskWorktrees(nested, '/Users/me/dev/.jucode-worktrees/repo')).toEqual([]);
+		const nested = parseWorktreeList('worktree /Users/me/dev/.lynshen-worktrees/repo/a/b\nHEAD 4444\n');
+		expect(taskWorktrees(nested, '/Users/me/dev/.lynshen-worktrees/repo')).toEqual([]);
 	});
 });
 

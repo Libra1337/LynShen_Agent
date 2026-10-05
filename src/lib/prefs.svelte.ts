@@ -2,7 +2,7 @@
 // from engine/backend settings — these are pure UI choices.
 import { invoke } from '@tauri-apps/api/core';
 
-const KEY = 'jucode-prefs';
+const KEY = 'lynshen-prefs';
 
 type PrefsShape = {
 	/** Clicking an .html/.htm link in chat opens it in the built-in browser

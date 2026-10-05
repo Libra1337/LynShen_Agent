@@ -1,6 +1,6 @@
 # 凭据静态加密（auth.json）
 
-桌面端会把 provider 的 API key 和 JuCode 的 OAuth token 写进 `~/.jucode/auth.json`。
+桌面端会把 provider 的 API key 和 LynShen 的 OAuth token 写进 `~/.lynshen/auth.json`。
 默认它们是明文。打开 `encrypt_secrets` 之后，桌面端在**下一次写入** `auth.json` 时
 会把这些字段就地加密。
 
@@ -20,17 +20,17 @@
 
 ## 默认关闭的原因
 
-`~/.jucode/auth.json` 是和 `jucode` CLI 引擎**共享**的文件：引擎自己也会读里面的
+`~/.lynshen/auth.json` 是和 `lynshen` CLI 引擎**共享**的文件：引擎自己也会读里面的
 provider key 和 OAuth token，而且桌面端驱动的是用户机器上任意版本的 CLI
 （应用不再内置引擎）。CLI 不认识这里的密文封装格式，所以默认开启会让引擎直接
 拿到一串密文当 API key 用，聊天和登录全断。
 
-因此：**只有当你只通过桌面端使用引擎、不直接跑 `jucode` 命令行时，才建议打开。**
+因此：**只有当你只通过桌面端使用引擎、不直接跑 `lynshen` 命令行时，才建议打开。**
 等 CLI 侧支持同一套封装格式后，这个开关可以改成默认开启。
 
 ## 打开 / 关闭
 
-在 `~/.jucode/config.json` 里加一个顶层布尔字段：
+在 `~/.lynshen/config.json` 里加一个顶层布尔字段：
 
 ```json
 {
@@ -54,9 +54,9 @@ provider 的 key、退出登录、或者 OAuth access token 到期自动续期�
 只加密凭据本身：
 
 - `providers.*` 的每一个字符串值（各家 API key）
-- `jucode.access_token`、`jucode.refresh_token`
+- `lynshen.access_token`、`lynshen.refresh_token`
 
-`jucode.access_expires_at` 之类的记账字段保持明文，这样"登录状态""要不要续期"
+`lynshen.access_expires_at` 之类的记账字段保持明文，这样"登录状态""要不要续期"
 这些判断不需要密钥也能做。
 
 ## 格式
@@ -78,13 +78,13 @@ jcenc1:<base64(nonce ‖ ciphertext‖tag)>
 
 ## 密钥所在目录
 
-和 Tauri 的 `app_config_dir()` 一致（bundle identifier `com.jucode.desktop`）：
+和 Tauri 的 `app_config_dir()` 一致（bundle identifier `com.lynshen.desktop`）：
 
 | 平台    | 路径                                                          |
 | ------- | ------------------------------------------------------------- |
-| macOS   | `~/Library/Application Support/com.jucode.desktop/secret.key` |
-| Linux   | `$XDG_CONFIG_HOME/com.jucode.desktop/secret.key`（默认 `~/.config/...`） |
-| Windows | `%APPDATA%\com.jucode.desktop\secret.key`                     |
+| macOS   | `~/Library/Application Support/com.lynshen.desktop/secret.key` |
+| Linux   | `$XDG_CONFIG_HOME/com.lynshen.desktop/secret.key`（默认 `~/.config/...`） |
+| Windows | `%APPDATA%\com.lynshen.desktop\secret.key`                     |
 
 `0600` 只在 Unix 上生效；Windows 依赖 `%APPDATA%` 本身的用户目录 ACL。
 

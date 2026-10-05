@@ -24,7 +24,7 @@
 	let installDir = $state('');
 	let query = $state('');
 	let tag = $state('');
-	let source = $state<'all' | 'jucode' | 'anthropic' | 'installed'>('all');
+	let source = $state<'all' | 'lynshen' | 'anthropic' | 'installed'>('all');
 	let installing = $state<Record<string, boolean>>({});
 
 	const tags = $derived([...new Set(skills.flatMap((s) => s.tags))].sort());
@@ -92,7 +92,7 @@
 
 		<div class="chips sources" aria-label={t('settings.marketplace.sourceFilter')}>
 			<Chip selected={source === 'all'} onclick={() => (source = 'all')}>{t('settings.marketplace.all')}</Chip>
-			<Chip selected={source === 'jucode'} onclick={() => (source = 'jucode')}>JuCode</Chip>
+			<Chip selected={source === 'lynshen'} onclick={() => (source = 'lynshen')}>LynShen</Chip>
 			<Chip selected={source === 'anthropic'} onclick={() => (source = 'anthropic')}>Anthropic</Chip>
 			<Chip selected={source === 'installed'} onclick={() => (source = 'installed')}>{t('settings.marketplace.installed')}</Chip>
 		</div>
@@ -123,7 +123,7 @@
 							<div class="card">
 								<div class="card-top">
 									<span class="name">{s.name}</span>
-									<span class="source">{s.source === 'anthropic' ? 'Anthropic' : 'JuCode'}</span>
+									<span class="source">{s.source === 'anthropic' ? 'Anthropic' : 'LynShen'}</span>
 									{#if s.isDefault}<span class="badge">{t('settings.account.default')}</span>{/if}
 								</div>
 								<p class="desc">{s.description}</p>

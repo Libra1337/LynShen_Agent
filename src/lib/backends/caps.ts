@@ -1,5 +1,5 @@
 // What each backend's sessions can do in the UI. The daemon runs every
-// backend and translates it into the jucode protocol; these flags say which
+// backend and translates it into the lynshen protocol; these flags say which
 // of the protocol's features the engine behind it actually supports.
 
 import type { BackendCaps } from './types';
@@ -68,7 +68,7 @@ export const ACP_CAPS: BackendCaps = {
 	contextUsage: false, // no usage/context telemetry in ACP v1
 	compact: false,
 	modelPicker: false, // session/set_model is optional; kept off until provable
-	resume: false, // session/load is optional (jucode acp: loadSession false)
+	resume: false, // session/load is optional (lynshen acp: loadSession false)
 	subagents: false,
 	transcriptReplay: false,
 	slashCommands: false, // available_commands have no invocation RPC (prompt text only)

@@ -12,7 +12,7 @@
 import { build, files, version } from '$service-worker';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
-const CACHE = `jucode-shell-${version}`;
+const CACHE = `lynshen-shell-${version}`;
 const SHELL = '/remote';
 const PRECACHE = [SHELL, ...files.filter((f) => /^\/(manifest\.webmanifest|icon-\d+\.png|apple-touch-icon\.png|favicon\.png)$/.test(f))];
 const BUILD = new Set(build);
@@ -45,7 +45,7 @@ sw.addEventListener('push', (event) => {
 		data = { body: event.data?.text() };
 	}
 	event.waitUntil(
-		sw.registration.showNotification(data.title || 'JuCode', {
+		sw.registration.showNotification(data.title || 'LynShen', {
 			body: data.body ?? '',
 			tag: data.tag,
 			// A dispatch's later notice replaces its earlier one, and still alerts.
@@ -64,7 +64,7 @@ sw.addEventListener('notificationclick', (event) => {
 			const open = windows.find((w) => new URL(w.url).pathname.startsWith(SHELL));
 			if (!open) return sw.clients.openWindow(url);
 			// The open page shows what the notification is about (a requirement).
-			open.postMessage({ type: 'jucode-open', url });
+			open.postMessage({ type: 'lynshen-open', url });
 			return open.focus();
 		})
 	);

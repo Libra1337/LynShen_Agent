@@ -44,7 +44,7 @@
 		...offered.slice(0, 6).map((p) => ({ key: `p:${p.path}`, label: t('shell.requirement.startIn', { project: p.name }), icon: FolderIcon })),
 		...(requirement.projects.length
 			? [
-					...(['jucode', 'claude', 'codex'] as const).map((b) => ({
+					...(['lynshen', 'claude', 'codex'] as const).map((b) => ({
 						key: `b:${b}`,
 						label: t('shell.requirement.startWith', { engine: BACKEND_LABELS[b] }),
 						icon: CpuIcon

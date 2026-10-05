@@ -1,5 +1,5 @@
 <script lang="ts">
-	// The website's Signal Raster (JuCode-frontend src/components/SignalRaster.tsx):
+	// The website's Signal Raster (LynShen-frontend src/components/SignalRaster.tsx):
 	// two sine carriers drawn as a square dot field, bent toward the pointer.
 	// Same shader and colors; the site's scroll boost is dropped (nothing
 	// scrolls here) and the theme comes from data-theme instead of a class.

@@ -1,7 +1,7 @@
 // Pure packing of the in-chat model picker rows: the current engine's
-// model_view catalog plus (for jucode sessions) the models of every other
+// model_view catalog plus (for lynshen sessions) the models of every other
 // provider that has credentials, grouped for display; for Claude Code / Codex,
-// one list of what runs on this machine and on the JuCode gateway. Kept
+// one list of what runs on this machine and on the LynShen gateway. Kept
 // free of Svelte so the row shape stays unit-testable.
 
 export interface ModelRow {
@@ -31,23 +31,23 @@ export interface CatalogProvider {
 }
 
 export interface ModelGroupLabels {
-	jucode: string;
+	lynshen: string;
 	byok: string;
 }
 
 /** Context window as shown beside a model: 272K, 1M; empty when unknown. */
 export const fmtContext = (n?: number) =>
 	!n ? '' : n >= 1_000_000 ? `${+(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}K` : `${n}`;
-/** The group header already names jucode and the agent's own catalog; BYOK rows
+/** The group header already names lynshen and the agent's own catalog; BYOK rows
  *  from several providers share one group, so they keep the provider id. */
 const detailOf = (provider: string | null, ctx?: number) => [provider, fmtContext(ctx)].filter(Boolean).join(' · ');
-/** A JuCode gateway model whose window nobody configured says so (the user can
+/** A LynShen gateway model whose window nobody configured says so (the user can
  *  set one in the model settings) instead of showing nothing. */
-const jucodeDetail = (ctx: number | undefined, unsetWindow: string) => fmtContext(ctx) || unsetWindow;
+const lynshenDetail = (ctx: number | undefined, unsetWindow: string) => fmtContext(ctx) || unsetWindow;
 
 /**
  * A Claude Code / Codex model and where it runs: `local` is the engine's own
- * id for it (its catalog, on this machine's login or config), `jucode` the
+ * id for it (its catalog, on this machine's login or config), `lynshen` the
  * gateway's name. A model both offer is one entry (the engine's catalog
  * resolves aliases: "opus" is `claude-opus-5-5`).
  */
@@ -57,7 +57,7 @@ export interface ToolModel {
 	vendor: string;
 	context_window?: number;
 	local?: string;
-	jucode?: string;
+	lynshen?: string;
 	active: boolean;
 }
 
@@ -77,7 +77,7 @@ function claudeLabel(id: string): string {
 export function toolModels(
 	models: EngineModel[],
 	served: { name: string; display_name?: string | null; context_window?: number }[],
-	onJucode: boolean
+	onLynShen: boolean
 ): ToolModel[] {
 	const keyOf = (m: EngineModel) => m.vendor || m.model;
 	const running = models.find((m) => m.active);
@@ -85,7 +85,7 @@ export function toolModels(
 	for (const m of models) {
 		// A model the engine only marks as running runs here when the session
 		// is on this machine; on the gateway it is the gateway's.
-		if (m.listed === false && onJucode) continue;
+		if (m.listed === false && onLynShen) continue;
 		const key = keyOf(m);
 		if (byKey.has(key)) continue;
 		byKey.set(key, {
@@ -100,7 +100,7 @@ export function toolModels(
 	for (const g of served) {
 		const known = byKey.get(g.name);
 		if (known) {
-			known.jucode = g.name;
+			known.lynshen = g.name;
 			known.context_window ||= g.context_window;
 			continue;
 		}
@@ -109,7 +109,7 @@ export function toolModels(
 			label: g.display_name || (g.name.startsWith('claude-') ? claudeLabel(g.name) : g.name),
 			vendor: g.name,
 			context_window: g.context_window,
-			jucode: g.name,
+			lynshen: g.name,
 			active: false
 		});
 	}
@@ -124,7 +124,7 @@ export function toolModels(
 				label: running.label || running.model,
 				vendor: key,
 				context_window: running.context_window,
-				...(onJucode ? { jucode: running.model } : { local: running.model }),
+				...(onLynShen ? { lynshen: running.model } : { local: running.model }),
 				active: true
 			});
 	}
@@ -135,7 +135,7 @@ export function toolModels(
  * The active provider's rows come from the engine's model_view (already
  * filtered and flagged with the active model — the running engine resolved
  * its credentials, possibly from an env var); other providers come from the
- * client-side catalog, limited to the ones with credentials, so a jucode
+ * client-side catalog, limited to the ones with credentials, so a lynshen
  * session can switch to any of them.
  * Same-provider picks use /model (instant); cross-provider picks switch via
  * @switch (config rewrite + engine restart). Claude Code / Codex list
@@ -148,15 +148,15 @@ export function buildModelRows(input: {
 	provider: string;
 	providersList: CatalogProvider[];
 	/** Provider ids with credentials (read_auth_providers: a stored API key
-	 *  under auth.json `providers`, or `jucode` when logged in). Cross-provider
+	 *  under auth.json `providers`, or `lynshen` when logged in). Cross-provider
 	 *  rows for any other provider are dropped — the engine can't run them. */
 	configured: string[];
 	groups: ModelGroupLabels;
-	/** Claude/Codex: on this machine's config or the JuCode gateway. */
-	toolMode?: 'system' | 'jucode';
+	/** Claude/Codex: on this machine's config or the LynShen gateway. */
+	toolMode?: 'system' | 'lynshen';
 	/** Claude/Codex: what "this machine" is called beside a model. */
 	localLabel?: string;
-	/** Shown beside a JuCode model with no context window configured. */
+	/** Shown beside a LynShen model with no context window configured. */
 	unsetWindow?: string;
 }): ModelRow[] {
 	const {
@@ -171,58 +171,58 @@ export function buildModelRows(input: {
 		unsetWindow = ''
 	} = input;
 	if (backendId === 'claude' || backendId === 'codex') {
-		const onJucode = toolMode === 'jucode';
-		const served = configured.includes('jucode')
-			? (providersList.find((p) => p.id === 'jucode')?.models ?? [])
+		const onLynShen = toolMode === 'lynshen';
+		const served = configured.includes('lynshen')
+			? (providersList.find((p) => p.id === 'lynshen')?.models ?? [])
 			: [];
-		return toolModels(models, served, onJucode).map((m) => ({
+		return toolModels(models, served, onLynShen).map((m) => ({
 			id: m.key,
 			label: m.label,
 			vendor: m.vendor,
 			// The window first: a narrow menu truncates the detail from the end.
-			detail: [fmtContext(m.context_window), m.local !== undefined && localLabel, m.jucode !== undefined && 'JuCode']
+			detail: [fmtContext(m.context_window), m.local !== undefined && localLabel, m.lynshen !== undefined && 'LynShen']
 				.filter(Boolean)
 				.join(' · '),
 			active: m.active,
-			command: onJucode
-				? m.jucode !== undefined
-					? `/model ${m.jucode}`
+			command: onLynShen
+				? m.lynshen !== undefined
+					? `/model ${m.lynshen}`
 					: `@tool system ${m.local}`
 				: m.local !== undefined
 					? `/model ${m.local}`
-					: `@tool jucode ${m.jucode}`,
+					: `@tool lynshen ${m.lynshen}`,
 			depth: undefined
 		}));
 	}
-	const activeGroup = cur === 'jucode' ? groups.jucode : groups.byok;
+	const activeGroup = cur === 'lynshen' ? groups.lynshen : groups.byok;
 	const activeRows: ModelRow[] = models.map((m) => ({
 		id: `${cur}::${m.model}`,
 		label: m.label || m.model,
 		vendor: m.vendor || m.model,
 		detail:
-			cur === 'jucode'
-				? jucodeDetail(m.context_window, unsetWindow)
+			cur === 'lynshen'
+				? lynshenDetail(m.context_window, unsetWindow)
 				: detailOf(activeGroup === groups.byok ? cur : null, m.context_window),
 		active: m.active,
 		command: `/model ${m.model}`,
 		depth: undefined,
 		group: activeGroup
 	}));
-	const otherRows: ModelRow[] = (backendId !== 'jucode' ? [] : providersList)
+	const otherRows: ModelRow[] = (backendId !== 'lynshen' ? [] : providersList)
 		.filter((pv) => pv.id !== cur && configured.includes(pv.id))
 		.flatMap((pv) =>
 			pv.models.map((m) => ({
 				id: `${pv.id}::${m.name}`,
 				label: m.display_name || m.name,
 				vendor: m.name,
-				detail: pv.id === 'jucode' ? jucodeDetail(m.context_window, unsetWindow) : detailOf(pv.id, m.context_window),
+				detail: pv.id === 'lynshen' ? lynshenDetail(m.context_window, unsetWindow) : detailOf(pv.id, m.context_window),
 				active: false,
 				command: `@switch ${pv.id} ${m.name}`,
 				depth: undefined,
-				group: pv.id === 'jucode' ? groups.jucode : groups.byok
+				group: pv.id === 'lynshen' ? groups.lynshen : groups.byok
 			}))
 		);
-	const order = [groups.jucode, groups.byok];
+	const order = [groups.lynshen, groups.byok];
 	return [...activeRows, ...otherRows].sort(
 		(a, b) => order.indexOf(a.group ?? '') - order.indexOf(b.group ?? '')
 	);

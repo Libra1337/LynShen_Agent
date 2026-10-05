@@ -34,7 +34,7 @@ describe('isValidResumeSessionId', () => {
 
 describe('canHandOffToTui', () => {
 	it('allows the three native CLIs and never acp', () => {
-		expect(canHandOffToTui('jucode')).toBe(true);
+		expect(canHandOffToTui('lynshen')).toBe(true);
 		expect(canHandOffToTui('claude')).toBe(true);
 		expect(canHandOffToTui('codex')).toBe(true);
 		expect(canHandOffToTui('acp')).toBe(false);
@@ -45,9 +45,9 @@ describe('tuiResumeArgs / tuiResumeCommand', () => {
 	it('builds the per-backend resume argv the rust allowlist accepts', () => {
 		expect(tuiResumeArgs('claude', SID)).toEqual(['--resume', SID]);
 		expect(tuiResumeArgs('codex', SID)).toEqual(['resume', SID]);
-		// jucode resumes via the slash command written into the pty, not argv.
-		expect(tuiResumeArgs('jucode', SID)).toEqual([]);
-		expect(tuiResumeCommand('jucode', SID)).toBe(`/resume ${SID}\n`);
+		// lynshen resumes via the slash command written into the pty, not argv.
+		expect(tuiResumeArgs('lynshen', SID)).toEqual([]);
+		expect(tuiResumeCommand('lynshen', SID)).toBe(`/resume ${SID}\n`);
 		expect(tuiResumeCommand('claude', SID)).toBeUndefined();
 		expect(tuiResumeCommand('codex', SID)).toBeUndefined();
 	});
@@ -55,6 +55,6 @@ describe('tuiResumeArgs / tuiResumeCommand', () => {
 	it('emits nothing for an invalid id', () => {
 		expect(tuiResumeArgs('claude', '--help')).toEqual([]);
 		expect(tuiResumeArgs('codex', '')).toEqual([]);
-		expect(tuiResumeCommand('jucode', 'a b')).toBeUndefined();
+		expect(tuiResumeCommand('lynshen', 'a b')).toBeUndefined();
 	});
 });

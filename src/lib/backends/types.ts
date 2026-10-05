@@ -1,34 +1,34 @@
 // Engine-adapter contract: one adapter instance per live session translates
-// between the desktop's native (jucode-dialect) protocol and the backend
+// between the desktop's native (lynshen-dialect) protocol and the backend
 // CLI's own wire format. See src/lib/backends/README.md for the full contract
 // (ordering guarantees, approval bridging, how onStart is invoked).
 
 import type { Op, AgentEvent } from '$lib/protocol';
 
-export type BackendId = 'jucode' | 'codex' | 'claude' | 'acp';
+export type BackendId = 'lynshen' | 'codex' | 'claude' | 'acp';
 
-export const BACKEND_IDS: BackendId[] = ['jucode', 'codex', 'claude', 'acp'];
+export const BACKEND_IDS: BackendId[] = ['lynshen', 'codex', 'claude', 'acp'];
 
 /** The backends with a single well-known binary (probe rows, path overrides).
  *  'acp' is excluded: it launches whichever agent the registry entry names. */
-export const NATIVE_BACKEND_IDS: BackendId[] = ['jucode', 'codex', 'claude'];
+export const NATIVE_BACKEND_IDS: BackendId[] = ['lynshen', 'codex', 'claude'];
 
 /** Display names (brand names — not localized). The 'acp' label is a generic
  *  fallback; sessions display their registry entry's name instead. */
 export const BACKEND_LABELS: Record<BackendId, string> = {
-	jucode: 'JuCode',
+	lynshen: 'LynShen',
 	codex: 'Codex',
 	claude: 'Claude Code',
 	acp: 'ACP'
 };
 
 export function isBackendId(v: unknown): v is BackendId {
-	return v === 'jucode' || v === 'codex' || v === 'claude' || v === 'acp';
+	return v === 'lynshen' || v === 'codex' || v === 'claude' || v === 'acp';
 }
 
-/** Restore path: unknown / missing backend ids collapse to 'jucode'. */
+/** Restore path: unknown / missing backend ids collapse to 'lynshen'. */
 export function normalizeBackendId(v: unknown): BackendId {
-	return isBackendId(v) ? v : 'jucode';
+	return isBackendId(v) ? v : 'lynshen';
 }
 
 /**
@@ -86,7 +86,7 @@ export interface BackendCaps {
 	agentTrace: boolean;
 }
 
-/** Normalized events are the existing jucode AgentEvent dialect — adapters
+/** Normalized events are the existing lynshen AgentEvent dialect — adapters
  *  emit that dialect so ChatState stays untouched. */
 export type NormalizedEvent = AgentEvent;
 
@@ -127,7 +127,7 @@ export interface SessionCtx {
 }
 
 /**
- * One adapter instance per session (`createJucodeAdapter()`).
+ * One adapter instance per session (`createLynShenAdapter()`).
  */
 export interface EngineAdapter {
 	readonly id: BackendId;
@@ -136,7 +136,7 @@ export interface EngineAdapter {
 	 *  restart); may send handshake frames and reset per-process state. */
 	onStart(io: AdapterIO, ctx: SessionCtx): void;
 	/** One raw stdout line (parsed JSON, or a {__stderr} payload) → zero or
-	 *  more normalized jucode-style AgentEvents, in order. */
+	 *  more normalized lynshen-style AgentEvents, in order. */
 	translate(raw: unknown): NormalizedEvent[];
 	/** Outgoing desktop Op → raw stdin lines (one frame each). Return null when
 	 *  the op is unsupported — the caller surfaces a notice to the user. */

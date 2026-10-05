@@ -5,7 +5,7 @@ import type { TabIcon } from './workbench/tabChrome';
 export interface Session {
 	id: string;
 	chat: ChatState;
-	/** Engine backend driving this session (persisted; 'jucode' default). */
+	/** Engine backend driving this session (persisted; 'lynshen' default). */
 	backendId: BackendId;
 	/** Tab tag color (persisted with the session's saved tab). */
 	color?: string;
@@ -14,7 +14,7 @@ export interface Session {
 	/** For 'acp' sessions: the registry id + display name of the launched agent
 	 *  (passed as the allowlisted `agent` spawn option on every (re)spawn). */
 	acpAgent?: { id: string; name: string };
-	/** Per-session adapter instance (the jucode one; not persisted). */
+	/** Per-session adapter instance (the lynshen one; not persisted). */
 	adapter: EngineAdapter;
 	/** Archived threads are hidden from the sidebar by default (persisted); the
 	 *  conversation isn't deleted and can be unarchived. */
@@ -41,11 +41,11 @@ export interface Session {
 	pinned?: boolean;
 	/** Model and effort picked while a draft, applied when it starts. */
 	draftPick?: { model?: string; effort?: string };
-	/** Claude Code / Codex: runs through the JuCode gateway on the user's
-	 *  JuCode login (only this session's process; their own config is left
+	/** Claude Code / Codex: runs through the LynShen gateway on the user's
+	 *  LynShen login (only this session's process; their own config is left
 	 *  alone). Unset: as it last ran (the daemon remembers it). */
 	gateway?: boolean;
-	/** Gateway sessions: the JuCode group its requests route to, applied by
+	/** Gateway sessions: the LynShen group its requests route to, applied by
 	 *  the daemon's local gateway (unset: the model's default, else automatic). */
 	group?: string;
 	/** Claude Code: the model a restored session last ran on, until its engine
@@ -81,7 +81,7 @@ export interface Project {
 	lastBackend?: BackendId;
 	/** lastBackend 为 'acp' 时：上次选择的 ACP agent（注册表 id + 名称）。 */
 	lastAcpAgent?: { id: string; name: string };
-	/** 对话分组：path 为 ~/.jucode/chats，会话以对话模式（非编程）运行，只用 jucode 引擎。 */
+	/** 对话分组：path 为 ~/.lynshen/chats，会话以对话模式（非编程）运行，只用 lynshen 引擎。 */
 	chats?: boolean;
 	/** 承载长期 Agent 会话的隐藏项目（每个 Agent 工作目录一个）：会话只在工作台里显示，
 	 *  不进侧栏和画布，也不保存、不同步给后台服务（随用随建）。 */

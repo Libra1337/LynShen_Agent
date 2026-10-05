@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Start a session from the remote app: pick the project and the engine
-	// that runs it. Chats run on JuCode only (the chat mode is JuCode's).
+	// that runs it. Chats run on LynShen only (the chat mode is LynShen's).
 	import { untrack } from 'svelte';
 	import Modal from '$lib/ui/Modal.svelte';
 	import Button from '$lib/ui/Button.svelte';
@@ -29,18 +29,18 @@
 		if (!projectId && projects.length) projectId = projects[0].id;
 	});
 	const chosen = $derived(projects.find((p) => p.id === projectId) ?? project);
-	let engine = $state('jucode');
+	let engine = $state('lynshen');
 	const engines = $derived(
 		chosen?.chats
-			? [{ value: 'jucode', label: 'JuCode' }]
+			? [{ value: 'lynshen', label: 'LynShen' }]
 			: [
-					{ value: 'jucode', label: 'JuCode' },
+					{ value: 'lynshen', label: 'LynShen' },
 					{ value: 'claude', label: 'Claude Code' },
 					{ value: 'codex', label: 'Codex' }
 				]
 	);
 	$effect(() => {
-		if (!engines.some((e) => e.value === engine)) engine = 'jucode';
+		if (!engines.some((e) => e.value === engine)) engine = 'lynshen';
 	});
 	const label = (p: ProjectView) => (p.chats ? t('shell.remote.chats') : p.name);
 </script>

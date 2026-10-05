@@ -1,7 +1,7 @@
 // 应用自动更新状态。模块级 runes 单例：设置页的更新卡片
 // 与侧栏设置入口的小圆点共享同一份状态，启动时的静默检查也写到这里。
 // 检查和下载在 Rust 侧（src-tauri/src/app_update.rs）：先走 GitHub，
-// 不通或太慢时换 JuCode 服务器上的同一份签名安装包。
+// 不通或太慢时换 LynShen 服务器上的同一份签名安装包。
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -35,8 +35,8 @@ export class UpdaterState {
 	/** 下载进度 0–100。 */
 	progress = $state(0);
 	error = $state('');
-	/** 这次更新从哪里下载：GitHub 或 JuCode 服务器。 */
-	source = $state<'github' | 'jucode' | ''>('');
+	/** 这次更新从哪里下载：GitHub 或 LynShen 服务器。 */
+	source = $state<'github' | 'lynshen' | ''>('');
 	/** 新版本的更新说明。 */
 	notes = $state('');
 	/** 服务器要求的最低版本，当前版本低于它时（必须更新）才有值。 */
@@ -58,7 +58,7 @@ export class UpdaterState {
 		if (this.phase === 'checking' || this.phase === 'downloading' || this.phase === 'ready') return;
 		this.phase = 'checking';
 		try {
-			const u = await invoke<{ version: string; notes: string | null; source: 'github' | 'jucode' } | null>(
+			const u = await invoke<{ version: string; notes: string | null; source: 'github' | 'lynshen' } | null>(
 				'update_check'
 			);
 			if (u) {

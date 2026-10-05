@@ -228,11 +228,11 @@
 	let pickerQuery = $state('');
 	let selIdx = $state(0);
 	let pendingModel = $state('');
-	// Whether this Claude Code / Codex session runs through the JuCode gateway.
-	const toolMode = $derived<'system' | 'jucode'>(session.gateway ? 'jucode' : 'system');
+	// Whether this Claude Code / Codex session runs through the LynShen gateway.
+	const toolMode = $derived<'system' | 'lynshen'>(session.gateway ? 'lynshen' : 'system');
 
 	// Ops flow through this session's backend adapter; an unsupported op
-	// (non-jucode stub backends) surfaces as an inline system notice.
+	// (non-lynshen stub backends) surfaces as an inline system notice.
 	function send(op: Op) {
 		// A typed /model on a draft is a pick like the menu's, not a reason to
 		// start the engine.
@@ -275,29 +275,29 @@
 		else if (action === 'model') openModelPicker();
 	}
 
-	// The project history picker's sources: JuCode's own conversations, or the
+	// The project history picker's sources: LynShen's own conversations, or the
 	// ones Claude Code / Codex saved in their own apps (picking one imports it).
 	const historySources = [
-		{ value: 'jucode', label: 'JuCode' },
+		{ value: 'lynshen', label: 'LynShen' },
 		{ value: 'claude', label: 'Claude Code' },
 		{ value: 'codex', label: 'Codex' }
 	];
-	// The selected tab follows the list shown (each opening starts on JuCode);
+	// The selected tab follows the list shown (each opening starts on LynShen);
 	// a switch applies only if it is still the latest and the picker is open.
-	let historyTab = $state('jucode');
+	let historyTab = $state('lynshen');
 	let historyReq = 0;
 	$effect(() => {
-		if (chat.picker?.kind === 'resume' && chat.picker.history) historyTab = chat.picker.source ?? 'jucode';
+		if (chat.picker?.kind === 'resume' && chat.picker.history) historyTab = chat.picker.source ?? 'lynshen';
 	});
 	async function showHistorySource(source: string) {
 		const proj = project;
 		if (!proj) return;
 		const req = ++historyReq;
 		const current = () => req === historyReq && chat.picker?.kind === 'resume' && !!chat.picker.history;
-		const from = source === 'claude' || source === 'codex' ? source : 'jucode';
+		const from = source === 'claude' || source === 'codex' ? source : 'lynshen';
 		try {
 			const items =
-				from === 'jucode'
+				from === 'lynshen'
 					? await store.historyItems(proj, chat)
 					: (await nativeSessions(from, proj.path)).map((s) => ({
 							id: s.id,
@@ -311,7 +311,7 @@
 		} catch (e) {
 			if (!current()) return;
 			toast.error(t('shell.historyFail', { msg: String(e) }));
-			historyTab = chat.picker?.kind === 'resume' ? (chat.picker.source ?? 'jucode') : 'jucode';
+			historyTab = chat.picker?.kind === 'resume' ? (chat.picker.source ?? 'lynshen') : 'lynshen';
 		}
 	}
 
@@ -488,7 +488,7 @@
 		if (p.kind === 'checkpoint')
 			return p.items.map((it) => ({ id: it.id, label: it.label, detail: it.detail, active: it.active, command: `/rewind ${it.id}`, depth: nil }));
 		// Model picker rows (pure packing in $lib/composer/modelRows): the active
-		// provider's models from the engine's model_view plus, for jucode
+		// provider's models from the engine's model_view plus, for lynshen
 		// sessions, the catalog of every other provider with credentials.
 		return buildModelRows({
 			models: p.models,
@@ -497,7 +497,7 @@
 			providersList,
 			configured: providers,
 			groups: {
-				jucode: t('shell.modelGroup.jucode'),
+				lynshen: t('shell.modelGroup.lynshen'),
 				byok: t('shell.modelGroup.byok')
 			},
 			toolMode,
@@ -510,12 +510,12 @@
 	// menu's provider row.
 	const toolModel = $derived.by((): ToolModel | undefined => {
 		if ((chat.backendId !== 'claude' && chat.backendId !== 'codex') || !chat.model) return undefined;
-		const served = providers.includes('jucode')
-			? (providersList.find((p) => p.id === 'jucode')?.models ?? [])
+		const served = providers.includes('lynshen')
+			? (providersList.find((p) => p.id === 'lynshen')?.models ?? [])
 			: [];
 		const id = chat.model;
-		const found = toolModels(chat.modelCatalog, served, toolMode === 'jucode').find(
-			(m) => m.key === id || m.local === id || m.jucode === id
+		const found = toolModels(chat.modelCatalog, served, toolMode === 'lynshen').find(
+			(m) => m.key === id || m.local === id || m.lynshen === id
 		);
 		return (
 			found ?? {
@@ -523,7 +523,7 @@
 				label: id,
 				vendor: id,
 				active: true,
-				...(toolMode === 'jucode' ? { jucode: id } : { local: id })
+				...(toolMode === 'lynshen' ? { lynshen: id } : { local: id })
 			}
 		);
 	});
@@ -531,10 +531,10 @@
 	/** Moves this Claude Code / Codex session between this machine and the
 	 *  gateway. A conversation under way may not carry over (its thinking is
 	 *  signed for the account that wrote it): asked first. */
-	async function switchTool(mode: 'system' | 'jucode', model?: string): Promise<boolean> {
+	async function switchTool(mode: 'system' | 'lynshen', model?: string): Promise<boolean> {
 		if (!session.draft && chat.messages.some((m) => m.kind === 'user')) {
 			const ok = await confirm({
-				title: t(mode === 'jucode' ? 'shell.toolSwitch.confirmJucode' : 'shell.toolSwitch.confirmSystem'),
+				title: t(mode === 'lynshen' ? 'shell.toolSwitch.confirmLynShen' : 'shell.toolSwitch.confirmSystem'),
 				message: t('shell.toolSwitch.confirmBody'),
 				confirmLabel: t('shell.toolSwitch.confirm')
 			});
@@ -545,17 +545,17 @@
 	}
 
 	async function pickProvider(m: ToolModel, choice: { local: true } | { group: string }) {
-		if (toolMode === 'jucode' && !('local' in choice)) {
+		if (toolMode === 'lynshen' && !('local' in choice)) {
 			store.setSessionGroup(session.id, choice.group);
 			return;
 		}
 		chat.closePicker();
 		if ('local' in choice) {
-			if (toolMode === 'jucode' && m.local) await switchTool('system', m.local);
+			if (toolMode === 'lynshen' && m.local) await switchTool('system', m.local);
 			return;
 		}
 		// Set once the switch is confirmed; the gateway reads it per request.
-		if (m.jucode && (await switchTool('jucode', m.jucode))) store.setSessionGroup(session.id, choice.group);
+		if (m.lynshen && (await switchTool('lynshen', m.lynshen))) store.setSessionGroup(session.id, choice.group);
 	}
 
 	// Whether to offer a filter box (history and other long lists).
@@ -789,7 +789,7 @@
 		if (command.startsWith('@tool ')) {
 			const [mode, name] = command.slice('@tool '.length).trim().split(/\s+/);
 			chat.closePicker();
-			if (mode === 'system' || mode === 'jucode') void switchTool(mode, name);
+			if (mode === 'system' || mode === 'lynshen') void switchTool(mode, name);
 			return;
 		}
 		// Resuming a history item opens it in a fresh session so the current chat
@@ -798,7 +798,7 @@
 			const sid = command.slice('/resume '.length).trim();
 			// A history item opens in a new tab so the current chat isn't
 			// replaced: codex via thread/resume, claude via --resume + transcript
-			// replay, jucode via session_open (hosted) or /resume after spawn.
+			// replay, lynshen via session_open (hosted) or /resume after spawn.
 			const picker = chat.picker?.kind === 'resume' ? chat.picker : undefined;
 			const backend = picker?.backend ?? chat.backendId;
 			const item = picker?.items.find((i) => i.id === sid);
@@ -815,7 +815,7 @@
 					.finally(() => toast.dismiss(notice));
 				return;
 			}
-			if (backend === 'codex' || backend === 'claude' || backend === 'jucode') {
+			if (backend === 'codex' || backend === 'claude' || backend === 'lynshen') {
 				store.openSaved(project, sid, item?.label ?? '', backend);
 				return;
 			}
@@ -972,7 +972,7 @@
 
 	function rewindToMessage(text: string, userIndex: number) {
 		// codex (thread/rollback) and claude (resume-at-uuid respawn) rewind without
-		// the jucode checkpoint_view round-trip — confirm directly from the index.
+		// the lynshen checkpoint_view round-trip — confirm directly from the index.
 		if (chat.backendId === 'codex' || chat.backendId === 'claude') {
 			chat.pendingRewind = { id: `${chat.backendId}:${userIndex}`, text };
 			return;
@@ -1182,11 +1182,11 @@
 			{backendLocked}
 			toolProvider={toolModel
 				? {
-						model: toolModel.jucode ?? toolModel.key,
+						model: toolModel.lynshen ?? toolModel.key,
 						name: BACKEND_LABELS[chat.backendId],
 						local: toolModel.local !== undefined,
-						jucode: toolModel.jucode !== undefined,
-						onJucode: toolMode === 'jucode',
+						lynshen: toolModel.lynshen !== undefined,
+						onLynShen: toolMode === 'lynshen',
 						group: session.group ?? '',
 						groups: store.takesSessionGroup(session),
 						onPick: (choice) => pickProvider(toolModel, choice)

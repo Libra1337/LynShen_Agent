@@ -1,6 +1,6 @@
 // Approximate USD pricing per 1M tokens, matched by model id. Best-effort: used
 // only to estimate session cost when the engine doesn't report an authoritative
-// number (jucode does, via context_usage.cost; claude/codex don't, so we price
+// number (lynshen does, via context_usage.cost; claude/codex don't, so we price
 // their token counts here). Cached-input discounts are ignored — the usage
 // events don't break cached vs fresh input out — so this slightly over-estimates
 // input cost on long contexts. Order matters: first match wins.

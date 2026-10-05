@@ -4,17 +4,17 @@
 
 	// Brand mark for a model (by name) or a provider (by id), from brandIcons.
 	// A model with no known brand shows a sparkle; a provider shows its initial,
-	// and JuCode its own monogram (the brand is a wordmark, no logo).
+	// and LynShen its own monogram (the brand is a wordmark, no logo).
 	let { model, provider, size = 14 }: { model?: string; provider?: string; size?: number } = $props();
 
 	const svg = $derived(provider ? providerBrand(provider) : model ? modelBrand(model) : undefined);
-	const initial = $derived(provider === 'jucode' ? 'Ju' : (provider?.[0]?.toUpperCase() ?? ''));
+	const initial = $derived(provider === 'lynshen' ? 'Ju' : (provider?.[0]?.toUpperCase() ?? ''));
 </script>
 
 {#if svg}
 	<span class="vendor" style:font-size="{size}px" aria-hidden="true">{@html svg}</span>
 {:else if provider}
-	<span class="mono" class:ju={provider === 'jucode'} style:font-size="{size}px" aria-hidden="true">{initial}</span>
+	<span class="mono" class:ju={provider === 'lynshen'} style:font-size="{size}px" aria-hidden="true">{initial}</span>
 {:else}
 	<SparkleIcon {size} />
 {/if}

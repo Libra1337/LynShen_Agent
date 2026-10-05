@@ -1,5 +1,5 @@
 // Pure helpers for native TUI dock tabs: a tab whose panel kind encodes which
-// agent CLI it runs (`tui:jucode`, `tui:codex`, `tui:claude`). Framework-free
+// agent CLI it runs (`tui:lynshen`, `tui:codex`, `tui:claude`). Framework-free
 // so the mapping stays unit-testable; every TUI tab is an independent
 // interactive process, never a second view of a GUI session.
 
@@ -21,7 +21,7 @@ export function tuiBackendOf(panel: string): BackendId | null {
 	return isBackendId(raw) ? raw : null;
 }
 
-/** Tab title, e.g. "TUI · jucode" — the CLI's own name, not translated. */
+/** Tab title, e.g. "TUI · lynshen" — the CLI's own name, not translated. */
 export function tuiTabTitle(backend: BackendId): string {
 	return `TUI · ${backend}`;
 }

@@ -4,15 +4,15 @@ import { ChatState } from '$lib/chat.svelte';
 
 describe('caps() gating helper', () => {
 	it('defaults to the native backend for missing/unknown input', () => {
-		expect(caps(undefined)).toBe(CAPS.jucode);
-		expect(caps(null)).toBe(CAPS.jucode);
-		expect(caps({})).toBe(CAPS.jucode);
-		expect(caps({ backendId: 'weird' })).toBe(CAPS.jucode);
+		expect(caps(undefined)).toBe(CAPS.lynshen);
+		expect(caps(null)).toBe(CAPS.lynshen);
+		expect(caps({})).toBe(CAPS.lynshen);
+		expect(caps({ backendId: 'weird' })).toBe(CAPS.lynshen);
 	});
 
 	it('resolves the backend from a ChatState', () => {
 		const chat = new ChatState();
-		expect(caps(chat)).toBe(CAPS.jucode);
+		expect(caps(chat)).toBe(CAPS.lynshen);
 		chat.backendId = 'claude';
 		expect(caps(chat)).toBe(CAPS.claude);
 		chat.backendId = 'codex';
@@ -20,9 +20,9 @@ describe('caps() gating helper', () => {
 	});
 
 	it('gates the UI surfaces the design calls out', () => {
-		// jucode: everything on.
-		expect(caps({ backendId: 'jucode' }).approvalModes).toBe(true);
-		expect(caps({ backendId: 'jucode' }).goals).toBe(true);
+		// lynshen: everything on.
+		expect(caps({ backendId: 'lynshen' }).approvalModes).toBe(true);
+		expect(caps({ backendId: 'lynshen' }).goals).toBe(true);
 		// claude: approval picker, stop button, context ring, model picker
 		// (list_models/set_model control requests), /compact (stream-json slash
 		// text) and the resume picker (the daemon's session history, with transcript
@@ -49,8 +49,8 @@ describe('caps() gating helper', () => {
 		expect(cl.slashCommands).toBe(true);
 		expect(cl.compact).toBe(true);
 		expect(cl.transcriptReplay).toBe(true);
-		// jucode: manual /compact stays available.
-		expect(caps({ backendId: 'jucode' }).compact).toBe(true);
+		// lynshen: manual /compact stays available.
+		expect(caps({ backendId: 'lynshen' }).compact).toBe(true);
 		// codex: model picker, resume picker, compaction and goals are wired
 		// (model/list, thread/list + thread/resume, thread/compact/start,
 		// thread/goal/*); generic slash commands stay off.
@@ -71,7 +71,7 @@ describe('caps() gating helper', () => {
 	});
 
 	it('every backend declares the full flag set', () => {
-		const keys = Object.keys(CAPS.jucode).sort();
+		const keys = Object.keys(CAPS.lynshen).sort();
 		for (const id of BACKEND_IDS) {
 			expect(Object.keys(CAPS[id]).sort()).toEqual(keys);
 		}
@@ -79,12 +79,12 @@ describe('caps() gating helper', () => {
 });
 
 describe('backend id helpers', () => {
-	it('normalizeBackendId maps unknown values to jucode (restore path)', () => {
-		expect(normalizeBackendId(undefined)).toBe('jucode');
+	it('normalizeBackendId maps unknown values to lynshen (restore path)', () => {
+		expect(normalizeBackendId(undefined)).toBe('lynshen');
 		expect(normalizeBackendId('claude')).toBe('claude');
 		expect(normalizeBackendId('codex')).toBe('codex');
-		expect(normalizeBackendId('gpt')).toBe('jucode');
-		expect(normalizeBackendId(42)).toBe('jucode');
+		expect(normalizeBackendId('gpt')).toBe('lynshen');
+		expect(normalizeBackendId(42)).toBe('lynshen');
 		expect(isBackendId('claude')).toBe(true);
 		expect(isBackendId('x')).toBe(false);
 	});

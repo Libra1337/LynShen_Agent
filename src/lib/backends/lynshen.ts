@@ -1,4 +1,4 @@
-// Native-engine adapter: the desktop's Op / AgentEvent dialect is the jucode
+// Native-engine adapter: the desktop's Op / AgentEvent dialect is the lynshen
 // wire protocol, so events pass through untouched except for two things: the
 // `hello` version frame, and approval-mode names (the engine says manual /
 // full-access where the desktop's shared trio says read-only / full-auto).
@@ -6,7 +6,7 @@
 import type { Op } from '$lib/protocol';
 import type { BackendCaps, EngineAdapter, NormalizedEvent } from './types';
 
-export const JUCODE_CAPS: BackendCaps = {
+export const LYNSHEN_CAPS: BackendCaps = {
 	approvalModes: true,
 	extendedApprovalModes: false,
 	hunkApproval: true,
@@ -31,7 +31,7 @@ export const JUCODE_CAPS: BackendCaps = {
 };
 
 /** Wire protocol version this desktop speaks (`hello.protocol`). */
-export const JUCODE_PROTOCOL = 2;
+export const LYNSHEN_PROTOCOL = 2;
 
 const TO_ENGINE_MODE: Record<string, string> = {
 	'read-only': 'manual',
@@ -44,21 +44,21 @@ const FROM_ENGINE_MODE: Record<string, string> = {
 	'full-access': 'full-auto'
 };
 
-export function createJucodeAdapter(): EngineAdapter {
+export function createLynShenAdapter(): EngineAdapter {
 	return {
-		id: 'jucode',
-		caps: JUCODE_CAPS,
+		id: 'lynshen',
+		caps: LYNSHEN_CAPS,
 		onStart() {
 			/* no handshake — the daemon sends the session's startup events */
 		},
 		translate(raw: unknown): NormalizedEvent[] {
 			const ev = raw as Record<string, unknown>;
 			if (ev.type === 'hello') {
-				if (ev.protocol === JUCODE_PROTOCOL) return [];
+				if (ev.protocol === LYNSHEN_PROTOCOL) return [];
 				return [
 					{
 						type: 'error',
-						message: `jucode speaks protocol ${String(ev.protocol)}, this desktop speaks ${JUCODE_PROTOCOL}; update both to the same release`
+						message: `lynshen speaks protocol ${String(ev.protocol)}, this desktop speaks ${LYNSHEN_PROTOCOL}; update both to the same release`
 					}
 				];
 			}

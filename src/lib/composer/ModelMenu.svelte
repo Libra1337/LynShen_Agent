@@ -198,7 +198,7 @@
 
 		<SessionSwitches {chat} {onSwitch} />
 
-		{#if chat.backendId === 'jucode' && chat.provider === 'jucode' && chat.model}
+		{#if chat.backendId === 'lynshen' && chat.provider === 'lynshen' && chat.model}
 			{#key chat.model}<GroupPicker model={chat.model} />{/key}
 		{:else if toolProvider}
 			{#key toolProvider.model}<GroupPicker model={toolProvider.model} tool={toolProvider} />{/key}
@@ -240,8 +240,8 @@
 					<CaretLeftIcon size={14} />
 				</IconButton>
 				<span class="mtitle">{t('chat.pickModel')}</span>
-				{#if chat.backendId === 'jucode'}
-					<!-- Which JuCode models show, and their context windows. -->
+				{#if chat.backendId === 'lynshen'}
+					<!-- Which LynShen models show, and their context windows. -->
 					<button
 						class="manage"
 						onclick={() => {
@@ -454,7 +454,7 @@
 		font-size: var(--fs-2xs);
 		font-weight: 500;
 	}
-	/* Name and detail ("This machine · JuCode · 258K") share one line. WebKit
+	/* Name and detail ("This machine · LynShen · 258K") share one line. WebKit
 	   (the macOS app) does not wrap text inside the row button, so both
 	   truncate instead of overlapping; the detail gives way before the name. */
 	.mm .pop-txt {

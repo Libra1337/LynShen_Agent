@@ -4,7 +4,7 @@
 // engine's, reconciles from `approval_mode` events, and builds structured
 // `approve` ops — including per-hunk partial approvals for edit tools.
 
-// The shared 3-mode enum drives jucode/codex; claude additionally exposes
+// The shared 3-mode enum drives lynshen/codex; claude additionally exposes
 // 'plan' (read-only planning) and 'auto' (model auto-approves tool calls),
 // gated behind BackendCaps.extendedApprovalModes so only the claude picker
 // offers them. plan/auto map 1:1 between the UI and engine layers.

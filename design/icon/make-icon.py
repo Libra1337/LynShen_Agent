@@ -1,4 +1,4 @@
-"""JuCode app icon: the serif "Ju" of the wordmark with a violet text cursor.
+"""LynShen app icon: the serif "Ju" of the wordmark with a violet text cursor.
 
 Regenerate:
   pip install pillow fonttools brotli

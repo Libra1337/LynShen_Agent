@@ -2,7 +2,7 @@
 	// The remote control page for a phone's browser: pair once, then the desk,
 	// the agents and their sessions. Two ways to reach a computer:
 	// - LAN: the daemon served this page; pair with a code for a device token.
-	// - Relay: the PWA at app.jucode.net; a `#pair=` link names the computer
+	// - Relay: the PWA at app.lynshen.net; a `#pair=` link names the computer
 	//   and the connection runs end-to-end encrypted through the relay.
 	// Several computers can be paired; each keeps its own live connection and
 	// view (HostView), and the switcher in the list header picks the one shown.
@@ -256,7 +256,7 @@
 		want(location.href);
 		if (wanted) history.replaceState(null, '', location.pathname);
 		const fromWorker = (e: MessageEvent) => {
-			if (e.data?.type === 'jucode-open' && typeof e.data.url === 'string') want(e.data.url);
+			if (e.data?.type === 'lynshen-open' && typeof e.data.url === 'string') want(e.data.url);
 		};
 		navigator.serviceWorker?.addEventListener('message', fromWorker);
 		embedded = inAppBrowser();
@@ -271,7 +271,7 @@
 			// Keep the one-time code out of history and bookmarks.
 			history.replaceState(null, '', location.pathname);
 		}
-		relayOrigin = location.hostname === 'app.jucode.net';
+		relayOrigin = location.hostname === 'app.lynshen.net';
 		const install = !!link && isIos() && !isStandalone();
 		hosts = loadHosts();
 		// The linked computer connects with its code below.
@@ -378,7 +378,7 @@
 	const SIDE_MIN = 260;
 	const SIDE_MAX = 560;
 	const SIDE_DEFAULT = 340;
-	const SIDE_KEY = 'jucode-remote-sidebar-width';
+	const SIDE_KEY = 'lynshen-remote-sidebar-width';
 	let sideWidth = $state(SIDE_DEFAULT);
 	let resizing = $state(false);
 	function startResize(e: PointerEvent) {
@@ -425,7 +425,7 @@
 </script>
 
 <svelte:head>
-	<title>JuCode</title>
+	<title>LynShen</title>
 </svelte:head>
 
 <svelte:window onkeydown={(e) => switchMenu && e.key === 'Escape' && (switchMenu = false)} ononline={wakeAll} />

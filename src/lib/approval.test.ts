@@ -38,7 +38,7 @@ describe('approval mode mapping', () => {
 		for (const m of ['read-only', 'plan', 'auto', 'auto-edit'] as const)
 			expect(needsClaudeYoloRespawn('claude', m)).toBe(false);
 		// Other backends never respawn.
-		expect(needsClaudeYoloRespawn('jucode', 'full-auto')).toBe(false);
+		expect(needsClaudeYoloRespawn('lynshen', 'full-auto')).toBe(false);
 		expect(needsClaudeYoloRespawn('codex', 'full-auto')).toBe(false);
 	});
 

@@ -29,7 +29,7 @@ function apply() {
 }
 
 export function initTheme() {
-	const saved = localStorage.getItem('jucode-theme');
+	const saved = localStorage.getItem('lynshen-theme');
 	themeState.pref = saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
 	apply();
 	// Track OS theme changes while following the system.
@@ -42,7 +42,7 @@ export function initTheme() {
 
 export function setTheme(pref: ThemePref) {
 	themeState.pref = pref;
-	localStorage.setItem('jucode-theme', pref);
+	localStorage.setItem('lynshen-theme', pref);
 	apply();
 }
 

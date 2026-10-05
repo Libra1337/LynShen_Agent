@@ -18,10 +18,10 @@ export interface BackendSettings {
 	remoteAddress: string;
 }
 
-const KEY = 'jucode-backend-settings';
+const KEY = 'lynshen-backend-settings';
 
 export const DEFAULT_BACKEND_SETTINGS: BackendSettings = {
-	default: 'jucode',
+	default: 'lynshen',
 	paths: {},
 	env: {},
 	remoteAddress: ''
@@ -125,7 +125,7 @@ export interface SpawnBackendOpts extends Record<string, unknown> {
 /**
  * A backend's binary override and custom env from the settings; undefined
  * when there is none. Claude Code / Codex sessions pass them to the daemon;
- * jucode's start the daemon itself (it runs jucode sessions in-process).
+ * lynshen's start the daemon itself (it runs lynshen sessions in-process).
  */
 export function buildBackendOpts(
 	id: BackendId,
@@ -143,7 +143,7 @@ export function buildBackendOpts(
 
 /**
  * Which backend a new session should use: the project's last-used backend
- * wins, else the settings' default, else 'jucode'.
+ * wins, else the settings' default, else 'lynshen'.
  */
 export function defaultBackendFor(
 	lastUsed: string | null | undefined,

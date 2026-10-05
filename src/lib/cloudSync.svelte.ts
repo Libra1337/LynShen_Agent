@@ -1,10 +1,10 @@
-// Settings synced between the computers of a JuCode account
+// Settings synced between the computers of a LynShen account
 // (GET/PUT /v1/oauth/settings). Only basic preferences: interface, default
 // backend, model defaults, network and voice settings. Keys, custom
 // providers, paths, window sizes, projects, MCP, skills, agents and
 // schedules stay on each computer.
 //
-// Per key, the last value synced here is remembered (`jucode-cloud-sync`):
+// Per key, the last value synced here is remembered (`lynshen-cloud-sync`):
 // a local value that differs from it was changed here and is pushed; else a
 // newer cloud value is applied. A computer syncing for the first time takes
 // the cloud's values and uploads only what the cloud lacks.
@@ -16,7 +16,7 @@ import { prefs, TURN_STAT_KEYS, type TurnStatKey } from './prefs.svelte';
 import { loadBackendSettings, saveBackendSettings } from './backends/settings';
 import { isBackendId } from './backends';
 
-const STATE_KEY = 'jucode-cloud-sync';
+const STATE_KEY = 'lynshen-cloud-sync';
 const EVERY_MS = 5 * 60_000;
 
 type Config = Record<string, unknown>;
@@ -85,10 +85,10 @@ const SPECS: Spec[] = [
 	{
 		// Read by each new session (ChatState).
 		key: 'chat.approvalMode',
-		read: () => localValue('jucode-approval-mode'),
+		read: () => localValue('lynshen-approval-mode'),
 		apply: (v) => {
 			if (!['ask', 'plan', 'auto', 'edits', 'all'].includes(v as string)) return false;
-			localStorage.setItem('jucode-approval-mode', v as string);
+			localStorage.setItem('lynshen-approval-mode', v as string);
 			return true;
 		}
 	},

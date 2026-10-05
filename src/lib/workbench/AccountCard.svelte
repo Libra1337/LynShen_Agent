@@ -83,7 +83,7 @@
 		<button class="pop-row manage" onclick={onManage}>{t('shell.account.manage')}<CaretRightIcon size={14} /></button>
 	{:else}
 		<div class="sec">
-			<div class="name">{account.nickname || account.email || 'JuCode'}</div>
+			<div class="name">{account.nickname || account.email || 'LynShen'}</div>
 			{#if account.nickname && account.email}<div class="sub">{account.email}</div>{/if}
 		</div>
 		<div class="sec rows">

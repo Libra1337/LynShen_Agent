@@ -1,6 +1,6 @@
 <script lang="ts">
 	// 新建并行任务对话框：任务名（实时 slug 预览）+ 基于分支（默认当前分支）+
-	// 可选任务描述。确认后在 <repo-parent>/.jucode-worktrees/<repo>/<slug> 创建
+	// 可选任务描述。确认后在 <repo-parent>/.lynshen-worktrees/<repo>/<slug> 创建
 	// worktree（分支 task/<slug>），由父组件把它作为新项目打开。
 	import { onMount, tick } from 'svelte';
 	import GitBranchIcon from 'phosphor-svelte/lib/GitBranchIcon';
@@ -96,7 +96,7 @@
 	<div class="preview" class:bad={!!name.trim() && !slug}>
 		<span class="plabel">{t('shell.task.slugPreview')}</span>
 		{#if slug}
-			<code>…/.jucode-worktrees/{project.name}/{slug}</code>
+			<code>…/.lynshen-worktrees/{project.name}/{slug}</code>
 			<code class="pbranch">task/{slug} ← {base || '…'}</code>
 		{:else if name.trim()}
 			<span class="pbad">{t('shell.task.slugInvalid')}</span>

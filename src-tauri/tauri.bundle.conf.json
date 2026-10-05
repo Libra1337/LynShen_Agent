@@ -1,7 +1,7 @@
 {
   "bundle": {
     "externalBin": [
-      "binaries/jucode-cli"
+      "binaries/lynshen-cli"
     ],
     "macOS": {
       "hardenedRuntime": false

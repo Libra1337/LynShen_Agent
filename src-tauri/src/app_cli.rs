@@ -1,12 +1,12 @@
-//! The jucode CLI a release build ships (a Tauri sidecar next to the app's
-//! executable). The app runs its own copy, never another `jucode` on PATH, so
+//! The lynshen CLI a release build ships (a Tauri sidecar next to the app's
+//! executable). The app runs its own copy, never another `lynshen` on PATH, so
 //! the engine and the daemon always match the app's version.
 //!
-//! The copy lives at `~/.jucode/bin/jucode`: the daemon outlives the app, so
+//! The copy lives at `~/.lynshen/bin/lynshen`: the daemon outlives the app, so
 //! it must not run from inside an app bundle that an update replaces or a user
-//! moves. A CLI found there knows it belongs to the app (`jucode update` leaves
+//! moves. A CLI found there knows it belongs to the app (`lynshen update` leaves
 //! it to the app's updates). Development builds ship no sidecar and keep
-//! resolving `jucode` as before (see backend::resolve_backend_bin).
+//! resolving `lynshen` as before (see backend::resolve_backend_bin).
 
 use std::fs;
 use std::io::Read;
@@ -15,9 +15,9 @@ use std::sync::Mutex;
 
 fn exe_name() -> &'static str {
     if cfg!(windows) {
-        "jucode.exe"
+        "lynshen.exe"
     } else {
-        "jucode"
+        "lynshen"
     }
 }
 
@@ -29,26 +29,26 @@ fn home() -> Option<PathBuf> {
 
 /// Where the app keeps its copy.
 pub fn managed_path() -> Option<PathBuf> {
-    Some(home()?.join(".jucode").join("bin").join(exe_name()))
+    Some(home()?.join(".lynshen").join("bin").join(exe_name()))
 }
 
 /// The sidecar inside this build, when it has one. A debug build has none:
-/// a `jucode` left in target/debug by an older build is not the app's own.
-/// It is named `jucode-cli`: a `jucode` would be the same file as the app's
-/// own `JuCode` executable on case-insensitive file systems (macOS, Windows).
+/// a `lynshen` left in target/debug by an older build is not the app's own.
+/// It is named `lynshen-cli`: a `lynshen` would be the same file as the app's
+/// own `LynShen` executable on case-insensitive file systems (macOS, Windows).
 fn bundled() -> Option<PathBuf> {
     if cfg!(debug_assertions) {
         return None;
     }
     let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let path = dir.join(if cfg!(windows) { "jucode-cli.exe" } else { "jucode-cli" });
+    let path = dir.join(if cfg!(windows) { "lynshen-cli.exe" } else { "lynshen-cli" });
     path.is_file().then_some(path)
 }
 
 /// The installed copy, installed or refreshed on first use in a run.
 static INSTALLED: Mutex<Option<PathBuf>> = Mutex::new(None);
 
-/// The jucode this app runs: its own copy, or None in a build without one.
+/// The lynshen this app runs: its own copy, or None in a build without one.
 /// Falls back to the sidecar itself when the copy cannot be written.
 pub fn path() -> Option<PathBuf> {
     let bundled = bundled()?;
@@ -59,7 +59,7 @@ pub fn path() -> Option<PathBuf> {
     let path = match managed_path().map(|dest| install(&bundled, &dest).map(|()| dest)) {
         Some(Ok(dest)) => dest,
         Some(Err(error)) => {
-            eprintln!("could not install the app's jucode: {error}");
+            eprintln!("could not install the app's lynshen: {error}");
             bundled
         }
         None => bundled,
@@ -114,13 +114,13 @@ fn same_contents(a: &Path, b: &Path) -> bool {
     matches!((read(a), read(b)), (Some(x), Some(y)) if x == y)
 }
 
-/// The version of the jucode this build ships (src-tauri/jucode-cli.version),
+/// The version of the lynshen this build ships (src-tauri/lynshen-cli.version),
 /// None in a build without one. A daemon of another version is replaced once
 /// it is idle (see daemon.ts).
 #[tauri::command]
 pub fn app_cli_version() -> Option<String> {
     bundled()?;
-    Some(include_str!("../jucode-cli.version").trim().to_string())
+    Some(include_str!("../lynshen-cli.version").trim().to_string())
 }
 
 /// Ends the daemon listening on the app's daemon port right away: for
@@ -131,7 +131,7 @@ pub fn replace_daemon() -> Result<(), String> {
     let port = crate::DAEMON_ADDR.rsplit(':').next().unwrap_or("7788");
     // A login service would only start the old one again.
     if daemon_service_installed() {
-        return Err("the jucode daemon runs as a login service (jucode daemon install); reinstall it with this version".to_string());
+        return Err("the lynshen daemon runs as a login service (lynshen daemon install); reinstall it with this version".to_string());
     }
     #[cfg(unix)]
     let status = std::process::Command::new("sh")
@@ -160,26 +160,26 @@ pub fn replace_daemon() -> Result<(), String> {
 }
 
 /// Whether the user installed the daemon as a login service
-/// (`jucode daemon install`); the app then leaves the running daemon alone.
+/// (`lynshen daemon install`); the app then leaves the running daemon alone.
 fn daemon_service_installed() -> bool {
     let Some(home) = home() else {
         return false;
     };
-    home.join("Library/LaunchAgents/cn.jucode.daemon.plist").exists()
-        || home.join(".config/systemd/user/jucode-daemon.service").exists()
+    home.join("Library/LaunchAgents/cn.lynshen.daemon.plist").exists()
+        || home.join(".config/systemd/user/lynshen-daemon.service").exists()
 }
 
-/// Makes `jucode` a terminal command running the app's copy: a link in
-/// `~/.local/bin` (macOS, Linux) or `~/.jucode/bin` on the user's PATH
+/// Makes `lynshen` a terminal command running the app's copy: a link in
+/// `~/.local/bin` (macOS, Linux) or `~/.lynshen/bin` on the user's PATH
 /// (Windows). Returns where the command is.
 #[tauri::command]
 pub fn install_cli_command() -> Result<String, String> {
-    let target = path().ok_or("this build has no bundled jucode")?;
+    let target = path().ok_or("this build has no bundled lynshen")?;
     #[cfg(unix)]
     {
         let dir = home().ok_or("no home directory")?.join(".local").join("bin");
         fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-        let link = dir.join("jucode");
+        let link = dir.join("lynshen");
         match fs::symlink_metadata(&link) {
             Ok(meta) if meta.file_type().is_symlink() => {
                 if fs::read_link(&link).ok().as_deref() == Some(target.as_path()) {
@@ -220,7 +220,7 @@ mod tests {
     use super::*;
 
     fn temp(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("jucode-app-cli-{}-{name}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("lynshen-app-cli-{}-{name}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir

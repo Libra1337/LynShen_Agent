@@ -17,7 +17,7 @@ export interface BackendProfile {
 	commands?: CommandItem[];
 }
 
-const KEY = 'jucode-backend-profiles';
+const KEY = 'lynshen-backend-profiles';
 
 /** One profile per backend; each ACP agent has its own. */
 export function profileKey(backendId: string, acpAgentId = ''): string {

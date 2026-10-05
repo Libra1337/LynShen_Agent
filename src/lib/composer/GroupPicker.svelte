@@ -1,10 +1,10 @@
 <script lang="ts" module>
-	import { fetchJucodeGroups, type JucodeGroup } from '$lib/protocol';
+	import { fetchLynShenGroups, type LynShenGroup } from '$lib/protocol';
 
 	// Groups change rarely; fetch once per app run, again after a failure.
-	let cached: Promise<JucodeGroup[]> | null = null;
-	function loadGroups(): Promise<JucodeGroup[]> {
-		cached ??= fetchJucodeGroups().catch((e) => {
+	let cached: Promise<LynShenGroup[]> | null = null;
+	function loadGroups(): Promise<LynShenGroup[]> {
+		cached ??= fetchLynShenGroups().catch((e) => {
 			cached = null;
 			throw e;
 		});
@@ -16,8 +16,8 @@
 		name: string;
 		/** The model runs on this machine / on the gateway. */
 		local: boolean;
-		jucode: boolean;
-		onJucode: boolean;
+		lynshen: boolean;
+		onLynShen: boolean;
 		group: string;
 		/** The session's group reaches its requests (it runs in the daemon). */
 		groups: boolean;
@@ -26,10 +26,10 @@
 </script>
 
 <script lang="ts">
-	// Which JuCode group serves the current model. "Auto" leaves routing to
+	// Which LynShen group serves the current model. "Auto" leaves routing to
 	// the gateway (lowest multiplier first, then the others); a group pins
-	// requests for this model to it (`jucode_groups` in config.json, sent as
-	// X-JuCode-Group by the engine from the next turn). With `tool` it is the
+	// requests for this model to it (`lynshen_groups` in config.json, sent as
+	// X-LynShen-Group by the engine from the next turn). With `tool` it is the
 	// provider of one Claude Code / Codex session instead: this machine (the
 	// tool's own login or config) or the gateway, on a group of its own that
 	// the daemon's local gateway applies to its next request.
@@ -50,27 +50,27 @@
 		tool?: ToolProvider;
 	} = $props();
 
-	let groups = $state<JucodeGroup[]>([]);
+	let groups = $state<LynShenGroup[]>([]);
 	let configured = $state('');
 	// Claude Code reports a long-context model as `name[1m]`.
 	const base = $derived(model.replace(/\[[^\]]*\]$/, ''));
 	let open = $state(false);
 
 	const served = $derived(
-		!tool || (tool.jucode && tool.groups)
+		!tool || (tool.lynshen && tool.groups)
 			? groups.filter((g) => g.models?.includes(base)).sort((a, b) => a.rate_multiplier - b.rate_multiplier)
 			: []
 	);
 	const chosen = $derived(tool ? tool.group : configured);
-	const local = $derived(!!tool && !tool.onJucode);
+	const local = $derived(!!tool && !tool.onLynShen);
 	const current = $derived(local ? undefined : served.find((g) => g.id === chosen));
 	// One group is what "auto" picks anyway: no rows of its own.
 	const listed = $derived(served.length > 1 ? served : []);
 	const shown = $derived(
-		tool ? (tool.local ? 1 : 0) + (tool.jucode ? 1 : 0) + listed.length > 1 : listed.length > 0
+		tool ? (tool.local ? 1 : 0) + (tool.lynshen ? 1 : 0) + listed.length > 1 : listed.length > 0
 	);
 	const mult = (n: number) => `×${Number(n.toFixed(3))}`;
-	const billing = (g: JucodeGroup) =>
+	const billing = (g: LynShenGroup) =>
 		g.billing_source === 'plan_only' ? t('chat.groupPlan') : g.billing_source === 'balance_only' ? t('chat.groupBalance') : '';
 	const autoLabel = $derived(tool ? t('chat.providerAuto') : t('chat.groupAuto'));
 	const currentLabel = $derived(local ? t('chat.providerLocal') : current ? current.name : autoLabel);
@@ -79,7 +79,7 @@
 		Promise.all([loadGroups(), tool ? null : readConfig()])
 			.then(([list, cfg]) => {
 				groups = list;
-				const map = (cfg?.jucode_groups ?? {}) as Record<string, string>;
+				const map = (cfg?.lynshen_groups ?? {}) as Record<string, string>;
 				configured = map[model] ?? '';
 			})
 			.catch(() => {});
@@ -95,10 +95,10 @@
 		configured = id;
 		try {
 			const cfg = await readConfig();
-			const map = { ...((cfg.jucode_groups ?? {}) as Record<string, string>) };
+			const map = { ...((cfg.lynshen_groups ?? {}) as Record<string, string>) };
 			if (id) map[model] = id;
 			else delete map[model];
-			await writeConfig({ jucode_groups: map });
+			await writeConfig({ lynshen_groups: map });
 		} catch (e) {
 			configured = prev;
 			toast.error(t('chat.groupSaveFailed', { error: String(e) }));
@@ -132,7 +132,7 @@
 						<span class="pop-check" class:off={!local}><CheckIcon size={16} /></span>
 					</button>
 				{/if}
-				{#if !tool || tool.jucode}
+				{#if !tool || tool.lynshen}
 					<button class="pop-row" role="option" aria-selected={!local && !current} onclick={() => pick('')}>
 						<span class="pop-txt">
 							<span class="pop-label">{autoLabel}</span>

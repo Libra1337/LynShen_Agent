@@ -3,20 +3,20 @@
 桌面端通过 [tauri-plugin-updater](https://v2.tauri.app/plugin/updater/) 实现应用内自动更新。
 `src-tauri/tauri.conf.json` 中的 `plugins.updater` 配置了：
 
-- **endpoint**：`https://github.com/JuCode-Team/JuCode-Desktop/releases/latest/download/latest.json`
+- **endpoint**：`https://github.com/LynShen-Team/LynShen-Desktop/releases/latest/download/latest.json`
   —— 指向 GitHub Release 最新版附带的 `latest.json` 清单（由 tauri-action 自动生成并上传）。
 - **pubkey**：已配置为真实公钥（密钥对生成于 2026-07-13，私钥在维护者本机
-  `~/.tauri/jucode-desktop.key`，**空密码**）。
+  `~/.tauri/lynshen-desktop.key`，**空密码**）。
 
 ## 1. 生成签名密钥（已完成）
 
 密钥对已用下面的命令生成，公钥已写入 `tauri.conf.json`：
 
 ```sh
-pnpm tauri signer generate -w ~/.tauri/jucode-desktop.key --password ""
+pnpm tauri signer generate -w ~/.tauri/lynshen-desktop.key --password ""
 ```
 
-- 私钥文件 `~/.tauri/jucode-desktop.key`（**绝不能提交进仓库**，务必异地备份）；
+- 私钥文件 `~/.tauri/lynshen-desktop.key`（**绝不能提交进仓库**，务必异地备份）；
 - 公钥即 `plugins.updater.pubkey` 当前值。
 
 若需轮换密钥：重新生成、替换 pubkey、更新 CI secret——但注意已分发的旧客户端
@@ -27,8 +27,8 @@ pnpm tauri signer generate -w ~/.tauri/jucode-desktop.key --password ""
 在仓库 Settings → Secrets and variables → Actions 里添加（或用 gh CLI）：
 
 ```sh
-gh secret set TAURI_SIGNING_PRIVATE_KEY -R JuCode-Team/JuCode-Desktop < ~/.tauri/jucode-desktop.key
-gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R JuCode-Team/JuCode-Desktop --body ""
+gh secret set TAURI_SIGNING_PRIVATE_KEY -R LynShen-Team/LynShen-Desktop < ~/.tauri/lynshen-desktop.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R LynShen-Team/LynShen-Desktop --body ""
 ```
 
 | Secret | 内容 |
@@ -47,9 +47,9 @@ tauri-action 会自动：
 之后已安装的客户端即可发现新版本。检查和下载在 Rust 侧（`src-tauri/src/app_update.rs`）：
 
 - 先读 GitHub 的 `releases/latest/download/latest.json`，并试下载更新包开头 512 KB；
-- GitHub 不通，或 4 秒内下不完这 512 KB，就改用 JuCode 服务器的镜像
-  `{jucode_api_url}/v1/public/releases/desktop/latest.json`（`jucode_api_url` 取自
-  `~/.jucode/config.json`，默认 `https://api.jucode.net`）。镜像由后端每 10 分钟从
+- GitHub 不通，或 4 秒内下不完这 512 KB，就改用 LynShen 服务器的镜像
+  `{lynshen_api_url}/v1/public/releases/desktop/latest.json`（`lynshen_api_url` 取自
+  `~/.lynshen/config.json`，默认 `https://api.lynshen.net`）。镜像由后端每 10 分钟从
   GitHub 同步（后台「版本发布」也可手动同步），签名与 GitHub 上的完全相同；
 - 从 GitHub 下载中途失败时，再从镜像重试一次。
 
@@ -60,13 +60,13 @@ tauri-action 会自动：
 
 ## 3. 发布流程
 
-安装包内置 JuCode CLI：Release workflow 从 JuCode-CLI 的 GitHub Release 下载
-`src-tauri/jucode-cli.version` 指定版本的二进制（`jucode-<target>`）和
-`jucode-third-party-notices.txt`，作为 sidecar `jucode-cli` 打进安装包（不能叫 `jucode`：
-macOS、Windows 文件名不区分大小写，会和应用自身的 `JuCode` 可执行文件重名）。所以先发 CLI，再发桌面端：
+安装包内置 LynShen CLI：Release workflow 从 LynShen-CLI 的 GitHub Release 下载
+`src-tauri/lynshen-cli.version` 指定版本的二进制（`lynshen-<target>`）和
+`lynshen-third-party-notices.txt`，作为 sidecar `lynshen-cli` 打进安装包（不能叫 `lynshen`：
+macOS、Windows 文件名不区分大小写，会和应用自身的 `LynShen` 可执行文件重名）。所以先发 CLI，再发桌面端：
 
-1. JuCode-CLI：改 `Cargo.toml` 版本号，打 tag 推送，等两个 Release workflow 跑完；
-2. 把 `src-tauri/jucode-cli.version` 改成这个 CLI 版本；
+1. LynShen-CLI：改 `Cargo.toml` 版本号，打 tag 推送，等两个 Release workflow 跑完；
+2. 把 `src-tauri/lynshen-cli.version` 改成这个 CLI 版本；
 3. 更新 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 中的版本号；
 4. 打 tag 并推送（如 `git tag v0.4.0 && git push origin v0.4.0`）；
 5. Release workflow 构建、签名并上传安装包 + 更新包 + `latest.json`；
@@ -75,10 +75,10 @@ macOS、Windows 文件名不区分大小写，会和应用自身的 `JuCode` 可
 ## 4. 本地验证签名构建（可选）
 
 ```sh
-export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/jucode-desktop.key)"
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/lynshen-desktop.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<密码，若无则空>"
-# 内置 CLI：放一个本平台的 jucode 到 src-tauri/binaries/jucode-cli-<target>
-cp ../JuCode-CLI/target/release/jucode src-tauri/binaries/jucode-cli-aarch64-apple-darwin
+# 内置 CLI：放一个本平台的 lynshen 到 src-tauri/binaries/lynshen-cli-<target>
+cp ../LynShen-CLI/target/release/lynshen src-tauri/binaries/lynshen-cli-aarch64-apple-darwin
 pnpm tauri build --config src-tauri/tauri.bundle.conf.json
 ```
 
@@ -95,7 +95,7 @@ pnpm tauri build --config src-tauri/tauri.bundle.conf.json
 ## 强制更新
 
 后台「版本发布」页可以把某个版本设为强制更新。客户端每次检查时读取
-`{jucode_api_url}/v1/public/releases/desktop/policy` 的 `min_version`：当前版本低于它，
+`{lynshen_api_url}/v1/public/releases/desktop/policy` 的 `min_version`：当前版本低于它，
 就自动下载更新，并弹出不能关闭的对话框，装好后只能重启。服务器连不上时不强制
 （不会因为网络问题把应用锁住）。
 
@@ -113,12 +113,12 @@ macOS 包用一张固定的自签名证书签名（未公证，首次打开仍�
 签名身份固定后，系统记住的麦克风、录屏等授权在更新后仍然有效；ad-hoc 签名每次构建都不同，
 每次更新都要重新授权。
 
-- 证书：`JuCode Self-Signed`，有效期到 2036 年，公钥证书在 `src-tauri/macos-signing-cert.pem`。
-- 私钥与 p12：维护者本机 `~/.tauri/macos-signing/`（`jucode-macos-signing.p12`、
+- 证书：`LynShen Self-Signed`，有效期到 2036 年，公钥证书在 `src-tauri/macos-signing-cert.pem`。
+- 私钥与 p12：维护者本机 `~/.tauri/macos-signing/`（`lynshen-macos-signing.p12`、
   `p12-password.txt`），**务必备份**。丢失后换新证书，用户需要重新授权一次。
 - CI secret：`APPLE_CERTIFICATE`（p12 的 base64）、`APPLE_CERTIFICATE_PASSWORD`。
   Release workflow 在 macOS 上把它导入临时钥匙串并设为代码签名可信，再由 tauri-action 签名
   （`APPLE_SIGNING_IDENTITY`）。不开 hardened runtime（不做公证就不需要，也免去麦克风等
   entitlement 配置）。
 - 手动运行 Release workflow 只构建 macOS 包，不发布，用来检查签名：
-  `codesign -d -r- JuCode.app` 应显示 `certificate root = H"..."`，而不是 `cdhash`。
+  `codesign -d -r- LynShen.app` 应显示 `certificate root = H"..."`，而不是 `cdhash`。

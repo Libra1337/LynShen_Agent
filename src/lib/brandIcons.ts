@@ -155,7 +155,7 @@ const MODEL_RULES: [RegExp, string][] = [
 	[/mimo/i, 'xiaomimimo']
 ];
 
-/** Provider id → brand (ids from `jucode providers`), by prefix. */
+/** Provider id → brand (ids from `lynshen providers`), by prefix. */
 const PROVIDER_RULES: [RegExp, string][] = [
 	[/^openai/, 'openai'],
 	[/^anthropic/, 'anthropic'],

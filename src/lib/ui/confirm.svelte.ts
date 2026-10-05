@@ -15,7 +15,7 @@ export type ConfirmRequest = {
 	dontAskKey?: string;
 };
 
-const dontAskStorage = (key: string) => `jucode-dont-ask:${key}`;
+const dontAskStorage = (key: string) => `lynshen-dont-ask:${key}`;
 
 function skipped(key: string | undefined): boolean {
 	if (!key) return false;

@@ -109,7 +109,7 @@
 			return {
 				id,
 				title: view?.title || t('shell.agentPage.untitled'),
-				engine: BACKEND_LABELS[normalizeBackendId(view?.engine ?? 'jucode')],
+				engine: BACKEND_LABELS[normalizeBackendId(view?.engine ?? 'lynshen')],
 				at: view?.updated_at ?? view?.created_at,
 				project: view ? base(view.cwd) : '',
 				state: r.session_states?.[id]

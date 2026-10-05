@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Settings → 关于: the license texts of the third-party code the app ships
 	// (written at build time by scripts/third-party-notices.mjs, the bundled
-	// jucode CLI's from its release).
+	// lynshen CLI's from its release).
 	import Button from '$lib/ui/Button.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
 	import { t } from '$lib/i18n';
@@ -11,7 +11,7 @@
 	import { LEGAL, type LegalDocId } from '$lib/legal';
 	import { getLocale } from '$lib/i18n';
 
-	const FILES = ['/third-party-notices.txt', '/jucode-cli-third-party-notices.txt'];
+	const FILES = ['/third-party-notices.txt', '/lynshen-cli-third-party-notices.txt'];
 	let open = $state(false);
 	let text = $state('');
 	let legal = $state<LegalDocId | null>(null);

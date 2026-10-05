@@ -128,7 +128,7 @@ export function parseWorktreeList(out: string): WorktreeEntry[] {
 
 export type TaskWorktree = WorktreeEntry & { slug: string };
 
-/** 过滤出容器目录（`…/.jucode-worktrees/<repo>`）下的并行任务 worktree，并附上 slug。 */
+/** 过滤出容器目录（`…/.lynshen-worktrees/<repo>`）下的并行任务 worktree，并附上 slug。 */
 export function taskWorktrees(entries: WorktreeEntry[], baseDir: string): TaskWorktree[] {
 	const prefix = baseDir.replace(/\/+$/, '') + '/';
 	return entries

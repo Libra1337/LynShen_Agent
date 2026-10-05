@@ -83,7 +83,7 @@
 		return Object.keys(settings.env[id] ?? {}).length + (settings.paths[id]?.trim() ? 1 : 0);
 	}
 
-	// Claude Code and Codex can be upgraded from here; the app's jucode comes
+	// Claude Code and Codex can be upgraded from here; the app's lynshen comes
 	// with the app.
 	const upgradable = (id: BackendId) => id === 'claude' || id === 'codex';
 
@@ -119,9 +119,9 @@
 		}
 	});
 
-	// The app's own jucode (a release build's, kept in ~/.jucode/bin) can
+	// The app's own lynshen (a release build's, kept in ~/.lynshen/bin) can
 	// become a terminal command.
-	const appCli = (path?: string | null) => !!path && /[\\/]\.jucode[\\/]bin[\\/]jucode(\.exe)?$/.test(path);
+	const appCli = (path?: string | null) => !!path && /[\\/]\.lynshen[\\/]bin[\\/]lynshen(\.exe)?$/.test(path);
 	let cliCommand = $state<{ ok: boolean; text: string } | null>(null);
 	function addCliCommand() {
 		installCliCommand()
@@ -214,7 +214,7 @@
 							<span class="bstate ok"><CheckCircleIcon size={12} /> {versionLabel(st) || t('settings.backend.found')}</span>
 							{#if updates[id]?.available}
 								<span class="bstate up">{t('settings.backend.updateAvailable', { version: updates[id]!.latest })}</span>
-							{:else if id === 'jucode' && appCli(st.path)}
+							{:else if id === 'lynshen' && appCli(st.path)}
 								<span class="bstate dim">{t('settings.backend.bundled')}</span>
 							{/if}
 						{:else if st}
@@ -223,7 +223,7 @@
 					</div>
 					{#if st && st !== 'checking' && st.found && st.path}
 						<span class="bpath" title={st.path}>{st.path}</span>
-						{#if id === 'jucode' && appCli(st.path)}
+						{#if id === 'lynshen' && appCli(st.path)}
 							<div class="clicmd">
 								<button class="linkbtn" onclick={addCliCommand}>{t('settings.backend.cliCommand')}</button>
 								{#if cliCommand}<span class="clires" class:bad={!cliCommand.ok}>{cliCommand.text}</span>{/if}

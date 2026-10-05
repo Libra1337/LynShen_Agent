@@ -36,7 +36,7 @@ function requestIdOf(raw: string): string | undefined {
 	return /request[ _-]?id["']?\s*[:=]\s*["']?([\w-]{8,})/i.exec(raw)?.[1];
 }
 
-/** `backend` is the session's engine (`jucode`, `claude`, `codex`, `acp`). */
+/** `backend` is the session's engine (`lynshen`, `claude`, `codex`, `acp`). */
 export function describeError(raw: string, backend = ''): ErrorInfo | null {
 	const text = stripEngineHint(raw);
 	const low = text.toLowerCase();
@@ -58,11 +58,11 @@ export function describeError(raw: string, backend = ''): ErrorInfo | null {
 	if (/model provider `?([^`\s]+)`? not found/i.test(text))
 		return info('providerMissing', undefined, /model provider `?([^`\s]+)`?/i.exec(text)?.[1]);
 
-	if (/not logged in to jucode|jucode session expired|run \/login/i.test(text)) return info('jucodeLogin', 'login');
+	if (/not logged in to lynshen|lynshen session expired|run \/login/i.test(text)) return info('lynshenLogin', 'login');
 	if (status === 401 || /\bunauthori[sz]ed\b|invalid[_ ](api[_ ])?(key|token)|token (is )?expired|authentication_error/i.test(low)) {
-		// Through the JuCode gateway: the credential the session started with
+		// Through the LynShen gateway: the credential the session started with
 		// ran out (it is handed over once, at start); a restart takes a new one.
-		if (/jucode/i.test(text) || backend === 'jucode') return info('jucodeAuth', 'restart');
+		if (/lynshen/i.test(text) || backend === 'lynshen') return info('lynshenAuth', 'restart');
 		return info('toolAuth', undefined, tool || undefined);
 	}
 	if (status === 402 || /insufficient[_ ](balance|quota|funds)|余额不足|quota exceeded|billing/i.test(text))

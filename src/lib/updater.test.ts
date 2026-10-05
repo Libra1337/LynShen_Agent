@@ -29,7 +29,7 @@ describe('UpdaterState', () => {
 	});
 
 	it('automatically downloads and installs a silent startup update', async () => {
-		commands(undefined, 'jucode');
+		commands(undefined, 'lynshen');
 		const state = new UpdaterState();
 
 		await state.check(true, true);
@@ -37,7 +37,7 @@ describe('UpdaterState', () => {
 		expect(calls('update_install')).toBe(1);
 		expect(state.phase).toBe('ready');
 		expect(state.version).toBe('0.3.2');
-		expect(state.source).toBe('jucode');
+		expect(state.source).toBe('lynshen');
 	});
 
 	it('keeps manual checks download-free until the user starts the download', async () => {
@@ -80,7 +80,7 @@ describe('a required version', () => {
 		let min = '0.5.0';
 		invoke.mockImplementation((cmd: string) => {
 			if (cmd === 'update_policy') return Promise.resolve(min);
-			if (cmd === 'update_check') return Promise.resolve({ version: '0.5.0', notes: 'fixes', source: 'jucode' });
+			if (cmd === 'update_check') return Promise.resolve({ version: '0.5.0', notes: 'fixes', source: 'lynshen' });
 			if (cmd === 'update_install') return Promise.resolve();
 			return Promise.reject(new Error(`unexpected ${cmd}`));
 		});

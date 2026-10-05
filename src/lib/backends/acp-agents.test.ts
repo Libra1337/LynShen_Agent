@@ -20,7 +20,7 @@ describe('tokenizeArgs', () => {
 describe('slugifyAgentId', () => {
 	it('lowercases, strips punctuation and never returns empty', () => {
 		expect(slugifyAgentId('Gemini CLI')).toBe('gemini-cli');
-		expect(slugifyAgentId('  JuCode (ACP)!  ')).toBe('jucode-acp');
+		expect(slugifyAgentId('  LynShen (ACP)!  ')).toBe('lynshen-acp');
 		expect(slugifyAgentId('日本語')).toBe('agent');
 	});
 

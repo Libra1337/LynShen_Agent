@@ -1,4 +1,4 @@
-// The long-lived agents hosted by the local `jucode daemon`, kept current
+// The long-lived agents hosted by the local `lynshen daemon`, kept current
 // from its `agents` / `sessions` / `schedules` broadcasts.
 
 import { daemon as sharedDaemon } from './protocol';
@@ -77,13 +77,13 @@ export interface DaemonSessionView {
 	/** The daemon's title, or the engine's label (newer daemons). */
 	title?: string | null;
 	archived?: boolean;
-	/** The JuCode group its gateway requests route to (null: automatic). */
+	/** The LynShen group its gateway requests route to (null: automatic). */
 	group?: string | null;
-	/** Claude Code / Codex: it last ran through the JuCode gateway. */
+	/** Claude Code / Codex: it last ran through the LynShen gateway. */
 	gateway?: boolean;
 	updated_at?: number;
 	chat?: boolean;
-	/** `jucode`, `claude`, `codex` or `acp` (newer daemons). */
+	/** `lynshen`, `claude`, `codex` or `acp` (newer daemons). */
 	engine?: string;
 }
 

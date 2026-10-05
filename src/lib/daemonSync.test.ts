@@ -11,7 +11,7 @@ vi.mock('./protocol', () => ({
 	sendLine: vi.fn(() => Promise.resolve()),
 	acpAgentsList: vi.fn(() => Promise.resolve([])),
 	projectRoot: vi.fn(() => Promise.resolve('/tmp/demo')),
-	chatsDir: vi.fn(() => Promise.resolve('/h/.jucode/chats')),
+	chatsDir: vi.fn(() => Promise.resolve('/h/.lynshen/chats')),
 	writeConfig: vi.fn(() => Promise.resolve()),
 	git: vi.fn(() => Promise.resolve('')),
 	sessionHistory: vi.fn(() => Promise.resolve([])),
@@ -145,7 +145,7 @@ describe('DaemonSync', () => {
 		const frame = (rev: number, projects: { id: string; name: string; path: string }[]) =>
 			sync.handle({ type: 'workspaces', rev, workspaces: [{ id: ws.id, name: ws.name, is_default: true, projects }] });
 		frame(3, [{ id: 'p1', name: 'app', path: '/w/app' }, { id: 'p9', name: 'new', path: '/w/new' }]);
-		sync.reconcile([{ session: 's-1', cwd: '/w/app', created_at: 0, open: false, engine: 'jucode' }]);
+		sync.reconcile([{ session: 's-1', cwd: '/w/app', created_at: 0, open: false, engine: 'lynshen' }]);
 		sync.reset();
 		frame(1, [{ id: 'p1', name: 'app', path: '/w/app' }]);
 		sync.reconcile([]);
@@ -198,14 +198,14 @@ describe('DaemonSync', () => {
 	it('never lists a session a tab here is opening', async () => {
 		const { sync, store } = await setup();
 		desktopOf.mockReturnValue('tab-1');
-		sync.reconcile([{ session: 's-2', cwd: '/w/app', created_at: 0, open: true, engine: 'jucode' }]);
+		sync.reconcile([{ session: 's-2', cwd: '/w/app', created_at: 0, open: true, engine: 'lynshen' }]);
 		expect(store.projects[0].sessions).toHaveLength(0);
 	});
 
 	it('skips a just-created session while a tab here waits for its id, not while only drafts are open', async () => {
 		const { sync, store } = await setup();
 		const p = store.projects[0];
-		const fresh = (session: string) => ({ session, cwd: '/w/app', created_at: Date.now(), open: true, engine: 'jucode' });
+		const fresh = (session: string) => ({ session, cwd: '/w/app', created_at: Date.now(), open: true, engine: 'lynshen' });
 		// A draft has no daemon session yet: nothing is on its way to it.
 		store.addSession(p);
 		sync.reconcile([fresh('s-new')]);
@@ -224,7 +224,7 @@ describe('DaemonSync', () => {
 	it('keeps the sidebar order and pins over a reconcile; new daemon sessions join at the start', async () => {
 		const { sync, store } = await setup();
 		const p = store.projects[0];
-		const session = (id: string) => ({ session: id, cwd: '/w/app', created_at: 0, open: false, engine: 'jucode', title: id });
+		const session = (id: string) => ({ session: id, cwd: '/w/app', created_at: 0, open: false, engine: 'lynshen', title: id });
 		sync.reconcile([session('s-1'), session('s-2'), session('s-3')]);
 		const id = (sid: string) => p.sessions.find((s) => s.chat.sessionId === sid)!.id;
 		store.moveSession(id('s-3'), id('s-1'), false);
@@ -242,7 +242,7 @@ describe('DaemonSync', () => {
 
 	it('shares renames, archiving and closing of daemon sessions', async () => {
 		const { store, sync } = await setup();
-		sync.reconcile([{ session: 's-3', cwd: '/w/app', created_at: 0, open: false, engine: 'jucode', title: 'x' }]);
+		sync.reconcile([{ session: 's-3', cwd: '/w/app', created_at: 0, open: false, engine: 'lynshen', title: 'x' }]);
 		const id = store.projects[0].sessions[0].id;
 		store.renameSession(id, 'Nice name');
 		store.archiveSession(id);

@@ -1,6 +1,6 @@
 <script lang="ts">
 	// 反馈问题: a bug report or suggestion, sent as a support ticket of the
-	// signed-in JuCode account (the console shows it and the replies). It can
+	// signed-in LynShen account (the console shows it and the replies). It can
 	// carry screenshots and, by default, the end of the engine's and the
 	// daemon's logs: listed with their sizes and previewable, redacted and
 	// gzipped before they leave (feedback.ts).
@@ -97,7 +97,7 @@
 				data_url: s.url
 			}));
 			if (withLogs && logs.length)
-				attachments.push({ name: 'jucode-logs.txt.gz', type: 'application/gzip', data_url: await gzipDataURL(logBundle(logs)) });
+				attachments.push({ name: 'lynshen-logs.txt.gz', type: 'application/gzip', data_url: await gzipDataURL(logBundle(logs)) });
 			const environment = t('shell.feedback.environment', { version: version || '?', system: platform() });
 			const ticket = await submitFeedback({
 				title: `[${t(kind === 'bug' ? 'shell.feedback.kindBug' : 'shell.feedback.kindIdea')}] ${title.trim()}`,

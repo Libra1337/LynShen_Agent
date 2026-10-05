@@ -115,10 +115,10 @@
 	// the app; the page's own back button goes through history too.
 	function push(screen: NewScreen) {
 		stacks[tab] = [...stacks[tab], { ...screen, key: nextKey++ } as Screen];
-		history.pushState({ jucodePage: true }, '');
+		history.pushState({ lynshenPage: true }, '');
 	}
 	function pop() {
-		if (history.state?.jucodePage) history.back();
+		if (history.state?.lynshenPage) history.back();
 		else drop();
 	}
 	/** The page on top gives way to `screen` (one history entry still). */
@@ -160,7 +160,7 @@
 			kind: 'session',
 			cwd: project.path,
 			chat: project.chats,
-			engine: engine === 'jucode' ? undefined : engine,
+			engine: engine === 'lynshen' ? undefined : engine,
 			title: ENGINE_TITLES[engine] ?? t('shell.remote.newSession')
 		};
 		if (replace) open(screen);
@@ -192,7 +192,7 @@
 			kind: 'session',
 			session,
 			cwd: known?.cwd,
-			engine: known?.engine && known.engine !== 'jucode' ? known.engine : undefined,
+			engine: known?.engine && known.engine !== 'lynshen' ? known.engine : undefined,
 			title: title ?? agent?.name ?? known?.title ?? session
 		};
 	}
@@ -284,7 +284,7 @@
 								session: s.session,
 								cwd: s.cwd,
 								chat: project?.chats,
-								engine: s.engine && s.engine !== 'jucode' ? s.engine : undefined,
+								engine: s.engine && s.engine !== 'lynshen' ? s.engine : undefined,
 								title: s.title || t('shell.remote.untitled')
 							})}
 						onNewSession={(project) => (creating = { project, replace: true })}

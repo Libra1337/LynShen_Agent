@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Interop check of the PWA's Noise initiator (src/lib/relay/noise.ts) against
-// the daemon's Rust responder, JuCode-CLI crates/daemon/examples/noise_peer.rs
+// the daemon's Rust responder, LynShen-CLI crates/daemon/examples/noise_peer.rs
 // (docs/relay-protocol.md §6): handshake, then one frame larger than a chunk
 // sent and echoed back.
 //
-//   node scripts/relay-interop.mjs                     # cargo run in ../JuCode-CLI
-//   JUCODE_CLI=/path/to/JuCode-CLI node scripts/relay-interop.mjs
+//   node scripts/relay-interop.mjs                     # cargo run in ../LynShen-CLI
+//   LYNSHEN_CLI=/path/to/LynShen-CLI node scripts/relay-interop.mjs
 //   NOISE_PEER=/path/to/target/debug/examples/noise_peer node scripts/relay-interop.mjs
 //
 // Needs Node >= 23.6 (imports the .ts module directly) and, without
@@ -18,10 +18,10 @@ import { fileURLToPath } from 'node:url';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { FrameReader, Initiator, generateKeyPair, sealFrame } from '../src/lib/relay/noise.ts';
 
-const cli = process.env.JUCODE_CLI ?? fileURLToPath(new URL('../../JuCode-CLI', import.meta.url));
+const cli = process.env.LYNSHEN_CLI ?? fileURLToPath(new URL('../../LynShen-CLI', import.meta.url));
 const peer =
 	process.env.NOISE_PEER ??
-	`cargo run -q --manifest-path "${cli}/Cargo.toml" -p jucode-daemon --example noise_peer --`;
+	`cargo run -q --manifest-path "${cli}/Cargo.toml" -p lynshen-daemon --example noise_peer --`;
 
 const host = generateKeyPair();
 const child = spawn(`${peer} ${bytesToHex(host.priv)}`, { shell: true, stdio: ['pipe', 'pipe', 'pipe'] });

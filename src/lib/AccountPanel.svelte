@@ -114,7 +114,7 @@
 					<div class="logrow">
 						<span class="lm">{l.model || '-'}</span>
 						<span class="lt">↑{fmtNum(l.input_tokens)} ↓{fmtNum(l.output_tokens)}{l.device ? ` · ${l.device.name}` : ''}</span>
-						<span class="lc">{l.channel_kind === 'jucode' ? (l.cost ?? '0') : '—'}</span>
+						<span class="lc">{l.channel_kind === 'lynshen' ? (l.cost ?? '0') : '—'}</span>
 						<span class="ld">{relTime(l.started_at)}</span>
 					</div>
 				{/each}

@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       cli_version:
-        description: jucode CLI release to bundle (default src-tauri/jucode-cli.version)
+        description: lynshen CLI release to bundle (default src-tauri/lynshen-cli.version)
         required: false
         type: string
 
@@ -52,26 +52,26 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # The app ships the jucode CLI release named in src-tauri/jucode-cli.version
+      # The app ships the lynshen CLI release named in src-tauri/lynshen-cli.version
       # (a sidecar, see src-tauri/src/app_cli.rs and tauri.bundle.conf.json).
-      - name: Bundle the jucode CLI
+      - name: Bundle the lynshen CLI
         shell: bash
         run: |
           version="${{ inputs.cli_version }}"
-          [ -n "$version" ] || version="$(tr -d '[:space:]' < src-tauri/jucode-cli.version)"
+          [ -n "$version" ] || version="$(tr -d '[:space:]' < src-tauri/lynshen-cli.version)"
           ext=""; [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ] && ext=".exe"
-          name="jucode-${{ matrix.target }}${ext}"
-          # Bundled as jucode-cli: on macOS and Windows a jucode would collide
-          # with the app's own JuCode executable.
-          bin="src-tauri/binaries/jucode-cli-${{ matrix.target }}${ext}"
+          name="lynshen-${{ matrix.target }}${ext}"
+          # Bundled as lynshen-cli: on macOS and Windows a lynshen would collide
+          # with the app's own LynShen executable.
+          bin="src-tauri/binaries/lynshen-cli-${{ matrix.target }}${ext}"
           mkdir -p src-tauri/binaries
           curl -fsSL --retry 3 -o "$bin" \
-            "https://github.com/JuCode-Team/JuCode-CLI/releases/download/v${version}/${name}"
+            "https://github.com/LynShen-Team/LynShen-CLI/releases/download/v${version}/${name}"
           chmod +x "$bin"
           reported="$("$bin" --version | awk '{print $NF}' | tr -d '\r')"
-          [ "$reported" = "$version" ] || { echo "::error::bundled jucode reports $reported, expected $version"; exit 1; }
-          curl -fsSL --retry 3 -o static/jucode-cli-third-party-notices.txt \
-            "https://github.com/JuCode-Team/JuCode-CLI/releases/download/v${version}/jucode-third-party-notices.txt" \
+          [ "$reported" = "$version" ] || { echo "::error::bundled lynshen reports $reported, expected $version"; exit 1; }
+          curl -fsSL --retry 3 -o static/lynshen-cli-third-party-notices.txt \
+            "https://github.com/LynShen-Team/LynShen-CLI/releases/download/v${version}/lynshen-third-party-notices.txt" \
             || [ "${{ github.event_name }}" = "workflow_dispatch" ]
 
       # macOS builds are signed with a fixed self-signed certificate (not
@@ -100,7 +100,7 @@ jobs:
           rm "$RUNNER_TEMP/signing.p12"
 
       # tauri-action runs beforeBuildCommand (pnpm build), bundles the app with
-      # the jucode sidecar and uploads the installers to a release named after
+      # the lynshen sidecar and uploads the installers to a release named after
       # the tag.
       #
       # Auto-update: with TAURI_SIGNING_PRIVATE_KEY set (repo secret) and
@@ -113,7 +113,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && 'JuCode Self-Signed' || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && 'LynShen Self-Signed' || '' }}
         with:
           # A manual run builds without publishing.
           tagName: ${{ github.event_name == 'push' && github.ref_name || '' }}
@@ -124,7 +124,7 @@ jobs:
           releaseBody: |
             The beta builds are not code-signed yet. To open them the first
             time and grant their permissions, see the install guide:
-            https://github.com/JuCode-Team/JuCode-Desktop/blob/main/docs/install.md
+            https://github.com/LynShen-Team/LynShen-Desktop/blob/main/docs/install.md
 
       - name: Keep the manual build
         if: github.event_name == 'workflow_dispatch'

@@ -11,7 +11,7 @@
 //! inactive.
 //!
 //! The page talks back to the host (nav state, picked elements) by navigating to
-//! `jucode-ipc:` URLs, which the on_navigation handler intercepts and re-emits as
+//! `lynshen-ipc:` URLs, which the on_navigation handler intercepts and re-emits as
 //! `browser-event`.
 
 use base64::Engine as _;
@@ -114,7 +114,7 @@ pub fn browser_open(
         .inner_size(width.max(1.0), height.max(1.0))
         .initialization_script(INIT_SCRIPT)
         .on_navigation(move |url| {
-            if url.scheme() == "jucode-ipc" {
+            if url.scheme() == "lynshen-ipc" {
                 if let Some(fragment) = url.fragment() {
                     if let Ok(bytes) =
                         base64::engine::general_purpose::STANDARD.decode(fragment.as_bytes())
@@ -201,9 +201,9 @@ pub fn browser_close(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn browser_pick(app: AppHandle, enable: bool) -> Result<(), String> {
     let js = if enable {
-        "window.__jucodePicker && window.__jucodePicker.enable()"
+        "window.__lynshenPicker && window.__lynshenPicker.enable()"
     } else {
-        "window.__jucodePicker && window.__jucodePicker.disable()"
+        "window.__lynshenPicker && window.__lynshenPicker.disable()"
     };
     get_browser(&app)?.eval(js).map_err(|e| e.to_string())
 }

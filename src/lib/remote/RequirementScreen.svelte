@@ -48,7 +48,7 @@
 			return {
 				id: sid,
 				title: view?.title || t('shell.agentPage.untitled'),
-				engine: BACKEND_LABELS[normalizeBackendId(view?.engine ?? 'jucode')],
+				engine: BACKEND_LABELS[normalizeBackendId(view?.engine ?? 'lynshen')],
 				at: view?.updated_at ?? view?.created_at,
 				state: r?.session_states?.[sid]
 			};
@@ -104,8 +104,8 @@
 	$effect(() => {
 		if (!startProject && projectOptions.length) startProject = projectOptions[0].value;
 	});
-	let engine = $state('jucode');
-	const engines = (['jucode', 'claude', 'codex'] as const).map((b) => ({ value: b, label: BACKEND_LABELS[b] }));
+	let engine = $state('lynshen');
+	const engines = (['lynshen', 'claude', 'codex'] as const).map((b) => ({ value: b, label: BACKEND_LABELS[b] }));
 	function start() {
 		if (!startProject) return;
 		void run(async () => {

@@ -2,7 +2,7 @@
 //
 // The SessionStore registers each session's adapter on spawn and unregisters
 // it on close; every UI call site sends ops through `dispatch()` instead of
-// protocol.sendOp, so non-jucode sessions get their ops encoded by their
+// protocol.sendOp, so non-lynshen sessions get their ops encoded by their
 // adapter (or politely refused when unsupported).
 
 import * as protocol from '$lib/protocol';

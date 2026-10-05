@@ -20,10 +20,10 @@ describe('feedback logs', () => {
 
 	it('bundles the logs under their names and gzips them', async () => {
 		const text = logBundle([
-			{ name: 'jucode.log', text: 'one' },
+			{ name: 'lynshen.log', text: 'one' },
 			{ name: 'daemon.log', text: 'two' }
 		]);
-		expect(text).toBe('===== jucode.log =====\none\n\n===== daemon.log =====\ntwo');
+		expect(text).toBe('===== lynshen.log =====\none\n\n===== daemon.log =====\ntwo');
 		const url = await gzipDataURL(text);
 		expect(url.startsWith('data:application/gzip;base64,')).toBe(true);
 		const bytes = Uint8Array.from(atob(url.split(',')[1]), (c) => c.charCodeAt(0));

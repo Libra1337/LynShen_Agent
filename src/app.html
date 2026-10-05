@@ -11,7 +11,7 @@
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1a1a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>JuCode</title>
+    <title>LynShen</title>
     <script>
       // Before any script loads: the saved theme (theme.svelte.ts applies the
       // same rule later), and on the phone app a centered boot screen that the
@@ -19,7 +19,7 @@
       (function () {
         var root = document.documentElement;
         try {
-          var pref = localStorage.getItem('jucode-theme');
+          var pref = localStorage.getItem('lynshen-theme');
           var light = pref === 'light' || (pref !== 'dark' && matchMedia('(prefers-color-scheme: light)').matches);
           root.setAttribute('data-theme', light ? 'light' : 'dark');
         } catch (e) {}
@@ -68,7 +68,7 @@
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
-    <div id="boot" aria-hidden="true">JuCode<i></i></div>
+    <div id="boot" aria-hidden="true">LynShen<i></i></div>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

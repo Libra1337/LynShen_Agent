@@ -47,7 +47,7 @@ describe('telemetry', () => {
 		t.start(send);
 		await t.flush();
 		expect(send).not.toHaveBeenCalled();
-		expect(JSON.parse(store.get('jucode-telemetry')!).days).toEqual({});
+		expect(JSON.parse(store.get('lynshen-telemetry')!).days).toEqual({});
 	});
 
 	it('keeps counts when sending fails', async () => {
@@ -56,6 +56,6 @@ describe('telemetry', () => {
 			throw new Error('offline');
 		});
 		await new Promise((r) => setTimeout(r));
-		expect(Object.values(JSON.parse(store.get('jucode-telemetry')!).days)[0]).toEqual({ app_start: 1 });
+		expect(Object.values(JSON.parse(store.get('lynshen-telemetry')!).days)[0]).toEqual({ app_start: 1 });
 	});
 });

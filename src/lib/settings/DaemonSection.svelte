@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Settings → 所有智能体 → 后台服务: what the local jucode daemon does for
+	// Settings → 所有智能体 → 后台服务: what the local lynshen daemon does for
 	// every agent's sessions — naming them (the caller's snippet) and remote
 	// access from a phone. Persists to the backend settings in localStorage.
 	import type { Snippet } from 'svelte';

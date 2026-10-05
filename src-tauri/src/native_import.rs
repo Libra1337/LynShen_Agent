@@ -1,11 +1,11 @@
 //! Import a conversation Claude Code or Codex saved in its own app, so it
-//! continues in a JuCode session of the same engine.
+//! continues in a LynShen session of the same engine.
 //!
 //! The original is never touched: an import writes a copy under a new id next
-//! to the engine's own sessions, and that copy is what JuCode resumes. The
+//! to the engine's own sessions, and that copy is what LynShen resumes. The
 //! copy drops what only the account that wrote it can use — Claude's signed
 //! thinking blocks and Codex's `encrypted_content` reasoning — because either
-//! engine rejects the whole request when another account (the JuCode gateway,
+//! engine rejects the whole request when another account (the LynShen gateway,
 //! a different login) replays them (verified: a Claude session with altered
 //! thinking signatures resumes into `API Error: 400`; the cleaned copy
 //! resumes with its context). Visible text, tool calls and tool results stay.
@@ -28,7 +28,7 @@
 //! context from the full history (verified: the same context and input size
 //! as with the record stripped or kept).
 //!
-//! `~/.jucode/native-imports.json` records each import, so a copy is not
+//! `~/.lynshen/native-imports.json` records each import, so a copy is not
 //! listed as a native session of its own and re-importing opens the copy.
 
 use crate::claude_history::{self, is_session_id, preview_of, project_dir, truncate_chars};
@@ -48,7 +48,7 @@ pub struct NativeSession {
     pub mtime_ms: u64,
     /// Which app wrote it: "Claude Code", "Codex CLI", "Codex Desktop".
     pub origin: String,
-    /// The JuCode copy when this conversation was imported before.
+    /// The LynShen copy when this conversation was imported before.
     pub imported: Option<String>,
 }
 
@@ -84,7 +84,7 @@ fn homes() -> Homes {
         codex: std::env::var_os("CODEX_HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| home.join(".codex")),
-        registry: home.join(".jucode").join("native-imports.json"),
+        registry: home.join(".lynshen").join("native-imports.json"),
     }
 }
 
@@ -456,8 +456,8 @@ fn is_conversation(segments: &[Segment]) -> bool {
         && meta["source"].get("subagent").is_none()
 }
 
-/// Threads JuCode's own Codex sessions wrote: already JuCode sessions.
-const JUCODE_ORIGINATOR: &str = "jucode-daemon";
+/// Threads LynShen's own Codex sessions wrote: already LynShen sessions.
+const LYNSHEN_ORIGINATOR: &str = "lynshen-daemon";
 
 fn codex_origin(meta: &Value) -> String {
     match meta["originator"].as_str().unwrap_or("") {
@@ -482,7 +482,7 @@ fn list_codex(h: &Homes, cwd: &str) -> Result<Vec<NativeSession>, String> {
         .filter(|(id, segs)| {
             !copies.contains(id.as_str())
                 && is_conversation(segs)
-                && segs[0].meta["originator"].as_str() != Some(JUCODE_ORIGINATOR)
+                && segs[0].meta["originator"].as_str() != Some(LYNSHEN_ORIGINATOR)
                 && segs[0].meta["cwd"].as_str().is_some_and(|c| same_dir(c, cwd))
         })
         .map(|(id, segs)| (segs.iter().map(|s| mtime_ms(&s.path)).max().unwrap_or(0), id, segs))
@@ -648,7 +648,7 @@ pub fn native_sessions(source: String, cwd: String) -> Result<Vec<NativeSession>
     }
 }
 
-/// Copies one of them for JuCode (see module docs); returns the copy's id,
+/// Copies one of them for LynShen (see module docs); returns the copy's id,
 /// which the engine resumes. An earlier copy is reused.
 /// Imports run one at a time: each reads, extends and rewrites the registry.
 static IMPORTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -668,7 +668,7 @@ mod tests {
     use super::*;
 
     fn fixture(name: &str) -> Homes {
-        let root = std::env::temp_dir().join(format!("jucode-native-import-{}-{name}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("lynshen-native-import-{}-{name}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
         Homes { claude: root.join("claude"), codex: root.join("codex"), registry: root.join("imports.json") }

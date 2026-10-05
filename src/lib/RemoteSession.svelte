@@ -38,10 +38,10 @@
 	import Button from '$lib/ui/Button.svelte';
 	import Notice from '$lib/ui/Notice.svelte';
 	import { ChatState } from '$lib/chat.svelte';
-	import { createJucodeAdapter } from '$lib/backends/jucode';
+	import { createLynShenAdapter } from '$lib/backends/lynshen';
 	import { effortLabel } from '$lib/composer/effort';
 	import { modelColor, isTopEffort } from '$lib/modelColor';
-	import type { JucodeGroup, Op } from '$lib/protocol';
+	import type { LynShenGroup, Op } from '$lib/protocol';
 	import { useHost } from '$lib/remote/connection.svelte';
 	import { confirm } from '$lib/ui/confirm.svelte';
 	import { BACKEND_LABELS, caps } from '$lib/backends';
@@ -89,7 +89,7 @@
 	const chat = new ChatState();
 	// The session belongs to the computer: show its approval mode as it is.
 	chat.followEngineMode = true;
-	const adapter = createJucodeAdapter();
+	const adapter = createLynShenAdapter();
 	// Unsent text is kept on this device per conversation (a new one by where
 	// it would start), so leaving the page or closing the app keeps it.
 	const textKey = untrack(
@@ -199,7 +199,7 @@
 				resume,
 				resume ? undefined : agent,
 				!resume && !agent && isChat,
-				engine && engine !== 'jucode' ? { engine, options: {} } : undefined
+				engine && engine !== 'lynshen' ? { engine, options: {} } : undefined
 			);
 			connected = true;
 			dropped = false;
@@ -327,7 +327,7 @@
 			text = '';
 			return;
 		}
-		// A busy session queues the message: the engine lists it (jucode) or
+		// A busy session queues the message: the engine lists it (lynshen) or
 		// runs it as the next turn (others, listed here until that turn).
 		if (chat.busy) {
 			if (!bcaps.steer) queued = [...queued, content];
@@ -348,7 +348,7 @@
 
 	const sid = $derived(chat.sessionId || session || '');
 	const view = $derived(agentDirectory.sessions.find((x) => x.session === sid));
-	const bcaps = $derived(caps({ backendId: engine ?? view?.engine ?? 'jucode' }));
+	const bcaps = $derived(caps({ backendId: engine ?? view?.engine ?? 'lynshen' }));
 	/** Messages sent mid-turn to an engine that runs them as the next turn
 	 *  (it does not list them): shown until that turn starts. */
 	let queued = $state<string[]>([]);
@@ -412,17 +412,17 @@
 		if (toolSession) loadCatalog();
 	}
 
-	// Claude Code / Codex run on this machine's own login or on the JuCode
+	// Claude Code / Codex run on this machine's own login or on the LynShen
 	// gateway; the daemon knows which, and what the gateway offers.
 	const toolSession = $derived((engine === 'claude' || engine === 'codex') && !!sid);
-	let catalog = $state<{ models: { name: string; display_name?: string | null; context_window?: number }[]; groups: JucodeGroup[] } | null>(null);
+	let catalog = $state<{ models: { name: string; display_name?: string | null; context_window?: number }[]; groups: LynShenGroup[] } | null>(null);
 	function loadCatalog() {
 		daemon
 			.request({ op: 'gateway_catalog' })
 			.then((r) => {
 				catalog = {
 					models: Array.isArray(r.models) ? (r.models as { name: string }[]) : [],
-					groups: Array.isArray(r.groups) ? (r.groups as JucodeGroup[]) : []
+					groups: Array.isArray(r.groups) ? (r.groups as LynShenGroup[]) : []
 				};
 			})
 			.catch(() => (catalog = { models: [], groups: [] }));
@@ -436,7 +436,7 @@
 		closeModels();
 		if (chat.messages.some((m) => m.kind === 'user')) {
 			const ok = await confirm({
-				title: t(gateway ? 'shell.toolSwitch.confirmJucode' : 'shell.toolSwitch.confirmSystem'),
+				title: t(gateway ? 'shell.toolSwitch.confirmLynShen' : 'shell.toolSwitch.confirmSystem'),
 				message: t('shell.toolSwitch.confirmBody'),
 				confirmLabel: t('shell.toolSwitch.confirm')
 			});
@@ -697,7 +697,7 @@
 						>
 							{#key shownModel.id}
 								<span class="mswap">
-									{#if !engine || engine === 'jucode'}<Vendor model={shownModel.id} size={15} />{:else}<BackendIcon backend={engine as 'claude'} size={15} />{/if}
+									{#if !engine || engine === 'lynshen'}<Vendor model={shownModel.id} size={15} />{:else}<BackendIcon backend={engine as 'claude'} size={15} />{/if}
 									<span class="m">{shownModel.label}</span>
 								</span>
 							{/key}
@@ -732,7 +732,7 @@
 			tool={toolSession
 				? {
 						name: BACKEND_LABELS[engine as 'claude' | 'codex'],
-						onJucode: !!view?.gateway,
+						onLynShen: !!view?.gateway,
 						group: view?.group ?? '',
 						catalog,
 						onSwitch: switchSide,

@@ -1,12 +1,12 @@
 // Notifications on this phone (Web Push). The browser's subscription is
 // made with the relay's key (the relay sends the notifications, see
-// jucode-relay push.go) and handed to each paired computer, which asks the
-// relay to notify it (JuCode-CLI daemon push.rs). The service worker shows
+// lynshen-relay push.go) and handed to each paired computer, which asks the
+// relay to notify it (LynShen-CLI daemon push.rs). The service worker shows
 // them.
 
 import type { DaemonClient } from '$lib/daemon';
 
-const ON = 'jucode-push-on';
+const ON = 'lynshen-push-on';
 
 /** This browser can be notified (an iPhone only from the Home Screen app). */
 export function pushSupported(): boolean {

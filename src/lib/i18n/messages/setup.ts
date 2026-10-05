@@ -2,10 +2,10 @@
 const setup = {
 	zh: {
 		welcome: {
-			label: '欢迎使用 JuCode',
+			label: '欢迎使用 LynShen',
 			login: {
-				title: '登录 JuCode',
-				sub: '登录后可使用 JuCode 账号下的模型。也可以填写自己的 API\u00a0Key，接入其他模型服务商。',
+				title: '登录 LynShen',
+				sub: '登录后可使用 LynShen 账号下的模型。也可以填写自己的 API\u00a0Key，接入其他模型服务商。',
 				apiKey: '使用自己的 API Key',
 				later: '暂不登录，先完成设置'
 			},
@@ -17,8 +17,8 @@ const setup = {
 			},
 			account: {
 				title: '账号',
-				sub: '登录 JuCode 账号，或使用自己的 API Key。',
-				loggedIn: '已登录 JuCode 账号。',
+				sub: '登录 LynShen 账号，或使用自己的 API Key。',
+				loggedIn: '已登录 LynShen 账号。',
 				byok: '已配置 API Key。',
 				manage: '管理账号'
 			},
@@ -26,7 +26,7 @@ const setup = {
 				title: '编程智能体',
 				sub: '选择新对话默认使用的智能体。每个对话也可以单独切换。',
 				desc: {
-					jucode: 'JuCode 自带引擎，可使用账号内的模型和自定义服务商。',
+					lynshen: 'LynShen 自带引擎，可使用账号内的模型和自定义服务商。',
 					claude: 'Anthropic 的 Claude Code，使用本机安装的 claude 命令。',
 					codex: 'OpenAI 的 Codex CLI，使用本机安装的 codex 命令。'
 				},
@@ -35,9 +35,9 @@ const setup = {
 			},
 			model: {
 				title: '模型',
-				sub: '设置 JuCode 引擎的默认模型和思考强度。',
-				otherBackend: '{name} 使用自己的模型设置，可在对话输入框的模型菜单中切换。以下设置只作用于 JuCode 引擎。',
-				empty: '还没有可用的模型。登录 JuCode 账号，或在设置中添加模型服务商。',
+				sub: '设置 LynShen 引擎的默认模型和思考强度。',
+				otherBackend: '{name} 使用自己的模型设置，可在对话输入框的模型菜单中切换。以下设置只作用于 LynShen 引擎。',
+				empty: '还没有可用的模型。登录 LynShen 账号，或在设置中添加模型服务商。',
 				emptyLoggedIn: '还没有选择要显示的模型。',
 				pick: '选择要显示的模型',
 				providers: '模型服务商设置',
@@ -45,7 +45,7 @@ const setup = {
 			},
 			env: {
 				title: '运行环境',
-				sub: 'JuCode 需要 Git 读取项目文件和管理版本。下面是本机的检测结果。'
+				sub: 'LynShen 需要 Git 读取项目文件和管理版本。下面是本机的检测结果。'
 			},
 			appearance: {
 				title: '外观',
@@ -62,7 +62,7 @@ const setup = {
 			}
 		},
 		envCheck: {
-			engineName: 'JuCode 引擎',
+			engineName: 'LynShen 引擎',
 			notDetected: '未检测到',
 			engineNotFound: '未找到引擎二进制'
 		},
@@ -99,22 +99,22 @@ const setup = {
 			upgradeFail: '升级失败（退出码 {code}）',
 			startFailed: '无法启动安装：{e}',
 			tools: {
-				node: { name: 'Node.js / npm', desc: 'codex、jucode 等 CLI 的运行时' },
+				node: { name: 'Node.js / npm', desc: 'codex、lynshen 等 CLI 的运行时' },
 				ffmpeg: { name: 'FFmpeg', desc: '录屏与视频关键帧提取' },
 				git: { name: 'Git', desc: 'Git 面板、并行任务与引擎的代码仓库操作' },
 				gh: { name: 'GitHub CLI', desc: '在 Git 面板查看和创建 Pull Request' },
 				claude: { name: 'Claude Code', desc: 'Anthropic Claude Code 引擎' },
 				codex: { name: 'Codex', desc: 'OpenAI Codex CLI 引擎' },
-				jucode: { name: 'JuCode CLI', desc: '默认引擎（@jucode/cli）' }
+				lynshen: { name: 'LynShen CLI', desc: '默认引擎（@lynshen/cli）' }
 			}
 		},
 		engineMissing: {
-			head: '未找到 JuCode 引擎',
-			tip: '正式安装包内置引擎；若你在开发环境，请设置 {bin} 或在同级目录构建 JuCode-CLI。'
+			head: '未找到 LynShen 引擎',
+			tip: '正式安装包内置引擎；若你在开发环境，请设置 {bin} 或在同级目录构建 LynShen-CLI。'
 		},
 		loginOauth: {
 			waiting: '等待浏览器授权…',
-			loginBtn: '使用 JuCode 账号登录',
+			loginBtn: '使用 LynShen 账号登录',
 			browserOpened: '已在浏览器中打开授权页，完成后会自动识别。',
 			agreeBefore: '继续使用即表示同意',
 			agreeAnd: '和',
@@ -128,10 +128,10 @@ const setup = {
 	},
 	en: {
 		welcome: {
-			label: 'Welcome to JuCode',
+			label: 'Welcome to LynShen',
 			login: {
-				title: 'Sign in to JuCode',
-				sub: 'Sign in to use the models on your JuCode account, or connect another model provider with your own API key.',
+				title: 'Sign in to LynShen',
+				sub: 'Sign in to use the models on your LynShen account, or connect another model provider with your own API key.',
 				apiKey: 'Use my own API key',
 				later: 'Skip sign-in and continue setup'
 			},
@@ -143,8 +143,8 @@ const setup = {
 			},
 			account: {
 				title: 'Account',
-				sub: 'Sign in to a JuCode account, or use your own API key.',
-				loggedIn: 'Signed in to JuCode.',
+				sub: 'Sign in to a LynShen account, or use your own API key.',
+				loggedIn: 'Signed in to LynShen.',
 				byok: 'An API key is configured.',
 				manage: 'Manage account'
 			},
@@ -152,7 +152,7 @@ const setup = {
 				title: 'Coding Agent',
 				sub: 'The agent new sessions start with. Each session can still switch on its own.',
 				desc: {
-					jucode: 'The built-in JuCode engine, with your account models and custom providers.',
+					lynshen: 'The built-in LynShen engine, with your account models and custom providers.',
 					claude: 'Anthropic Claude Code, using the claude command installed on this machine.',
 					codex: 'OpenAI Codex CLI, using the codex command installed on this machine.'
 				},
@@ -161,9 +161,9 @@ const setup = {
 			},
 			model: {
 				title: 'Model',
-				sub: 'The JuCode engine\'s default model and reasoning effort.',
-				otherBackend: '{name} keeps its own model settings; switch them from the model menu in the composer. The settings below apply to the JuCode engine only.',
-				empty: 'No models yet. Sign in to JuCode, or add a model provider in Settings.',
+				sub: 'The LynShen engine\'s default model and reasoning effort.',
+				otherBackend: '{name} keeps its own model settings; switch them from the model menu in the composer. The settings below apply to the LynShen engine only.',
+				empty: 'No models yet. Sign in to LynShen, or add a model provider in Settings.',
 				emptyLoggedIn: 'No models chosen to show yet.',
 				pick: 'Choose models to show',
 				providers: 'Model provider settings',
@@ -171,7 +171,7 @@ const setup = {
 			},
 			env: {
 				title: 'Environment',
-				sub: 'JuCode needs Git to read project files and manage versions. Here is what this machine has.'
+				sub: 'LynShen needs Git to read project files and manage versions. Here is what this machine has.'
 			},
 			appearance: {
 				title: 'Appearance',
@@ -188,7 +188,7 @@ const setup = {
 			}
 		},
 		envCheck: {
-			engineName: 'JuCode Engine',
+			engineName: 'LynShen Engine',
 			notDetected: 'Not detected',
 			engineNotFound: 'Engine binary not found'
 		},
@@ -225,22 +225,22 @@ const setup = {
 			upgradeFail: 'Upgrade failed (exit code {code})',
 			startFailed: 'Could not start install: {e}',
 			tools: {
-				node: { name: 'Node.js / npm', desc: 'Runtime for the codex / jucode CLIs' },
+				node: { name: 'Node.js / npm', desc: 'Runtime for the codex / lynshen CLIs' },
 				ffmpeg: { name: 'FFmpeg', desc: 'Screen recording and video keyframes' },
 				git: { name: 'Git', desc: 'The Git panel, parallel tasks and the engines’ repository work' },
 				gh: { name: 'GitHub CLI', desc: 'View and create pull requests in the Git panel' },
 				claude: { name: 'Claude Code', desc: 'Anthropic Claude Code engine' },
 				codex: { name: 'Codex', desc: 'OpenAI Codex CLI engine' },
-				jucode: { name: 'JuCode CLI', desc: 'Default engine (@jucode/cli)' }
+				lynshen: { name: 'LynShen CLI', desc: 'Default engine (@lynshen/cli)' }
 			}
 		},
 		engineMissing: {
-			head: 'JuCode Engine Not Found',
-			tip: 'The official installer bundles the engine; if you are in a development environment, set {bin} or build JuCode-CLI in a sibling directory.'
+			head: 'LynShen Engine Not Found',
+			tip: 'The official installer bundles the engine; if you are in a development environment, set {bin} or build LynShen-CLI in a sibling directory.'
 		},
 		loginOauth: {
 			waiting: 'Waiting for browser authorization…',
-			loginBtn: 'Sign in with JuCode account',
+			loginBtn: 'Sign in with LynShen account',
 			browserOpened: 'The authorization page has been opened in your browser; it will be detected automatically once complete.',
 			agreeBefore: 'By continuing you agree to the ',
 			agreeAnd: ' and the ',

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createJucodeAdapter, JUCODE_CAPS } from './jucode';
+import { createLynShenAdapter, LYNSHEN_CAPS } from './lynshen';
 import type { Op } from '$lib/protocol';
 
-describe('jucode adapter (passthrough)', () => {
-	const adapter = createJucodeAdapter();
+describe('lynshen adapter (passthrough)', () => {
+	const adapter = createLynShenAdapter();
 
 	it('drops a matching hello and reports a protocol mismatch', () => {
 		expect(adapter.translate({ type: 'hello', protocol: 2, version: '0.3.0' })).toEqual([]);
@@ -24,18 +24,18 @@ describe('jucode adapter (passthrough)', () => {
 	});
 
 	it('declares every capability', () => {
-		expect(adapter.id).toBe('jucode');
+		expect(adapter.id).toBe('lynshen');
 		// extendedApprovalModes is a claude-only quirk (its native plan/auto
 		// permission modes), not a superset capability — the native engine uses the
 		// shared read-only/auto-edit/full-auto trio, so it is legitimately false.
 		// mcpEngineOwned / ruleScopes describe claude's own config, not features
 		// the native engine lacks.
-		for (const [key, value] of Object.entries(JUCODE_CAPS)) {
+		for (const [key, value] of Object.entries(LYNSHEN_CAPS)) {
 			if (key === 'extendedApprovalModes' || key === 'mcpEngineOwned' || key === 'ruleScopes' || key === 'sideQuestions' || key === 'agentTrace') continue;
 			expect(value, `cap ${key} must be true for the native engine`).toBe(true);
 		}
-		expect(JUCODE_CAPS.extendedApprovalModes).toBe(false);
-		expect(adapter.caps).toEqual(JUCODE_CAPS);
+		expect(LYNSHEN_CAPS.extendedApprovalModes).toBe(false);
+		expect(adapter.caps).toEqual(LYNSHEN_CAPS);
 	});
 
 	it('translate is the identity over representative engine events', () => {
@@ -67,7 +67,7 @@ describe('jucode adapter (passthrough)', () => {
 			{ type: 'trust_prompt', cwd: '/tmp', repo_root: '/tmp' },
 			{ type: 'mcp_servers', servers: [] },
 			{ type: 'status', message: 'new session abc' },
-			{ type: 'model_status', provider: 'jucode', model: 'gpt-5.5', state: 'idle' },
+			{ type: 'model_status', provider: 'lynshen', model: 'gpt-5.5', state: 'idle' },
 			{ type: 'error', message: 'boom' }
 		];
 		for (const ev of samples) {

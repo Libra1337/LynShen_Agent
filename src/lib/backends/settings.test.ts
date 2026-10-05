@@ -20,11 +20,11 @@ describe('backend settings parsing', () => {
 	it('drops unknown backend ids and blank paths, normalizes the default', () => {
 		const parsed = parseBackendSettings(
 			JSON.stringify({
-				default: 'gpt', // unknown → jucode
+				default: 'gpt', // unknown → lynshen
 				paths: { claude: '  /opt/claude  ', gpt: '/nope', codex: '   ' }
 			})
 		);
-		expect(parsed.default).toBe('jucode');
+		expect(parsed.default).toBe('lynshen');
 		expect(parsed.paths).toEqual({ claude: '/opt/claude' });
 	});
 
@@ -46,21 +46,21 @@ describe('default backend for new sessions', () => {
 
 	it("the project's last-used backend wins", () => {
 		expect(defaultBackendFor('claude', settings)).toBe('claude');
-		expect(defaultBackendFor('jucode', settings)).toBe('jucode');
+		expect(defaultBackendFor('lynshen', settings)).toBe('lynshen');
 	});
 
-	it('falls back to the settings default, then jucode', () => {
+	it('falls back to the settings default, then lynshen', () => {
 		expect(defaultBackendFor(undefined, settings)).toBe('codex');
 		expect(defaultBackendFor(null, settings)).toBe('codex');
 		expect(defaultBackendFor('bogus', settings)).toBe('codex');
 		expect(
-			defaultBackendFor(undefined, { default: 'jucode', paths: {}, env: {}, remoteAddress: '' })
-		).toBe('jucode');
+			defaultBackendFor(undefined, { default: 'lynshen', paths: {}, env: {}, remoteAddress: '' })
+		).toBe('lynshen');
 	});
 });
 
 const base = (over: Partial<BackendSettings> = {}): BackendSettings => ({
-	default: 'jucode',
+	default: 'lynshen',
 	paths: {},
 	env: {},
 	remoteAddress: '',
@@ -69,14 +69,14 @@ const base = (over: Partial<BackendSettings> = {}): BackendSettings => ({
 
 describe('spawn options from settings', () => {
 	it('returns undefined when nothing is configured', () => {
-		expect(buildBackendOpts('jucode', base())).toBeUndefined();
+		expect(buildBackendOpts('lynshen', base())).toBeUndefined();
 		expect(buildBackendOpts('claude', base({ paths: { codex: '/x' } }))).toBeUndefined();
 	});
 
 	it('passes the configured path as bin_override', () => {
-		const s = base({ paths: { claude: '/opt/claude', jucode: '/dev/jucode' } });
+		const s = base({ paths: { claude: '/opt/claude', lynshen: '/dev/lynshen' } });
 		expect(buildBackendOpts('claude', s)).toEqual({ bin_override: '/opt/claude' });
-		expect(buildBackendOpts('jucode', s)).toEqual({ bin_override: '/dev/jucode' });
+		expect(buildBackendOpts('lynshen', s)).toEqual({ bin_override: '/dev/lynshen' });
 	});
 
 	it('includes per-backend custom env only for the matching backend', () => {
@@ -124,7 +124,7 @@ describe('availability status parsing', () => {
 	it('versionLabel keeps the first line, trimmed', () => {
 		expect(versionLabel({ found: true, version: '2.0.14 (Claude Code)' })).toBe('2.0.14 (Claude Code)');
 		expect(versionLabel({ found: true, version: 'codex-cli 0.42.0\nextra noise' })).toBe('codex-cli 0.42.0');
-		expect(versionLabel({ found: true, version: '  jucode 1.3.0  ' })).toBe('jucode 1.3.0');
+		expect(versionLabel({ found: true, version: '  lynshen 1.3.0  ' })).toBe('lynshen 1.3.0');
 		expect(versionLabel({ found: false })).toBe('');
 		expect(versionLabel({ found: true, version: null })).toBe('');
 	});

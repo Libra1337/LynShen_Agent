@@ -9,12 +9,12 @@ describe('uploadFile', () => {
 			received.push(Uint8Array.from(atob(String(op.data)), (c) => c.charCodeAt(0)));
 			const size = received.reduce((n, b) => n + b.length, 0);
 			return op.last
-				? { type: 'uploaded', upload: 'u-1', path: '/home/u/.jucode/uploads/u-1-a.bin', name: 'a.bin', size, image: false }
+				? { type: 'uploaded', upload: 'u-1', path: '/home/u/.lynshen/uploads/u-1-a.bin', name: 'a.bin', size, image: false }
 				: { type: 'upload_part', upload: 'u-1', size };
 		});
 		const progress: number[] = [];
 		const done = await uploadFile({ request }, new Blob([bytes]), 'a.bin', (sent) => progress.push(sent));
-		expect(done.path).toBe('/home/u/.jucode/uploads/u-1-a.bin');
+		expect(done.path).toBe('/home/u/.lynshen/uploads/u-1-a.bin');
 		const ops = request.mock.calls.map(([op]) => op);
 		expect(ops.map((op) => [op.upload, op.offset, op.last])).toEqual([
 			[undefined, undefined, false],

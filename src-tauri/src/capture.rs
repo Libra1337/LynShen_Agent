@@ -30,7 +30,7 @@ pub struct Recorder {
 }
 
 fn capture_dir() -> Result<PathBuf, String> {
-    let dir = std::env::temp_dir().join("jucode-capture");
+    let dir = std::env::temp_dir().join("lynshen-capture");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
@@ -437,7 +437,7 @@ pub fn stop_screen_recording(rec: tauri::State<'_, Recorder>) -> Result<String, 
     if size == 0 {
         let _ = std::fs::remove_file(&path);
         let hint = if std::env::consts::OS == "macos" {
-            "录屏文件未生成——请在 系统设置 → 隐私与安全性 → 屏幕录制 中授权 JuCode 后重试 / No recording was produced — grant JuCode screen-recording permission in System Settings → Privacy & Security → Screen Recording and retry"
+            "录屏文件未生成——请在 系统设置 → 隐私与安全性 → 屏幕录制 中授权 LynShen 后重试 / No recording was produced — grant LynShen screen-recording permission in System Settings → Privacy & Security → Screen Recording and retry"
         } else {
             "录屏文件未生成——录制工具未输出任何数据，请检查录屏工具与显示服务器权限后重试 / No recording was produced — the capture tool wrote no data; check the tool and display-server permissions and retry"
         };

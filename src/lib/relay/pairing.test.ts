@@ -41,7 +41,7 @@ describe('relay pairing', () => {
 		const link = (origin: string) => parsePairLink(`${origin}/remote#pair=${HOST}.${PUB}.ABCD1234`)?.host.relay;
 		expect(link('https://relay.example.com')).toBe('wss://relay.example.com/relay/v1');
 		expect(link('http://192.168.1.5:8080')).toBe('ws://192.168.1.5:8080/relay/v1');
-		expect(link('https://app.jucode.net')).toBe(RELAY_URL);
+		expect(link('https://app.lynshen.net')).toBe(RELAY_URL);
 	});
 
 	it('adds computers to a list and keeps one device key for all of them', () => {
@@ -94,21 +94,21 @@ describe('relay pairing', () => {
 
 	it('moves the single computer of an older version into the list', () => {
 		const old = { host_id: HOST, host_static_pub: PUB, relay: RELAY_URL };
-		store.set('jucode-relay-host', JSON.stringify(old));
+		store.set('lynshen-relay-host', JSON.stringify(old));
 		const hosts = loadHosts();
 		expect(hosts).toHaveLength(1);
 		expect(hosts[0]).toMatchObject({ ...old, name: '', seq: 1 });
-		expect(store.has('jucode-relay-host')).toBe(false);
-		expect(JSON.parse(store.get('jucode-relay-hosts')!)).toEqual(hosts);
+		expect(store.has('lynshen-relay-host')).toBe(false);
+		expect(JSON.parse(store.get('lynshen-relay-hosts')!)).toEqual(hosts);
 		// The next pairing adds to it.
 		addHost({ host_id: HOST2, host_static_pub: PUB, relay: RELAY_URL });
 		expect(loadHosts().map((h) => h.host_id)).toEqual([HOST, HOST2]);
 	});
 
 	it('ignores broken entries', () => {
-		store.set('jucode-relay-host', '{not json');
+		store.set('lynshen-relay-host', '{not json');
 		expect(loadHosts()).toEqual([]);
-		store.set('jucode-relay-hosts', JSON.stringify([{ host_id: HOST }, { host_id: HOST2, host_static_pub: PUB, relay: RELAY_URL }]));
+		store.set('lynshen-relay-hosts', JSON.stringify([{ host_id: HOST }, { host_id: HOST2, host_static_pub: PUB, relay: RELAY_URL }]));
 		expect(loadHosts().map((h) => h.host_id)).toEqual([HOST2]);
 	});
 });

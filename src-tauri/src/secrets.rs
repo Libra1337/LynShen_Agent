@@ -1,5 +1,5 @@
 //! At-rest encryption for the credentials the desktop app writes into
-//! `~/.jucode/auth.json` (provider API keys and the JuCode OAuth token pair).
+//! `~/.lynshen/auth.json` (provider API keys and the LynShen OAuth token pair).
 //!
 //! Threat model: this protects against *casual reads* — a backup, a synced
 //! home directory, a screen share, a support bundle. The key sits next to the
@@ -7,7 +7,7 @@
 //! running as the user can still decrypt. It is deliberately not an OS keychain
 //! integration and is not a defence against local malware.
 //!
-//! `auth.json` is a shared contract with the `jucode` CLI engine, which reads
+//! `auth.json` is a shared contract with the `lynshen` CLI engine, which reads
 //! the same file and knows nothing about this envelope, so encryption is
 //! opt-in (`encrypt_secrets` in `config.json`). See `docs/secrets.md`.
 
@@ -30,7 +30,7 @@ const NONCE_LEN: usize = 12;
 /// Tauri's bundle identifier, mirrored so the key lands in the same directory
 /// `AppHandle::path().app_config_dir()` would pick without threading a handle
 /// through every call site.
-const APP_IDENTIFIER: &str = "com.jucode.desktop";
+const APP_IDENTIFIER: &str = "com.lynshen.desktop";
 
 /// Serializes first-run key creation so two threads can't each generate a key
 /// and have one silently overwrite the other's (which would strand secrets
@@ -157,7 +157,7 @@ pub fn is_envelope(value: &str) -> bool {
 }
 
 /// Visits every string in `auth` that holds a credential: each entry of the
-/// `providers` map plus the JuCode OAuth token pair. Expiry timestamps and any
+/// `providers` map plus the LynShen OAuth token pair. Expiry timestamps and any
 /// other bookkeeping stay in the clear so `read_auth_providers` and the refresh
 /// check still work without a key.
 fn for_each_secret(auth: &mut Value, mut visit: impl FnMut(&mut String)) {
@@ -168,9 +168,9 @@ fn for_each_secret(auth: &mut Value, mut visit: impl FnMut(&mut String)) {
             }
         }
     }
-    if let Some(jucode) = auth.get_mut("jucode").and_then(Value::as_object_mut) {
+    if let Some(lynshen) = auth.get_mut("lynshen").and_then(Value::as_object_mut) {
         for field in ["access_token", "refresh_token"] {
-            if let Some(Value::String(s)) = jucode.get_mut(field) {
+            if let Some(Value::String(s)) = lynshen.get_mut(field) {
                 visit(s);
             }
         }
@@ -259,7 +259,7 @@ mod tests {
     impl TempDir {
         fn new(name: &str) -> Self {
             let dir =
-                std::env::temp_dir().join(format!("jucode-secrets-{}-{name}", std::process::id()));
+                std::env::temp_dir().join(format!("lynshen-secrets-{}-{name}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).unwrap();
             Self(dir)
@@ -356,7 +356,7 @@ mod tests {
         let store = dir.store();
         let original = json!({
             "providers": { "deepseek": "sk-deepseek", "mimo": "sk-mimo" },
-            "jucode": {
+            "lynshen": {
                 "access_token": "at-1",
                 "refresh_token": "rt-1",
                 "access_expires_at": 1234,
@@ -370,7 +370,7 @@ mod tests {
         assert!(!on_disk.contains("rt-1"));
         // Non-secret bookkeeping stays readable so the refresh check works
         // without touching the key.
-        assert_eq!(auth["jucode"]["access_expires_at"], json!(1234));
+        assert_eq!(auth["lynshen"]["access_expires_at"], json!(1234));
 
         store.reveal(&mut auth);
         assert_eq!(auth, original);

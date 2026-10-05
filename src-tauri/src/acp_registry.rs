@@ -87,9 +87,9 @@ pub fn validate_agent(agent: &AcpAgent) -> Result<(), String> {
 }
 
 /// Id of the engine's own ACP surface that earlier versions seeded as the
-/// first-run entry. JuCode runs natively, so wrapping it in ACP added nothing;
+/// first-run entry. LynShen runs natively, so wrapping it in ACP added nothing;
 /// the entry is dropped from existing registries on load.
-const RETIRED_DEFAULT_ID: &str = "jucode-acp";
+const RETIRED_DEFAULT_ID: &str = "lynshen-acp";
 
 /// Parses the registry file contents, validating every entry.
 fn parse_registry(text: &str) -> Result<Vec<AcpAgent>, String> {
@@ -230,8 +230,8 @@ mod tests {
     }
 
     #[test]
-    fn the_retired_jucode_acp_entry_is_dropped_on_load() {
-        let text = r#"{"agents":[{"id":"jucode-acp","name":"JuCode (ACP)","command":"jucode","args":["acp"]},{"id":"gemini","name":"Gemini","command":"gemini","args":["--experimental-acp"]}]}"#;
+    fn the_retired_lynshen_acp_entry_is_dropped_on_load() {
+        let text = r#"{"agents":[{"id":"lynshen-acp","name":"LynShen (ACP)","command":"lynshen","args":["acp"]},{"id":"gemini","name":"Gemini","command":"gemini","args":["--experimental-acp"]}]}"#;
         let agents = parse_registry(text).unwrap();
         assert_eq!(agents.len(), 1);
         assert_eq!(agents[0].id, "gemini");

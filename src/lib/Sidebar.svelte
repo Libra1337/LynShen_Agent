@@ -87,7 +87,7 @@
 		/** Right-click on a project folder: the page opens the chrome popover. */
 		onProjectMenu: (p: Project, ev: MouseEvent) => void;
 		onHistory: (p: Project) => void;
-		/** Long-lived agents of the local jucode daemon. */
+		/** Long-lived agents of the local lynshen daemon. */
 		agents?: AgentView[];
 		agentsStatus?: 'off' | 'connecting' | 'on' | 'unreachable';
 		/** Show the agent on the workbench. */
@@ -286,7 +286,7 @@
 			/>
 			<button class="head-act" onclick={toggleSearch} aria-label={t('shell.closeSearch')} title={t('shell.closeSearch')}><XIcon size={18} /></button>
 		{:else}
-			<span class="word">JuCode</span>
+			<span class="word">LynShen</span>
 			<button class="head-act" onclick={toggleSearch} aria-label={t('shell.searchSessions')} title={t('shell.searchSessions')}><MagnifyingGlassIcon size={18} /></button>
 		{/if}
 	</div>
@@ -358,7 +358,7 @@
 			{/if}
 			{#if req}<RequirementTag id={req.id} title={req.title} />{/if}
 			<!-- A draft belongs to no backend until its first message. -->
-			{#if s.backendId && s.backendId !== 'jucode' && !s.draft}
+			{#if s.backendId && s.backendId !== 'lynshen' && !s.draft}
 				<span class="backend-chip" title={BACKEND_LABELS[s.backendId]}><BackendIcon backend={s.backendId} size={12} /></span>
 			{/if}
 			{#if s.pinned && !s.archived}<span class="pin-mark" title={t('shell.pin')}><PushPinIcon size={12} weight="fill" /></span>{/if}

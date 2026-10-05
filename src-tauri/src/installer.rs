@@ -7,7 +7,7 @@
 //! Model per platform:
 //!   - system tools (node, ffmpeg): Windows → winget, macOS → brew, Linux → a
 //!     copyable `sudo <pkg-manager>` command (the GUI never runs sudo itself).
-//!   - npm tools (codex, jucode): `npm install -g <pkg>` on every platform,
+//!   - npm tools (codex, lynshen): `npm install -g <pkg>` on every platform,
 //!     gated on npm being present (else NeedsPrereq "node").
 //!   - claude: the official native installer (Windows PowerShell one-liner,
 //!     macOS/Linux curl|bash) — no sudo, user-local.
@@ -24,8 +24,8 @@ pub enum Dep {
     Ffmpeg,
     /// OpenAI Codex CLI (`@openai/codex`).
     Codex,
-    /// JuCode CLI (`@jucode/cli`) — the default engine.
-    Jucode,
+    /// LynShen CLI (`@lynshen/cli`) — the default engine.
+    LynShen,
     /// Claude Code CLI (native installer).
     Claude,
     /// git — the Git panel, worktree tasks and the engines' repo tools.
@@ -40,7 +40,7 @@ impl Dep {
             "node" | "npm" => Some(Self::Node),
             "ffmpeg" => Some(Self::Ffmpeg),
             "codex" => Some(Self::Codex),
-            "jucode" => Some(Self::Jucode),
+            "lynshen" => Some(Self::LynShen),
             "claude" => Some(Self::Claude),
             "git" => Some(Self::Git),
             "gh" => Some(Self::Gh),
@@ -54,7 +54,7 @@ impl Dep {
             Self::Node => "node",
             Self::Ffmpeg => "ffmpeg",
             Self::Codex => "codex",
-            Self::Jucode => "jucode",
+            Self::LynShen => "lynshen",
             Self::Claude => "claude",
             Self::Git => "git",
             Self::Gh => "gh",
@@ -208,9 +208,9 @@ pub fn plan(dep: Dep, os: &str, has: &dyn Fn(&str) -> bool) -> Plan {
                 }
             }
         }
-        Dep::Jucode => {
+        Dep::LynShen => {
             if has("npm") {
-                npm_global("@jucode/cli")
+                npm_global("@lynshen/cli")
             } else {
                 Plan::NeedsPrereq {
                     prereq: "node".to_string(),
@@ -327,7 +327,7 @@ mod tests {
             ("npm", Dep::Node),
             ("ffmpeg", Dep::Ffmpeg),
             ("codex", Dep::Codex),
-            ("jucode", Dep::Jucode),
+            ("lynshen", Dep::LynShen),
             ("claude", Dep::Claude),
             ("git", Dep::Git),
             ("gh", Dep::Gh),
@@ -394,7 +394,7 @@ mod tests {
             }
         );
         assert_eq!(
-            plan(Dep::Jucode, "linux", &avail(&[])),
+            plan(Dep::LynShen, "linux", &avail(&[])),
             Plan::NeedsPrereq {
                 prereq: "node".to_string()
             }
@@ -409,8 +409,8 @@ mod tests {
             npm_global("@openai/codex")
         );
         assert_eq!(
-            plan(Dep::Jucode, "linux", &avail(&["npm"])),
-            npm_global("@jucode/cli")
+            plan(Dep::LynShen, "linux", &avail(&["npm"])),
+            npm_global("@lynshen/cli")
         );
     }
 
@@ -442,7 +442,7 @@ mod tests {
             parse_version("codex-cli 0.161.0-alpha.8"),
             Some((0, 161, 0))
         );
-        assert_eq!(parse_version("jucode 0.4.0\n"), Some((0, 4, 0)));
+        assert_eq!(parse_version("lynshen 0.4.0\n"), Some((0, 4, 0)));
         assert_eq!(parse_version("1.2"), None);
         assert_eq!(parse_version(""), None);
     }
@@ -473,7 +473,7 @@ mod tests {
             Some(Plan::OpenUrl { .. })
         ));
         assert_eq!(
-            upgrade_plan(Dep::Jucode, bin, "jucode 0.4.0", &avail(&[])),
+            upgrade_plan(Dep::LynShen, bin, "lynshen 0.4.0", &avail(&[])),
             None
         );
     }

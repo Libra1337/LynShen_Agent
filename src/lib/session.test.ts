@@ -11,12 +11,12 @@ vi.mock('./protocol', () => ({
 	sendLine: vi.fn(() => Promise.resolve()),
 	sessionMeta: vi.fn(() => Promise.resolve()),
 	projectRoot: vi.fn(() => Promise.resolve('/tmp/demo')),
-	chatsDir: vi.fn(() => Promise.resolve('/home/u/.jucode/chats')),
+	chatsDir: vi.fn(() => Promise.resolve('/home/u/.lynshen/chats')),
 	writeConfig: vi.fn(() => Promise.resolve()),
 	git: vi.fn(() => Promise.resolve('')),
 	sessionHistory: vi.fn(() =>
 		Promise.resolve([
-			{ session: 's6old', title: 'old chat', updated_at: 1_700_000_000_000, entries: 4, archived: false, agent: null, open: false, engine: 'jucode' },
+			{ session: 's6old', title: 'old chat', updated_at: 1_700_000_000_000, entries: 4, archived: false, agent: null, open: false, engine: 'lynshen' },
 			{ session: 'claude-old', title: 'claude chat', updated_at: 1_700_000_000_000, entries: 2, archived: false, agent: null, open: false, engine: 'claude' }
 		])
 	)
@@ -88,7 +88,7 @@ describe('SessionStore lifecycle', () => {
 		]);
 	});
 
-	it('ops of every backend go out as jucode lines, approval modes in jucode names', async () => {
+	it('ops of every backend go out as lynshen lines, approval modes in lynshen names', async () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
@@ -104,7 +104,7 @@ describe('SessionStore lifecycle', () => {
 		]);
 	});
 
-	it('the JuCode gateway goes to this session\'s process only, and is kept', async () => {
+	it('the LynShen gateway goes to this session\'s process only, and is kept', async () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
@@ -112,17 +112,17 @@ describe('SessionStore lifecycle', () => {
 		begin(id);
 		await flush();
 		vi.mocked(hostSession).mockClear();
-		await store.applyToolProfile(id, 'jucode', 'claude-sonnet-5-5');
+		await store.applyToolProfile(id, 'lynshen', 'claude-sonnet-5-5');
 		expect(closeSession).toHaveBeenCalledWith(id);
 		const call = vi.mocked(hostSession).mock.calls.at(-1)!;
 		// The same conversation reopens, now on the gateway.
 		expect(call[2]).toBe(`conv-${id}`);
-		expect(call[5]).toEqual({ engine: 'claude', options: { approval_mode: 'read-only', jucode_gateway: true } });
+		expect(call[5]).toEqual({ engine: 'claude', options: { approval_mode: 'read-only', lynshen_gateway: true } });
 		expect(writeConfig).not.toHaveBeenCalled();
 		const tab = store.serialize()[0].tabs![0];
 		expect(tab.gateway).toBe(true);
 		await store.applyToolProfile(id, 'system');
-		expect(lastSpec()?.options?.jucode_gateway).toBe(false);
+		expect(lastSpec()?.options?.lynshen_gateway).toBe(false);
 		expect(store.serialize()[0].tabs![0].gateway).toBeUndefined();
 	});
 
@@ -131,11 +131,11 @@ describe('SessionStore lifecycle', () => {
 		const p = proj();
 		store.projects.push(p);
 		const id = store.addSession(p, undefined, 'codex');
-		void store.applyToolProfile(id, 'jucode', 'gpt-5.5');
+		void store.applyToolProfile(id, 'lynshen', 'gpt-5.5');
 		expect(hostSession).not.toHaveBeenCalled();
 		begin(id);
 		await flush();
-		expect(lastSpec()).toEqual({ engine: 'codex', options: { approval_mode: 'read-only', jucode_gateway: true } });
+		expect(lastSpec()).toEqual({ engine: 'codex', options: { approval_mode: 'read-only', lynshen_gateway: true } });
 	});
 
 	it('a draft renamed before it starts gives the daemon its name', async () => {
@@ -228,7 +228,7 @@ describe('SessionStore lifecycle', () => {
 		expect(vi.mocked(hostSession).mock.calls.at(-1)![2]).not.toBe('sid-x');
 	});
 
-	it('restored jucode tabs keep their saved id before the engine reports one', async () => {
+	it('restored lynshen tabs keep their saved id before the engine reports one', async () => {
 		const store = new SessionStore();
 		await store.restore([
 			{ id: 'p', name: 'p', path: '/tmp/p', tabs: [
@@ -242,7 +242,7 @@ describe('SessionStore lifecycle', () => {
 		expect(tabs.some((t) => 'hosted' in t)).toBe(false);
 	});
 
-	it('history opens as a picker of the daemon\'s jucode conversations without a new session', async () => {
+	it('history opens as a picker of the daemon\'s lynshen conversations without a new session', async () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
@@ -255,22 +255,22 @@ describe('SessionStore lifecycle', () => {
 		// Other engines' conversations are left out; updated_at is in ms.
 		expect(chat.picker).toEqual({
 			kind: 'resume',
-			backend: 'jucode',
+			backend: 'lynshen',
 			history: true,
-			source: 'jucode',
+			source: 'lynshen',
 			items: [{ id: 's6old', label: 'old chat', detail: new Date(1_700_000_000_000).toLocaleString(), active: false }]
 		});
 	});
 
-	it('a picked jucode conversation opens once, reopened by the daemon', async () => {
+	it('a picked lynshen conversation opens once, reopened by the daemon', async () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
-		store.openSaved(p, 's6old', 'old chat', 'jucode');
+		store.openSaved(p, 's6old', 'old chat', 'lynshen');
 		await flush();
 		expect(hostSession).toHaveBeenCalledWith(store.activeId, p.path, 's6old', undefined, false, undefined);
 		const first = store.activeId;
-		store.openSaved(p, 's6old', 'old chat', 'jucode');
+		store.openSaved(p, 's6old', 'old chat', 'lynshen');
 		expect(store.activeId).toBe(first);
 		expect(p.sessions.length).toBe(1);
 		expect(hostSession).toHaveBeenCalledTimes(1);
@@ -311,11 +311,11 @@ describe('SessionStore lifecycle', () => {
 		expect(sendLine).toHaveBeenCalledWith(id, expect.stringContaining('later'));
 	});
 
-	it.each(['jucode', 'claude'] as const)(
+	it.each(['lynshen', 'claude'] as const)(
 		'a %s session keeps retrying an unreachable daemon without spending its crash budget',
 		async (backend) => {
 			vi.useFakeTimers();
-			vi.mocked(hostSession).mockRejectedValue(new Error('cannot reach jucode daemon'));
+			vi.mocked(hostSession).mockRejectedValue(new Error('cannot reach lynshen daemon'));
 			const store = new SessionStore();
 			const p = proj();
 			store.projects.push(p);
@@ -353,7 +353,7 @@ describe('SessionStore lifecycle', () => {
 
 	it('a new claude session is spawned in the desktop approval mode', async () => {
 		vi.stubGlobal('localStorage', {
-			getItem: (k: string) => (k === 'jucode-approval-mode' ? 'all' : null),
+			getItem: (k: string) => (k === 'lynshen-approval-mode' ? 'all' : null),
 			setItem: () => {}
 		});
 		const store = new SessionStore();
@@ -374,20 +374,20 @@ describe('SessionStore lifecycle', () => {
 		store.projects.push(p);
 		const id = store.addSession(p);
 		// Started by a command, so still without a user turn.
-		dispatch(id, { op: 'command', input: '/login jucode' });
+		dispatch(id, { op: 'command', input: '/login lynshen' });
 		await flush();
-		expect(p.sessions[0].backendId).toBe('jucode');
+		expect(p.sessions[0].backendId).toBe('lynshen');
 		vi.mocked(hostSession).mockClear();
 		await store.switchBackend(id, 'claude');
 		const s = p.sessions[0];
 		expect(s.id).toBe(id); // same tab
 		expect(s.backendId).toBe('claude');
 		expect(s.chat.backendId).toBe('claude');
-		// The daemon translates claude into jucode events.
-		expect(s.adapter.id).toBe('jucode');
+		// The daemon translates claude into lynshen events.
+		expect(s.adapter.id).toBe('lynshen');
 		expect(p.lastBackend).toBe('claude');
 		expect(closeSession).toHaveBeenCalledWith(id);
-		// A new claude conversation, not the jucode one reopened.
+		// A new claude conversation, not the lynshen one reopened.
 		const call = vi.mocked(hostSession).mock.calls.at(-1)!;
 		expect(call[2]).toBeUndefined();
 		expect(call[5]).toMatchObject({ engine: 'claude' });
@@ -401,11 +401,11 @@ describe('SessionStore lifecycle', () => {
 		const id = store.addSession(p);
 		p.sessions[0].chat.messages.push({ kind: 'user', text: 'hi' });
 		await store.switchBackend(id, 'codex');
-		expect(p.sessions[0].backendId).toBe('jucode');
+		expect(p.sessions[0].backendId).toBe('lynshen');
 
-		const rid = store.restoreSession(p, 'sid-1', 'old', 'jucode');
+		const rid = store.restoreSession(p, 'sid-1', 'old', 'lynshen');
 		await store.switchBackend(rid, 'codex');
-		expect(p.sessions.find((s) => s.id === rid)?.backendId).toBe('jucode');
+		expect(p.sessions.find((s) => s.id === rid)?.backendId).toBe('lynshen');
 	});
 
 	it('switchProvider honors a valid effort override and falls back otherwise', async () => {
@@ -716,7 +716,7 @@ describe('SessionStore claude and codex in the daemon', () => {
 		await flush();
 		expect(hostSession).toHaveBeenCalledWith(id, p.path, 'codex-1', undefined, false, {
 			engine: 'codex',
-			options: { approval_mode: 'read-only', jucode_gateway: true }
+			options: { approval_mode: 'read-only', lynshen_gateway: true }
 		});
 	});
 
@@ -732,7 +732,7 @@ describe('SessionStore claude and codex in the daemon', () => {
 		expect(store.serialize()[0].tabs![0]).toMatchObject({ gateway: true, model: 'glm-5' });
 		store.wake(s.id);
 		await flush();
-		expect(lastSpec()?.options).toMatchObject({ jucode_gateway: true, model: 'glm-5' });
+		expect(lastSpec()?.options).toMatchObject({ lynshen_gateway: true, model: 'glm-5' });
 	});
 
 	it('a Claude Code restart keeps the model it ran on; a profile switch does not', async () => {
@@ -746,7 +746,7 @@ describe('SessionStore claude and codex in the daemon', () => {
 		store.restartSession(id, true);
 		await flush();
 		expect(lastSpec()?.options?.model).toBe('claude-opus-4-8[1m]');
-		await store.applyToolProfile(id, 'jucode');
+		await store.applyToolProfile(id, 'lynshen');
 		expect(lastSpec()?.options?.model).toBeUndefined();
 	});
 
@@ -813,7 +813,7 @@ describe('SessionStore claude and codex in the daemon', () => {
 		expect(s.chat.messages).toEqual([{ kind: 'user', text: 'plain replay' }]);
 	});
 
-	it('a jucode conversation takes the daemon replay as is', async () => {
+	it('a lynshen conversation takes the daemon replay as is', async () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
@@ -887,7 +887,7 @@ describe('hidden chats', () => {
 	it('a saved chats group stays in the data but is never listed or activated', async () => {
 		const store = new SessionStore();
 		await store.restore([
-			{ id: 'c', name: '对话', path: '/home/u/.jucode/chats', chats: true, tabs: [{ id: 'c1', sid: 's-chat', title: 'chat' }] },
+			{ id: 'c', name: '对话', path: '/home/u/.lynshen/chats', chats: true, tabs: [{ id: 'c1', sid: 's-chat', title: 'chat' }] },
 			{ id: 'p1', name: 'p1', path: '/tmp/p1', tabs: [{ id: 'k1', sid: 's-code', title: 'code' }] }
 		]);
 		expect(store.shownProjects.map((p) => p.id)).toEqual(['p1']);
@@ -901,7 +901,7 @@ describe('hidden chats', () => {
 
 	it('with only a chats group saved, nothing opens', async () => {
 		const store = new SessionStore();
-		await store.restore([{ id: 'c', name: '对话', path: '/home/u/.jucode/chats', chats: true, tabs: [{ id: 'c1', sid: 's-chat', title: 'chat' }] }]);
+		await store.restore([{ id: 'c', name: '对话', path: '/home/u/.lynshen/chats', chats: true, tabs: [{ id: 'c1', sid: 's-chat', title: 'chat' }] }]);
 		expect(store.shownProjects).toEqual([]);
 		expect(store.activeId).toBe('');
 	});
@@ -914,7 +914,7 @@ describe('SessionStore chats', () => {
 		const id = await store.newChat();
 		const chats = store.projects[0];
 		expect(chats.chats).toBe(true);
-		expect(chats.path).toBe('/home/u/.jucode/chats');
+		expect(chats.path).toBe('/home/u/.lynshen/chats');
 		expect(chats.sessions.map((s) => s.id)).toEqual([id]);
 		begin(id);
 		await flush();
@@ -925,7 +925,7 @@ describe('SessionStore chats', () => {
 		expect(store.projects[0].sessions).toHaveLength(2);
 	});
 
-	it('chat sessions use the jucode engine and survive serialize/restore as chats', async () => {
+	it('chat sessions use the lynshen engine and survive serialize/restore as chats', async () => {
 		const store = new SessionStore();
 		await store.newChat();
 		const saved = store.serialize();
@@ -936,7 +936,7 @@ describe('SessionStore chats', () => {
 		expect(again.projects[0].chats).toBe(true);
 		begin(again.projects[0].sessions[0].id);
 		await flush();
-		expect(hostSession).toHaveBeenCalledWith(expect.any(String), '/home/u/.jucode/chats', undefined, undefined, true, undefined);
+		expect(hostSession).toHaveBeenCalledWith(expect.any(String), '/home/u/.lynshen/chats', undefined, undefined, true, undefined);
 	});
 });
 
@@ -944,7 +944,7 @@ describe('SessionStore GUI ⇄ TUI handoff', () => {
 	const SID = '0f3d7a1c-9e2b-4b7e-9d4d-2a1b3c4d5e6f';
 
 	/** A session whose engine conversation is resumable (sid + one user turn). */
-	function readySession(store: SessionStore, p: Project, backend: 'jucode' | 'claude' | 'codex') {
+	function readySession(store: SessionStore, p: Project, backend: 'lynshen' | 'claude' | 'codex') {
 		const id = store.addSession(p, undefined, backend);
 		const s = p.sessions.find((x) => x.id === id)!;
 		s.chat.sessionId = SID;
@@ -1064,13 +1064,13 @@ describe('SessionStore GUI ⇄ TUI handoff', () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
-		// jucode session with no engine session id at all.
-		const a = store.addSession(p, undefined, 'jucode');
+		// lynshen session with no engine session id at all.
+		const a = store.addSession(p, undefined, 'lynshen');
 		// claude session with an id but no user turn (nothing to resume yet).
 		const b = store.addSession(p, undefined, 'claude');
 		p.sessions.find((x) => x.id === b)!.chat.sessionId = SID;
 		// resumable, but the id would fail the rust validator.
-		const c = store.addSession(p, undefined, 'jucode');
+		const c = store.addSession(p, undefined, 'lynshen');
 		const sc = p.sessions.find((x) => x.id === c)!;
 		sc.chat.sessionId = 'a b';
 		sc.chat.messages.push({ kind: 'user', text: 'hi' });
@@ -1095,11 +1095,11 @@ describe('SessionStore GUI ⇄ TUI handoff', () => {
 		expect(call[5]).toMatchObject({ engine: 'claude' });
 	});
 
-	it('returnToGui reopens a jucode conversation by id, without /resume', async () => {
+	it('returnToGui reopens a lynshen conversation by id, without /resume', async () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
-		const s = readySession(store, p, 'jucode');
+		const s = readySession(store, p, 'lynshen');
 		await store.openInTui(s.id);
 		vi.clearAllMocks();
 		await store.returnToGui(s.id);
@@ -1113,7 +1113,7 @@ describe('SessionStore GUI ⇄ TUI handoff', () => {
 		const p = proj();
 		store.projects.push(p);
 		const tui = readySession(store, p, 'claude');
-		const gui = readySession(store, p, 'jucode');
+		const gui = readySession(store, p, 'lynshen');
 		await store.openInTui(tui.id);
 		const tabs = store.serialize()[0].tabs!;
 		expect(tabs.find((t) => t.id === tui.id)?.surface).toBe('tui');
@@ -1173,7 +1173,7 @@ describe('SessionStore parallel-task worktrees', () => {
 		baseBranch: 'main',
 		slug: 'fix-login'
 	};
-	const wtPath = '/tmp/.jucode-worktrees/repo/fix-login';
+	const wtPath = '/tmp/.lynshen-worktrees/repo/fix-login';
 
 	it('createProject with worktree meta sends the task description as first message', async () => {
 		const store = new SessionStore();
@@ -1227,7 +1227,7 @@ describe('SessionStore parallel-task worktrees', () => {
 	});
 });
 
-describe('sessions in the jucode daemon', () => {
+describe('sessions in the lynshen daemon', () => {
 	it('every backend opens in the daemon; ACP agents from their registry command', async () => {
 		const store = new SessionStore();
 		const p = proj();
@@ -1251,7 +1251,7 @@ describe('sessions in the jucode daemon', () => {
 		const p = proj();
 		store.projects.push(p);
 		const id = store.addSession(p, undefined, 'codex');
-		await store.applyToolProfile(id, 'jucode', 'gpt-5.5');
+		await store.applyToolProfile(id, 'lynshen', 'gpt-5.5');
 		expect(store.takesSessionGroup(p.sessions[0])).toBe(true);
 		store.setSessionGroup(id, 'GPT · Azure');
 		expect(sessionMeta).not.toHaveBeenCalled();
@@ -1270,7 +1270,7 @@ describe('sessions in the jucode daemon', () => {
 		const s = p.sessions[0];
 		expect(s.chat.sessionId).toBe(`conv-${id}`);
 		expect(s.chat.backendId).toBe('claude');
-		expect(s.adapter.id).toBe('jucode');
+		expect(s.adapter.id).toBe('lynshen');
 
 		// A claude conversation picked from history reopens by its id.
 		vi.mocked(hostSession).mockClear();
@@ -1323,7 +1323,7 @@ describe('sessions in the jucode daemon', () => {
 		expect(sendLine).not.toHaveBeenCalledWith(s.id, expect.stringContaining('/resume'));
 	});
 
-	it('restore lists claude, codex and jucode tabs with a sid dormant, with or without a legacy hosted flag', async () => {
+	it('restore lists claude, codex and lynshen tabs with a sid dormant, with or without a legacy hosted flag', async () => {
 		const store = new SessionStore();
 		await store.restore([
 			{
@@ -1333,8 +1333,8 @@ describe('sessions in the jucode daemon', () => {
 				tabs: [
 					{ id: 't-claude', sid: 'claude-1', title: 'C', backend: 'claude' },
 					{ id: 't-codex', sid: 'codex-1', title: 'X', backend: 'codex', hosted: true },
-					{ id: 't-jucode', sid: 'jucode-1', title: 'J' },
-					{ id: 't-old', sid: 'jucode-2', title: 'O', hosted: false }
+					{ id: 't-lynshen', sid: 'lynshen-1', title: 'J' },
+					{ id: 't-old', sid: 'lynshen-2', title: 'O', hosted: false }
 				]
 			}
 		] as never);
@@ -1342,8 +1342,8 @@ describe('sessions in the jucode daemon', () => {
 		expect(sessions.map((s) => [s.id, s.backendId, s.dormant, s.chat.sessionId])).toEqual([
 			['t-claude', 'claude', true, 'claude-1'],
 			['t-codex', 'codex', true, 'codex-1'],
-			['t-jucode', 'jucode', true, 'jucode-1'],
-			['t-old', 'jucode', true, 'jucode-2']
+			['t-lynshen', 'lynshen', true, 'lynshen-1'],
+			['t-old', 'lynshen', true, 'lynshen-2']
 		]);
 		await flush();
 		expect(hostSession).not.toHaveBeenCalled();
@@ -1358,8 +1358,8 @@ describe('sessions in the jucode daemon', () => {
 			engine: 'codex',
 			options: { approval_mode: 'read-only' }
 		});
-		expect(hostSession).toHaveBeenCalledWith('t-jucode', '/tmp/p1', 'jucode-1', undefined, false, undefined);
-		expect(hostSession).toHaveBeenCalledWith('t-old', '/tmp/p1', 'jucode-2', undefined, false, undefined);
+		expect(hostSession).toHaveBeenCalledWith('t-lynshen', '/tmp/p1', 'lynshen-1', undefined, false, undefined);
+		expect(hostSession).toHaveBeenCalledWith('t-old', '/tmp/p1', 'lynshen-2', undefined, false, undefined);
 		// Woken once: a second wake opens nothing.
 		vi.mocked(hostSession).mockClear();
 		store.wake('t-claude');

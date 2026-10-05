@@ -18,7 +18,7 @@
 
 	async function openDownloads() {
 		const cfg = await readConfig().catch(() => ({}) as Record<string, unknown>);
-		const web = String(cfg.jucode_web_url || 'https://api.jucode.net').replace(/\/+$/, '');
+		const web = String(cfg.lynshen_web_url || 'https://api.lynshen.net').replace(/\/+$/, '');
 		await openUrl(`${web}/download`).catch(() => {});
 	}
 </script>

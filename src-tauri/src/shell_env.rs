@@ -15,7 +15,7 @@ use std::sync::{OnceLock, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// 输出流里的快照起始标记（NUL 包裹，正常 rc 输出不可能撞上）。
-const MARKER: &[u8] = b"\x00__JUCODE_ENV__\x00";
+const MARKER: &[u8] = b"\x00__LYNSHEN_ENV__\x00";
 const CAPTURE_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Clone)]
@@ -102,7 +102,7 @@ pub(crate) fn capture_with(shell: &str) -> Option<ShellEnv> {
     // -i：加载交互式 rc（zshrc 等，代理/包装方案的变量多在这里）；
     // -l：登录 shell（zprofile/profile）；-c：执行捕获脚本。
     // zsh/bash/fish 都接受这三个参数。
-    let script = "printf '\\000__JUCODE_ENV__\\000'; exec /usr/bin/env -0";
+    let script = "printf '\\000__LYNSHEN_ENV__\\000'; exec /usr/bin/env -0";
     let mut child = Command::new(shell)
         .args(["-ilc", script])
         .stdin(Stdio::null())
@@ -202,7 +202,7 @@ pub fn merge_into(cmd: &mut Command) {
 /// 后端子进程环境构建。`use_shell_env` 且快照可用时：清空 GUI 环境，
 /// 从快照重建（终端等价环境）；否则维持现状（继承 GUI 环境）。
 /// 优先级：快照 < `custom`（用户每后端自定义变量）< `explicit`
-///（应用协议关键变量，如 JUCODE_DESKTOP —— 永远最后断言，不可被覆盖）。
+///（应用协议关键变量，如 LYNSHEN_DESKTOP —— 永远最后断言，不可被覆盖）。
 pub fn apply_to_command(
     cmd: &mut Command,
     use_shell_env: bool,
@@ -304,7 +304,7 @@ mod tests {
     fn full_capture_round_trip_via_fake_shell() {
         use std::io::Write;
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("jucode-shellenv-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("lynshen-shellenv-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let fake = dir.join("fakeshell");
         // 模拟真实 shell：吃掉 -ilc <script> 并执行脚本，附带 rc 噪音输出。
@@ -336,7 +336,7 @@ mod tests {
             vars: HashMap::from([
                 ("PATH".into(), "/snap/bin".into()),
                 ("SHARED".into(), "from-snapshot".into()),
-                ("JUCODE_DESKTOP".into(), "0".into()),
+                ("LYNSHEN_DESKTOP".into(), "0".into()),
             ]),
             captured_at_ms: 1,
             shell: "test".into(),
@@ -345,10 +345,10 @@ mod tests {
         apply_to_command(
             &mut cmd,
             true,
-            &[("JUCODE_DESKTOP", "1")],
+            &[("LYNSHEN_DESKTOP", "1")],
             &[
                 ("SHARED".to_string(), "from-custom".to_string()),
-                ("JUCODE_DESKTOP".to_string(), "hack".to_string()),
+                ("LYNSHEN_DESKTOP".to_string(), "hack".to_string()),
             ],
         );
         let envs: HashMap<_, _> = cmd
@@ -363,7 +363,7 @@ mod tests {
         assert_eq!(envs["PATH"], "/snap/bin");
         assert_eq!(envs["SHARED"], "from-custom");
         // 协议关键变量不可被用户自定义覆盖。
-        assert_eq!(envs["JUCODE_DESKTOP"], "1");
+        assert_eq!(envs["LYNSHEN_DESKTOP"], "1");
         *state().write().unwrap() = None;
     }
 

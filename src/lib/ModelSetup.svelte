@@ -1,8 +1,8 @@
 <script lang="ts">
-	// "Models to show": the JuCode account reaches every model in every group
+	// "Models to show": the LynShen account reaches every model in every group
 	// it may use, far more than a model menu can hold. The user checks the ones
-	// they want; they become `jucode_models` in config.json (and `models` while
-	// JuCode is the provider), which the engine's model menu lists. Each row
+	// they want; they become `lynshen_models` in config.json (and `models` while
+	// LynShen is the provider), which the engine's model menu lists. Each row
 	// also takes a context window (`context_window_overrides`): it fills in one
 	// the gateway has not configured, or raises the advertised (smallest-account)
 	// window up to the gateway's largest.
@@ -15,14 +15,14 @@
 	import Notice from '$lib/ui/Notice.svelte';
 	import Vendor from '$lib/Vendor.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
-	import { fetchJucodeModels, readConfig, writeConfig, type JucodeModel } from '$lib/protocol';
+	import { fetchLynShenModels, readConfig, writeConfig, type LynShenModel } from '$lib/protocol';
 	import { fmtContext } from '$lib/composer/modelRows';
-	import { savedModel } from '$lib/jucodeModels';
+	import { savedModel } from '$lib/lynshenModels';
 	import { t } from '$lib/i18n';
 
 	let { onClose }: { onClose: () => void } = $props();
 
-	let models = $state<JucodeModel[]>([]);
+	let models = $state<LynShenModel[]>([]);
 	let picked = $state<string[]>([]);
 	let query = $state('');
 	let loading = $state(true);
@@ -41,8 +41,8 @@
 		return Math.round(parseFloat(m[1]) * (m[2] === 'k' ? 1_000 : m[2] === 'm' ? 1_000_000 : 1));
 	}
 	/** Largest window the gateway can serve; 0 when it configured none. */
-	const maxWindow = (m: JucodeModel) => m.max_context_window || m.context_window || 0;
-	function windowProblem(m: JucodeModel): string {
+	const maxWindow = (m: LynShenModel) => m.max_context_window || m.context_window || 0;
+	function windowProblem(m: LynShenModel): string {
 		const n = parseWindow(windows[m.id]);
 		if (Number.isNaN(n)) return t('shell.modelSetup.windowInvalid', { model: m.id });
 		const max = maxWindow(m);
@@ -53,7 +53,7 @@
 
 	// Vendor families by model-name prefix; the order is the display order.
 	// Preselected when nothing was chosen yet; mirrors the engine's
-	// DEFAULT_JUCODE_MODELS (agent-core/src/core.rs).
+	// DEFAULT_LYNSHEN_MODELS (agent-core/src/core.rs).
 	const DEFAULT_MODELS = [
 		'gpt-6.1-sol',
 		'codex-auto-review',
@@ -94,7 +94,7 @@
 
 	const groups = $derived.by(() => {
 		const q = query.trim().toLowerCase();
-		const map = new Map<string, JucodeModel[]>();
+		const map = new Map<string, LynShenModel[]>();
 		for (const m of models) {
 			if (q && !m.id.toLowerCase().includes(q)) continue;
 			const f = familyOf(m.id);
@@ -107,7 +107,7 @@
 		loading = true;
 		error = '';
 		try {
-			const [list, config] = await Promise.all([fetchJucodeModels(), readConfig()]);
+			const [list, config] = await Promise.all([fetchLynShenModels(), readConfig()]);
 			cfg = config;
 			models = list;
 			const names = (v: unknown) =>
@@ -118,7 +118,7 @@
 					.filter(([, v]) => typeof v === 'number' && v > 0)
 					.map(([k, v]) => [k, String(v)])
 			);
-			const prev = names(config.jucode_models);
+			const prev = names(config.lynshen_models);
 			const current = prev.length ? prev : DEFAULT_MODELS;
 			picked = current.filter((n) => list.some((m) => m.id === n));
 		} catch (e) {
@@ -132,7 +132,7 @@
 	function toggle(id: string, on: boolean) {
 		picked = on ? [...picked, id] : picked.filter((p) => p !== id);
 	}
-	function toggleGroup(list: JucodeModel[]) {
+	function toggleGroup(list: LynShenModel[]) {
 		const ids = list.map((m) => m.id);
 		const all = ids.every((id) => picked.includes(id));
 		picked = all ? picked.filter((p) => !ids.includes(p)) : [...new Set([...picked, ...ids])];
@@ -154,8 +154,8 @@
 			const n = parseWindow(windows[m.id]);
 			if (n > 0) overrides[m.id] = n;
 		}
-		const patch: Record<string, unknown> = { jucode_models: chosen, context_window_overrides: overrides };
-		if (cfg.provider === 'jucode') {
+		const patch: Record<string, unknown> = { lynshen_models: chosen, context_window_overrides: overrides };
+		if (cfg.provider === 'lynshen') {
 			patch.models = chosen;
 			if (!chosen.some((m) => m.name === cfg.model)) patch.model = chosen[0].name;
 		}

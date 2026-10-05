@@ -1,4 +1,4 @@
-// Sending a file to the computer (daemon `upload`, JuCode-CLI
+// Sending a file to the computer (daemon `upload`, LynShen-CLI
 // docs/daemon-protocol.md "Uploads"): base64 chunks over the daemon
 // connection, each acknowledged before the next, so through the relay the
 // file stays end to end encrypted and the session's own frames keep flowing.

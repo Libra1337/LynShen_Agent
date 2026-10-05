@@ -4,9 +4,9 @@ import { describeError, stripEngineHint } from './errorInfo';
 describe('describeError', () => {
 	it('reads a gateway 401 as the session credential running out, not a codex login', () => {
 		const raw =
-			"unexpected status 401 Unauthorized: invalid token, url: https://api.jucode.net/v1/responses, request id: 2e5d62a1-6dfa-4d1b-8ce2-ef42f25ee84a (Codex needs to sign in again: run `codex login` in a terminal.)";
+			"unexpected status 401 Unauthorized: invalid token, url: https://api.lynshen.net/v1/responses, request id: 2e5d62a1-6dfa-4d1b-8ce2-ef42f25ee84a (Codex needs to sign in again: run `codex login` in a terminal.)";
 		expect(describeError(raw, 'codex')).toEqual({
-			kind: 'jucodeAuth',
+			kind: 'lynshenAuth',
 			action: 'restart',
 			status: 401,
 			requestId: '2e5d62a1-6dfa-4d1b-8ce2-ef42f25ee84a'
@@ -22,7 +22,7 @@ describe('describeError', () => {
 	it.each([
 		['API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0: Invalid `signature` in `thinking` block"}}', 'foreignHistory'],
 		['failed to load configuration: Model provider `recodex` not found', 'providerMissing'],
-		['JuCode session expired. Run /login to sign in again.', 'jucodeLogin'],
+		['LynShen session expired. Run /login to sign in again.', 'lynshenLogin'],
 		['unexpected status 402 Payment Required: 余额不足', 'balance'],
 		["This model's maximum context length is 258400 tokens. context_length_exceeded", 'context'],
 		['prompt is too long: 212345 tokens > 200000 maximum', 'context'],

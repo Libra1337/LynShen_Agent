@@ -108,7 +108,7 @@ export type Picker =
 	| { kind: 'tree'; nodes: TreeNode[] }
 	| { kind: 'model'; models: ModelOption[]; activeEffort: string }
 	// `backend`: whose conversations the items are, when not this chat's own
-	// (the project history lists JuCode conversations in any chat).
+	// (the project history lists LynShen conversations in any chat).
 	| {
 			kind: 'resume';
 			items: ResumeItem[];
@@ -116,7 +116,7 @@ export type Picker =
 			/** The project's history picker (source tabs), not an engine's /resume. */
 			history?: boolean;
 			/** Whose saved conversations are listed; claude / codex ones import. */
-			source?: 'jucode' | 'claude' | 'codex';
+			source?: 'lynshen' | 'claude' | 'codex';
 	  }
 	| { kind: 'checkpoint'; items: ResumeItem[] }
 	| null;
@@ -139,7 +139,7 @@ export interface PlanStep {
 	status: string;
 }
 
-/** Mode names as a client sends them to the daemon (see backends/jucode.ts). */
+/** Mode names as a client sends them to the daemon (see backends/lynshen.ts). */
 const PENDING_MODES: Record<string, ApprovalMode> = { manual: 'ask', 'auto-edit': 'edits', auto: 'auto', 'full-access': 'all', plan: 'plan' };
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 const num = (v: unknown) => (typeof v === 'number' ? v : 0);
@@ -271,9 +271,9 @@ export class ChatState {
 	/** Where the messages of that turn start. */
 	#autoFrom = -1;
 
-	/** Which engine backend drives this session ('jucode' default). Set once at
+	/** Which engine backend drives this session ('lynshen' default). Set once at
 	 *  session creation; the `caps()` helper gates UI surfaces off it. */
-	backendId: BackendId = 'jucode';
+	backendId: BackendId = 'lynshen';
 
 	/** For 'acp' sessions: which registry agent backs it, and its display name
 	 *  (shown instead of the generic ACP label). Set once at session creation. */
@@ -287,9 +287,9 @@ export class ChatState {
 	 *  "Opus 4.8 (1M)"); falls back to `model` in the UI when empty. */
 	modelLabel = $state('');
 	cwd = $state('');
-	/** The engine runs this session as a chat (its directory is ~/.jucode/chats). */
+	/** The engine runs this session as a chat (its directory is ~/.lynshen/chats). */
 	get isChatMode() {
-		return /[\\/]\.jucode[\\/]chats([\\/]|$)/.test(this.cwd);
+		return /[\\/]\.lynshen[\\/]chats([\\/]|$)/.test(this.cwd);
 	}
 	sessionId = $state('');
 	effort = $state('');
@@ -300,7 +300,7 @@ export class ChatState {
 	ultracodeAvailable = $state(false);
 	engineState = $state('starting');
 	// True from session creation until the engine emits its first event — i.e.
-	// while the claude/codex/jucode child is still booting. Drives the spawn
+	// while the claude/codex/lynshen child is still booting. Drives the spawn
 	// loading animation in the empty chat area.
 	booting = $state(true);
 	// Set while the store (re)starts this chat's engine; what the user sends
@@ -392,7 +392,7 @@ export class ChatState {
 	/** The last turn ended in an error (its message); cleared by the next one. */
 	lastError = $state<string | null>(null);
 	compactionTokens = $state(0);
-	/** The model request failed and is being re-sent (jucode engine); null
+	/** The model request failed and is being re-sent (lynshen engine); null
 	 *  once output flows again or the turn ends. */
 	retry = $state<RetryState | null>(null);
 	// Files the agent edited this session (drives the Changes panel).
@@ -468,7 +468,7 @@ export class ChatState {
 	// When the request behind the current reply segment started.
 	#segStart: number | null = null;
 	#turnSegments = 0;
-	// Set once the engine reports an authoritative cost (jucode via context_usage).
+	// Set once the engine reports an authoritative cost (lynshen via context_usage).
 	// While false we estimate cost client-side from token usage × model pricing
 	// (claude/codex don't report cost).
 	#engineCost = false;
@@ -491,7 +491,7 @@ export class ChatState {
 
 	constructor() {
 		try {
-			const saved = localStorage.getItem('jucode-approval-mode');
+			const saved = localStorage.getItem('lynshen-approval-mode');
 			if (saved === 'edits' || saved === 'all') this.approvalMode = saved;
 		} catch {
 			/* no localStorage (e.g. tests) */
@@ -504,7 +504,7 @@ export class ChatState {
 	setApprovalMode(mode: ApprovalMode) {
 		this.approvalMode = mode;
 		try {
-			localStorage.setItem('jucode-approval-mode', mode);
+			localStorage.setItem('lynshen-approval-mode', mode);
 		} catch {
 			/* no localStorage (e.g. tests) */
 		}
@@ -635,14 +635,14 @@ export class ChatState {
 		this.#setSend(null);
 	}
 
-	/** A model request was sent. jucode then reports the connection
+	/** A model request was sent. lynshen then reports the connection
 	 *  (`thinking_start`); the other engines only the first token, so their
 	 *  wait counts as the time to it. */
 	#requestStarted() {
 		const now = Date.now();
 		this.#closeSegment(now);
 		this.#segStart = now;
-		this.call = { phase: this.backendId === 'jucode' ? 'connect' : 'ttft', since: now };
+		this.call = { phase: this.backendId === 'lynshen' ? 'connect' : 'ttft', since: now };
 	}
 
 	/** The open reply segment ends (its tool call, a new request, the turn's
@@ -661,7 +661,7 @@ export class ChatState {
 	bindRunKey(key: string) {
 		this.#runKey = key;
 		try {
-			this.runMs = Number(localStorage.getItem(`jucode-run-ms:${key}`)) || 0;
+			this.runMs = Number(localStorage.getItem(`lynshen-run-ms:${key}`)) || 0;
 		} catch {
 			/* no localStorage (e.g. tests) */
 		}
@@ -671,7 +671,7 @@ export class ChatState {
 		this.runMs += ms;
 		if (!this.#runKey) return;
 		try {
-			localStorage.setItem(`jucode-run-ms:${this.#runKey}`, String(this.runMs));
+			localStorage.setItem(`lynshen-run-ms:${this.#runKey}`, String(this.runMs));
 		} catch {
 			/* no localStorage (e.g. tests) */
 		}
@@ -1013,7 +1013,7 @@ export class ChatState {
 				break;
 			}
 			case 'thinking_start':
-				// jucode: the gateway answered; the first token is on its way.
+				// lynshen: the gateway answered; the first token is on its way.
 				if (this.#sending?.state === 'connecting' || this.#sending?.state === 'sending') this.#setSend('waiting');
 				if (this.call) this.call = { phase: 'ttft', since: Date.now() };
 				break;
@@ -1162,7 +1162,7 @@ export class ChatState {
 					kind: 'resume',
 					items: arr<ResumeItem>(ev.items),
 					...(isBackendId(str(ev.backend)) ? { backend: str(ev.backend) as BackendId } : {}),
-					...(ev.history === true ? { history: true, source: 'jucode' as const } : {})
+					...(ev.history === true ? { history: true, source: 'lynshen' as const } : {})
 				};
 				break;
 			case 'checkpoint_view': {
@@ -1318,7 +1318,7 @@ export class ChatState {
 					this.#lastTurn.outTokens += out;
 					this.#lastTurn.cost = this.cost - this.#turnCostStart;
 				}
-				// Prefer the active assistant message (jucode reports usage per
+				// Prefer the active assistant message (lynshen reports usage per
 				// message, mid-turn). When it's already reset — e.g. claude reports
 				// one usage at the end of the turn, after the assistant finished —
 				// fall back to the last assistant message, matching #endTurn's

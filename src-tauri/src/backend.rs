@@ -1,6 +1,6 @@
 //! The agent CLIs the desktop knows: how their binaries are resolved, which
 //! argv their native TUI tabs may start with, and the custom environment a
-//! user may give them. Sessions themselves run in the jucode daemon.
+//! user may give them. Sessions themselves run in the lynshen daemon.
 //!
 //! Safety model: the frontend never passes argv. TUI tabs take a fixed token
 //! allowlist per backend, and every value is one argv entry (never
@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BackendKind {
     /// Native engine, the default — full protocol support.
-    Jucode,
+    LynShen,
     /// OpenAI Codex CLI in stdio JSON-RPC server mode (`codex app-server`).
     Codex,
     /// Claude Code CLI in stream-json print mode.
@@ -26,7 +26,7 @@ pub enum BackendKind {
 impl BackendKind {
     pub fn parse(s: &str) -> Result<Self, String> {
         match s {
-            "jucode" => Ok(Self::Jucode),
+            "lynshen" => Ok(Self::LynShen),
             "codex" => Ok(Self::Codex),
             "claude" => Ok(Self::Claude),
             "acp" => Ok(Self::Acp),
@@ -38,7 +38,7 @@ impl BackendKind {
     /// only used in error messages — the actual command comes from the registry.
     pub fn bin_name(self) -> &'static str {
         match self {
-            Self::Jucode => "jucode",
+            Self::LynShen => "lynshen",
             Self::Codex => "codex",
             Self::Claude => "claude",
             Self::Acp => "acp",
@@ -49,10 +49,10 @@ impl BackendKind {
     /// consulted for `Acp` (its binary resolution goes through the registry).
     pub fn env_override(self) -> &'static str {
         match self {
-            Self::Jucode => "JUCODE_BIN",
+            Self::LynShen => "LYNSHEN_BIN",
             Self::Codex => "CODEX_BIN",
             Self::Claude => "CLAUDE_BIN",
-            Self::Acp => "JUCODE_ACP_BIN_UNUSED",
+            Self::Acp => "LYNSHEN_ACP_BIN_UNUSED",
         }
     }
 }
@@ -136,8 +136,8 @@ pub fn validate_env(value: &serde_json::Value) -> Result<Vec<(String, String)>, 
 /// webview can never smuggle arbitrary argv into a spawn.
 pub fn tui_allowed_args(kind: BackendKind) -> &'static [&'static str] {
     match kind {
-        // Bare `jucode` runs the TUI; it has no safe extra tokens.
-        BackendKind::Jucode => &[],
+        // Bare `lynshen` runs the TUI; it has no safe extra tokens.
+        BackendKind::LynShen => &[],
         // `codex resume` opens the interactive session picker.
         BackendKind::Codex => &["resume"],
         // `claude --continue` resumes the last session; a bare `claude
@@ -151,13 +151,13 @@ pub fn tui_allowed_args(kind: BackendKind) -> &'static [&'static str] {
 }
 
 /// The one TUI token that may be followed by a session id (GUI → TUI session
-/// handoff resumes by id). jucode has no resume argv — its TUI resumes via
+/// handoff resumes by id). lynshen has no resume argv — its TUI resumes via
 /// the `/resume` slash command after spawn.
 fn tui_resume_flag(kind: BackendKind) -> Option<&'static str> {
     match kind {
         BackendKind::Claude => Some("--resume"),
         BackendKind::Codex => Some("resume"),
-        BackendKind::Jucode | BackendKind::Acp => None,
+        BackendKind::LynShen | BackendKind::Acp => None,
     }
 }
 
@@ -198,7 +198,7 @@ pub fn validate_bin_override(s: &str) -> Result<(), String> {
 /// Well-known install locations probed after PATH (a packaged app inherits a
 /// minimal PATH from launchd / the desktop session).
 fn well_known_paths(kind: BackendKind) -> Vec<PathBuf> {
-    let mut paths = well_known_candidates(kind.bin_name(), kind == BackendKind::Jucode);
+    let mut paths = well_known_candidates(kind.bin_name(), kind == BackendKind::LynShen);
     if kind == BackendKind::Claude {
         let exe = exe_name("claude");
         let home = home_dir();
@@ -225,15 +225,15 @@ pub(crate) fn home_dir() -> PathBuf {
 
 /// Well-known install dirs for an arbitrary program name (shared by the fixed
 /// backends and the ACP registry's command resolution).
-fn well_known_candidates(name: &str, jucode_installer_dir: bool) -> Vec<PathBuf> {
+fn well_known_candidates(name: &str, lynshen_installer_dir: bool) -> Vec<PathBuf> {
     let exe = exe_name(name);
     let home = home_dir();
     let mut paths: Vec<PathBuf> = Vec::new();
     if cfg!(windows) {
-        if jucode_installer_dir {
+        if lynshen_installer_dir {
             // Per-user installer dir and the npm global prefix.
             if let Some(la) = std::env::var_os("LOCALAPPDATA") {
-                paths.push(PathBuf::from(la).join("Programs").join("jucode").join(&exe));
+                paths.push(PathBuf::from(la).join("Programs").join("lynshen").join(&exe));
             }
         }
         if let Some(ad) = std::env::var_os("APPDATA") {
@@ -255,7 +255,7 @@ fn well_known_candidates(name: &str, jucode_installer_dir: bool) -> Vec<PathBuf>
 /// resolution (env override → PATH → well-known dirs → dev builds); anything
 /// else goes PATH → well-known dirs → bare name (PATH-spawn at run time).
 pub fn resolve_acp_program(command: &str) -> PathBuf {
-    for kind in [BackendKind::Jucode, BackendKind::Codex, BackendKind::Claude] {
+    for kind in [BackendKind::LynShen, BackendKind::Codex, BackendKind::Claude] {
         if command == kind.bin_name() {
             return resolve_backend_bin(kind, None);
         }
@@ -276,17 +276,17 @@ pub fn resolve_acp_program(command: &str) -> PathBuf {
 }
 
 /// Dev fallback for the native engine only: the freshly-built binary from the
-/// sibling `JuCode-CLI` checkout (mirrors the pre-multi-backend behavior).
-fn jucode_dev_candidates() -> Vec<PathBuf> {
+/// sibling `LynShen-CLI` checkout (mirrors the pre-multi-backend behavior).
+fn lynshen_dev_candidates() -> Vec<PathBuf> {
     let exe = if cfg!(windows) {
-        "jucode.exe"
+        "lynshen.exe"
     } else {
-        "jucode"
+        "lynshen"
     };
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR")); // <repo>/src-tauri
     [
-        format!("../../JuCode-CLI/target/debug/{exe}"),
-        format!("../../JuCode-CLI/target/release/{exe}"),
+        format!("../../LynShen-CLI/target/debug/{exe}"),
+        format!("../../LynShen-CLI/target/release/{exe}"),
         format!("../../target/debug/{exe}"),
         format!("../../target/release/{exe}"),
     ]
@@ -297,7 +297,7 @@ fn jucode_dev_candidates() -> Vec<PathBuf> {
 
 /// Testable core of binary resolution. Order:
 /// env override → settings-provided path → PATH → well-known dirs →
-/// (jucode only) sibling dev build → bare binary name.
+/// (lynshen only) sibling dev build → bare binary name.
 fn resolve_with(
     kind: BackendKind,
     bin_override: Option<&str>,
@@ -319,8 +319,8 @@ fn resolve_with(
             return candidate;
         }
     }
-    if kind == BackendKind::Jucode {
-        for candidate in jucode_dev_candidates() {
+    if kind == BackendKind::LynShen {
+        for candidate in lynshen_dev_candidates() {
             if exists(&candidate) {
                 return candidate;
             }
@@ -330,11 +330,11 @@ fn resolve_with(
 }
 
 /// Resolves the binary for a backend (see `resolve_with` for the order). A
-/// release build runs its own jucode unless an override names another.
+/// release build runs its own lynshen unless an override names another.
 pub fn resolve_backend_bin(kind: BackendKind, bin_override: Option<&str>) -> PathBuf {
     let overridden = bin_override.is_some()
         || std::env::var(kind.env_override()).is_ok_and(|p| !p.trim().is_empty());
-    if kind == BackendKind::Jucode && !overridden {
+    if kind == BackendKind::LynShen && !overridden {
         if let Some(path) = crate::app_cli::path() {
             return path;
         }
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn parses_known_backends_and_rejects_unknown() {
-        assert_eq!(BackendKind::parse("jucode").unwrap(), BackendKind::Jucode);
+        assert_eq!(BackendKind::parse("lynshen").unwrap(), BackendKind::LynShen);
         assert_eq!(BackendKind::parse("codex").unwrap(), BackendKind::Codex);
         assert_eq!(BackendKind::parse("claude").unwrap(), BackendKind::Claude);
         assert_eq!(BackendKind::parse("acp").unwrap(), BackendKind::Acp);
@@ -372,7 +372,7 @@ mod tests {
         assert_eq!(p, PathBuf::from("/usr/local/bin/my-agent"));
         // The engine binaries route through the shared backend resolution
         // (worst case they fall back to the bare name, never to an empty path).
-        let ju = resolve_acp_program("jucode");
+        let ju = resolve_acp_program("lynshen");
         assert!(!ju.as_os_str().is_empty());
     }
 
@@ -477,7 +477,7 @@ mod tests {
 
     #[test]
     fn tui_accepts_empty_args_for_every_backend() {
-        for kind in [BackendKind::Jucode, BackendKind::Codex, BackendKind::Claude] {
+        for kind in [BackendKind::LynShen, BackendKind::Codex, BackendKind::Claude] {
             assert!(validate_tui_args(kind, &[]).is_ok(), "{kind:?}");
         }
     }
@@ -488,7 +488,7 @@ mod tests {
         assert!(validate_tui_args(BackendKind::Claude, &["--continue".into()]).is_ok());
         assert!(validate_tui_args(BackendKind::Claude, &["--resume".into()]).is_ok());
         // Tokens don't leak across backends.
-        assert!(validate_tui_args(BackendKind::Jucode, &["resume".into()]).is_err());
+        assert!(validate_tui_args(BackendKind::LynShen, &["resume".into()]).is_err());
         assert!(validate_tui_args(BackendKind::Codex, &["--continue".into()]).is_err());
         assert!(validate_tui_args(BackendKind::Claude, &["resume".into()]).is_err());
     }
@@ -498,12 +498,12 @@ mod tests {
         let sid = "0f3d7a1c-9e2b-4b7e-9d4d-2a1b3c4d5e6f";
         assert!(validate_tui_args(BackendKind::Claude, &["--resume".into(), sid.into()]).is_ok());
         assert!(validate_tui_args(BackendKind::Codex, &["resume".into(), sid.into()]).is_ok());
-        // The resume-with-id shape doesn't leak across backends, and jucode
+        // The resume-with-id shape doesn't leak across backends, and lynshen
         // has no resume argv at all (it resumes via /resume after spawn).
         assert!(validate_tui_args(BackendKind::Claude, &["resume".into(), sid.into()]).is_err());
         assert!(validate_tui_args(BackendKind::Codex, &["--resume".into(), sid.into()]).is_err());
-        assert!(validate_tui_args(BackendKind::Jucode, &["resume".into(), sid.into()]).is_err());
-        assert!(validate_tui_args(BackendKind::Jucode, &["--resume".into(), sid.into()]).is_err());
+        assert!(validate_tui_args(BackendKind::LynShen, &["resume".into(), sid.into()]).is_err());
+        assert!(validate_tui_args(BackendKind::LynShen, &["--resume".into(), sid.into()]).is_err());
         // Only the resume flag takes a value.
         assert!(
             validate_tui_args(BackendKind::Claude, &["--continue".into(), sid.into()]).is_err()
@@ -584,18 +584,18 @@ mod tests {
     }
 
     #[test]
-    fn jucode_probes_dev_build_before_bare_fallback() {
-        let p = resolve_with(BackendKind::Jucode, None, &no_env, &no_which, &|c| {
-            c.to_string_lossy().contains("JuCode-CLI/target/debug")
+    fn lynshen_probes_dev_build_before_bare_fallback() {
+        let p = resolve_with(BackendKind::LynShen, None, &no_env, &no_which, &|c| {
+            c.to_string_lossy().contains("LynShen-CLI/target/debug")
         });
-        assert!(p.to_string_lossy().contains("JuCode-CLI/target/debug"));
+        assert!(p.to_string_lossy().contains("LynShen-CLI/target/debug"));
         let none = resolve_with(
-            BackendKind::Jucode,
+            BackendKind::LynShen,
             None,
             &no_env,
             &no_which,
             &nothing_exists,
         );
-        assert_eq!(none, PathBuf::from("jucode"));
+        assert_eq!(none, PathBuf::from("lynshen"));
     }
 }

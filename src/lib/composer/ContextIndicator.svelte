@@ -15,7 +15,7 @@
 	}: {
 		pct: number;
 		// True only when contextLimit is the engine's real auto-compaction threshold
-		// (jucode). Otherwise we're gauging against the raw window → "context used".
+		// (lynshen). Otherwise we're gauging against the raw window → "context used".
 		atThreshold?: boolean;
 		contextTokens: number;
 		contextLimit: number;

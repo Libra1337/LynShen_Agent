@@ -18,7 +18,7 @@ export type { Locale };
 export const LOCALES: Locale[] = ['zh', 'en'];
 export const LOCALE_LABELS: Record<Locale, string> = { zh: '中文', en: 'English' };
 
-const STORAGE_KEY = 'jucode-locale';
+const STORAGE_KEY = 'lynshen-locale';
 const FALLBACK: Locale = 'zh';
 
 function detect(): Locale {

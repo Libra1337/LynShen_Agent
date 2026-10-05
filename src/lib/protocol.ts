@@ -3,14 +3,14 @@ import type { McpServerEntry } from './mcp';
 import { DaemonClient, type DaemonEndpoint, type EngineSpec, type SocketLike } from './daemon';
 import { buildBackendOpts } from './backends/settings';
 
-// Started when needed with the jucode backend's binary and environment (the
-// daemon runs jucode sessions itself).
+// Started when needed with the lynshen backend's binary and environment (the
+// daemon runs lynshen sessions itself).
 const daemonEndpoint = () => {
-	const opts = buildBackendOpts('jucode');
+	const opts = buildBackendOpts('lynshen');
 	return invoke<DaemonEndpoint>('daemon_endpoint', { binOverride: opts?.bin_override, env: opts?.env });
 };
 
-/** The desktop's connection to the local `jucode daemon`, which runs every
+/** The desktop's connection to the local `lynshen daemon`, which runs every
  *  session; the page wires its `onFrame` / `onExit` into the session store.
  *  The remote page makes one connection per computer (remote/connection). */
 export const daemon = new DaemonClient(daemonEndpoint, (url) => new WebSocket(url) as unknown as SocketLike);
@@ -41,7 +41,7 @@ export type Op =
 	| { op: 'user_message'; content: string; images?: string[] }
 	| { op: 'command'; input: string }
 	| { op: 'steer' }
-	// JuCode: runs a failed turn again with no new message (SessionStore.retryTurn).
+	// LynShen: runs a failed turn again with no new message (SessionStore.retryTurn).
 	| { op: 'continue' }
 	| { op: 'interrupt' }
 	| { op: 'shutdown' }
@@ -77,7 +77,7 @@ export type Op =
 	| { op: 'subagent_transcript'; agent_id: string };
 
 /** Saves an MCP server change (`mcp_set` / `mcp_remove` / `mcp_toggle`) for
- *  every session; open JuCode sessions apply it at once. */
+ *  every session; open LynShen sessions apply it at once. */
 export async function changeMcpServers(op: Op): Promise<void> {
 	await daemon.connect();
 	await daemon.request(op);
@@ -145,21 +145,21 @@ export function refreshShellEnv(): Promise<ShellEnvStatus> {
 	return invoke('refresh_shell_env');
 }
 
-/** Makes `jucode` a terminal command running the app's bundled CLI; the
+/** Makes `lynshen` a terminal command running the app's bundled CLI; the
  *  command's location. */
 export function installCliCommand(): Promise<string> {
 	return invoke('install_cli_command');
 }
 
 // Conversations Claude Code / Codex saved in their own apps, imported as a
-// cleaned copy that JuCode resumes (src-tauri/src/native_import.rs).
+// cleaned copy that LynShen resumes (src-tauri/src/native_import.rs).
 export type NativeSource = 'claude' | 'codex';
 export interface NativeSession {
 	id: string;
 	title: string;
 	mtime_ms: number;
 	origin: string;
-	/** The JuCode copy when it was imported before. */
+	/** The LynShen copy when it was imported before. */
 	imported: string | null;
 }
 export function nativeSessions(source: NativeSource, cwd: string): Promise<NativeSession[]> {
@@ -180,7 +180,7 @@ export interface HistoryItem {
 	agent: string | null;
 	/** Hosted by the daemon right now. */
 	open: boolean;
-	/** `jucode`, `claude` or `codex`. */
+	/** `lynshen`, `claude` or `codex`. */
 	engine?: string;
 }
 export async function sessionHistory(cwd: string): Promise<HistoryItem[]> {
@@ -188,7 +188,7 @@ export async function sessionHistory(cwd: string): Promise<HistoryItem[]> {
 	return (reply.sessions as HistoryItem[]) ?? [];
 }
 
-// Config / auth (read & write ~/.jucode/{config.json,auth.json} via Tauri fs).
+// Config / auth (read & write ~/.lynshen/{config.json,auth.json} via Tauri fs).
 export function readConfig(): Promise<Record<string, unknown>> {
 	return invoke('read_config');
 }
@@ -214,9 +214,9 @@ export function removeAuthKey(provider: string): Promise<void> {
 	return invoke('remove_auth_key', { provider });
 }
 
-// Skills marketplace: the daemon combines JuCode with github.com/anthropics/skills
+// Skills marketplace: the daemon combines LynShen with github.com/anthropics/skills
 // and installs into the backend's personal skills directory.
-export type SkillSource = 'jucode' | 'anthropic';
+export type SkillSource = 'lynshen' | 'anthropic';
 export interface MarketSkill {
 	id: string;
 	name: string;
@@ -244,7 +244,7 @@ export async function installMarketplaceSkill(source: SkillSource, id: string, b
 	return reply.path as string;
 }
 
-// JuCode account: plan / balance / usage / call-details, fetched via the
+// LynShen account: plan / balance / usage / call-details, fetched via the
 // OAuth read endpoints using the stored device access token (auto-refreshed).
 export interface AccountInfo {
 	email?: string;
@@ -275,10 +275,10 @@ export interface UsageTokens {
 	/** Gateway cost (account currency), cloud rows only. */
 	cost?: string;
 }
-/** jucode: the JuCode gateway; third_party: a built-in catalog provider;
+/** lynshen: the LynShen gateway; third_party: a built-in catalog provider;
  *  local: the user's own logins and providers; legacy: older local counts
  *  that cannot be told apart. */
-export type ChannelKind = 'jucode' | 'third_party' | 'local' | 'legacy';
+export type ChannelKind = 'lynshen' | 'third_party' | 'local' | 'legacy';
 /** Coding-agent usage over a range: the account's (cloud, every computer)
  *  or this computer's (the daemon's `usage_local`, with projects). */
 export interface UsageSummary {
@@ -303,8 +303,8 @@ export interface AgentTurnRow extends Omit<UsageTokens, 'turns'> {
 	started_at: number | null;
 	ended_at: number | null;
 }
-/** A model the JuCode account can use (GET /v1/models). */
-export type JucodeModel = {
+/** A model the LynShen account can use (GET /v1/models). */
+export type LynShenModel = {
 	id: string;
 	/** Smallest window among the gateway accounts serving the model; absent
 	 *  when the gateway has none configured. */
@@ -318,11 +318,11 @@ export type JucodeModel = {
 	/** The window range through each of the account's groups, by group id. */
 	group_context_windows?: Record<string, { context_window: number; max_context_window: number }>;
 };
-export async function fetchJucodeModels(): Promise<JucodeModel[]> {
-	const v = await invoke<{ data?: JucodeModel[] }>('fetch_jucode_models');
+export async function fetchLynShenModels(): Promise<LynShenModel[]> {
+	const v = await invoke<{ data?: LynShenModel[] }>('fetch_lynshen_models');
 	return Array.isArray(v.data) ? v.data : [];
 }
-export type JucodeGroup = {
+export type LynShenGroup = {
 	id: string;
 	name: string;
 	description?: string;
@@ -332,8 +332,8 @@ export type JucodeGroup = {
 	/** Each model's window range through this group, by model name. */
 	context_windows?: Record<string, { context_window: number; max_context_window: number }>;
 };
-export async function fetchJucodeGroups(): Promise<JucodeGroup[]> {
-	const v = await invoke<{ groups?: JucodeGroup[] }>('fetch_jucode_groups');
+export async function fetchLynShenGroups(): Promise<LynShenGroup[]> {
+	const v = await invoke<{ groups?: LynShenGroup[] }>('fetch_lynshen_groups');
 	return Array.isArray(v.groups) ? v.groups : [];
 }
 export function fetchAccountInfo(): Promise<AccountInfo> {
@@ -347,6 +347,17 @@ export interface DeepseekBalance {
 }
 export function fetchDeepseekBalance(): Promise<DeepseekBalance> {
 	return invoke('fetch_deepseek_balance');
+}
+
+// Monoize 网关（LynShen Console）。余额走 /user/balance——网关按 DeepSeek
+// /user/balance 的格式作答，所以直接复用上面的类型；模型列表走 /v1/models。
+export function fetchMonoizeBalance(): Promise<DeepseekBalance> {
+	return invoke('fetch_monoize_balance');
+}
+export type MonoizeModel = { id: string; owned_by?: string };
+export async function fetchMonoizeModels(): Promise<MonoizeModel[]> {
+	const v = await invoke<{ data?: MonoizeModel[] }>('fetch_monoize_models');
+	return Array.isArray(v.data) ? v.data : [];
 }
 export function fetchUsage(): Promise<PlanUsage> {
 	return invoke('fetch_usage');
@@ -378,7 +389,7 @@ export function projectRoot(): Promise<string> {
 	return invoke('project_root');
 }
 
-/** `~/.jucode/chats`, where chat sessions run (created when missing). */
+/** `~/.lynshen/chats`, where chat sessions run (created when missing). */
 export function chatsDir(): Promise<string> {
 	return invoke('chats_dir');
 }
@@ -452,7 +463,7 @@ export function installDependency(name: string): Promise<InstallOutcome> {
 	return invoke('install_dependency', { name });
 }
 
-// --- external tool dependencies (node/npm, ffmpeg, git, gh, codex, jucode, claude) ---
+// --- external tool dependencies (node/npm, ffmpeg, git, gh, codex, lynshen, claude) ---
 
 // What installing a tool entails on this machine (mirrors installer::Plan).
 export type InstallPlan =
@@ -528,12 +539,12 @@ export function listProviders(): Promise<ProviderInfo[]> {
 export function git(args: string[], cwd?: string): Promise<string> {
 	return invoke('git', { args, cwd });
 }
-// 并行任务 worktree 的容器目录（<repo-parent>/.jucode-worktrees/<repo-name>）。
+// 并行任务 worktree 的容器目录（<repo-parent>/.lynshen-worktrees/<repo-name>）。
 export function worktreeBase(cwd: string): Promise<string> {
 	return invoke('worktree_base', { cwd });
 }
 /** Non-shell pty target: `command` must be an allowlisted backend name
- *  (jucode / codex / claude). The Rust side validates it and `args` against
+ *  (lynshen / codex / claude). The Rust side validates it and `args` against
  *  fixed allowlists and resolves the binary like engine spawns — a missing
  *  binary rejects with `binary-missing:<name>`. */
 export interface PtyCommand {

@@ -39,27 +39,27 @@ pub(crate) fn no_window(cmd: &mut Command) {
     let _ = cmd;
 }
 
-/// Resolves the `jucode` binary: `JUCODE_BIN` override, then the system-installed
-/// CLI on PATH, then well-known install dirs, then a sibling `JuCode-CLI`
+/// Resolves the `lynshen` binary: `LYNSHEN_BIN` override, then the system-installed
+/// CLI on PATH, then well-known install dirs, then a sibling `LynShen-CLI`
 /// checkout / in-tree build (dev convenience). The desktop app no longer
-/// bundles the engine — it drives whatever `jucode` the user has installed.
+/// bundles the engine — it drives whatever `lynshen` the user has installed.
 /// (Resolution now lives in `backend::resolve_backend_bin`, shared with the
 /// codex / claude backends.)
 fn resolve_bin() -> PathBuf {
-    backend::resolve_backend_bin(BackendKind::Jucode, None)
+    backend::resolve_backend_bin(BackendKind::LynShen, None)
 }
 
-/// Working directory the agent operates in. `JUCODE_CWD` override, else the
+/// Working directory the agent operates in. `LYNSHEN_CWD` override, else the
 /// directory the app was launched from.
 fn resolve_cwd() -> PathBuf {
-    if let Ok(path) = std::env::var("JUCODE_CWD") {
+    if let Ok(path) = std::env::var("LYNSHEN_CWD") {
         return PathBuf::from(path);
     }
     std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
 /// After canonicalization: is `path` inside `root`, or inside `root`'s
-/// parallel-task worktree container (`<root-parent>/.jucode-worktrees/<root-name>`)?
+/// parallel-task worktree container (`<root-parent>/.lynshen-worktrees/<root-name>`)?
 /// Task worktrees are deliberate siblings of the repo, so the fallback keeps the
 /// files/editor commands usable in worktree projects without opening up
 /// arbitrary paths.
@@ -115,8 +115,8 @@ fn is_protected_in(home: &Path, canon_path: &Path) -> bool {
         ".ssh",
         ".gnupg",
         ".aws",
-        ".jucode/auth.json",
-        ".jucode/daemon",
+        ".lynshen/auth.json",
+        ".lynshen/daemon",
     ]
     .iter()
     .map(|protected| {
@@ -176,8 +176,8 @@ fn check_backend(backend: String, bin_override: Option<String>) -> Result<Backen
     })
 }
 
-/// Where the local `jucode daemon` listens (its default address) and the
-/// token it wrote to `~/.jucode/daemon/token` on first start.
+/// Where the local `lynshen daemon` listens (its default address) and the
+/// token it wrote to `~/.lynshen/daemon/token` on first start.
 #[derive(Serialize)]
 struct DaemonEndpoint {
     url: String,
@@ -194,7 +194,7 @@ fn daemon_listening() -> bool {
     .is_ok()
 }
 
-/// Starts `jucode daemon` in the background when nothing listens on its
+/// Starts `lynshen daemon` in the background when nothing listens on its
 /// address yet, and waits (up to ~8 s) until it accepts connections and has
 /// written its token. The daemon outlives Desktop on purpose: it keeps
 /// sessions and agents running.
@@ -210,7 +210,7 @@ fn ensure_daemon(bin_override: Option<&str>, env: &[(String, String)]) -> Result
     if daemon_listening() {
         return Ok(());
     }
-    let log = jucode_dir().join("daemon");
+    let log = lynshen_dir().join("daemon");
     std::fs::create_dir_all(&log).map_err(|e| e.to_string())?;
     let log = std::fs::OpenOptions::new()
         .create(true)
@@ -218,7 +218,7 @@ fn ensure_daemon(bin_override: Option<&str>, env: &[(String, String)]) -> Result
         .open(log.join("daemon.log"))
         .map_err(|e| e.to_string())?;
     let mut cmd = Command::new(backend::resolve_backend_bin(
-        BackendKind::Jucode,
+        BackendKind::LynShen,
         bin_override,
     ));
     no_window(&mut cmd);
@@ -227,9 +227,9 @@ fn ensure_daemon(bin_override: Option<&str>, env: &[(String, String)]) -> Result
         .stdout(log.try_clone().map_err(|e| e.to_string())?)
         .stderr(log);
     // The terminal's environment: a GUI launch has a bare PATH, so an
-    // npm-installed jucode could not find node and sessions' tools could not
-    // find git, cargo and the like. The jucode backend's own environment
-    // comes on top (the daemon is the jucode engine).
+    // npm-installed lynshen could not find node and sessions' tools could not
+    // find git, cargo and the like. The lynshen backend's own environment
+    // comes on top (the daemon is the lynshen engine).
     shell_env::apply_to_command(&mut cmd, true, &[], env);
     #[cfg(unix)]
     {
@@ -240,7 +240,7 @@ fn ensure_daemon(bin_override: Option<&str>, env: &[(String, String)]) -> Result
     }
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("could not start jucode daemon: {e}"))?;
+        .map_err(|e| format!("could not start lynshen daemon: {e}"))?;
     for _ in 0..40 {
         std::thread::sleep(std::time::Duration::from_millis(200));
         if daemon_listening() {
@@ -252,15 +252,15 @@ fn ensure_daemon(bin_override: Option<&str>, env: &[(String, String)]) -> Result
         }
         if let Ok(Some(status)) = child.try_wait() {
             return Err(format!(
-                "jucode daemon exited ({status}); see {}",
-                jucode_dir().join("daemon").join("daemon.log").display()
+                "lynshen daemon exited ({status}); see {}",
+                lynshen_dir().join("daemon").join("daemon.log").display()
             ));
         }
     }
     std::thread::spawn(move || {
         let _ = child.wait();
     });
-    Err("jucode daemon did not start in time".to_string())
+    Err("lynshen daemon did not start in time".to_string())
 }
 
 /// Whether this app run already checked the daemon for staleness.
@@ -298,9 +298,9 @@ fn stale_daemon() -> Option<(i32, String)> {
         run("ps", &["-o", "comm=", "-p", &pid.to_string()])?
     };
     let exe = PathBuf::from(exe);
-    // jucode-cli: the app's sidecar, run in place when its copy can't be written.
-    if !matches!(exe.file_name()?.to_str()?, "jucode" | "jucode-cli") {
-        return None; // not a jucode daemon: leave it alone
+    // lynshen-cli: the app's sidecar, run in place when its copy can't be written.
+    if !matches!(exe.file_name()?.to_str()?, "lynshen" | "lynshen-cli") {
+        return None; // not a lynshen daemon: leave it alone
     }
     let Ok(meta) = std::fs::metadata(&exe) else {
         return Some((pid, format!("{} was removed", exe.display())));
@@ -344,7 +344,7 @@ fn replace_stale_daemon() {
     }
     #[cfg(unix)]
     if let Some((pid, reason)) = stale_daemon() {
-        eprintln!("jucode daemon is stale ({reason}); restarting it");
+        eprintln!("lynshen daemon is stale ({reason}); restarting it");
         let _ = Command::new("kill")
             .args(["-TERM", &pid.to_string()])
             .status();
@@ -358,7 +358,7 @@ fn replace_stale_daemon() {
 }
 
 /// The local daemon's address and token, starting it first when needed.
-/// `bin_override` and `env` are the jucode backend's settings, used when it
+/// `bin_override` and `env` are the lynshen backend's settings, used when it
 /// has to be started.
 #[tauri::command(async)]
 fn daemon_endpoint(
@@ -374,21 +374,21 @@ fn daemon_endpoint(
     };
     replace_stale_daemon();
     ensure_daemon(bin_override.as_deref(), &env)?;
-    let path = jucode_dir().join("daemon").join("token");
+    let path = lynshen_dir().join("daemon").join("token");
     let token = std::fs::read_to_string(&path)
         .map(|token| token.trim().to_string())
         .ok()
         .filter(|token| !token.is_empty())
-        .ok_or_else(|| format!("jucode daemon wrote no token at {}", path.display()))?;
+        .ok_or_else(|| format!("lynshen daemon wrote no token at {}", path.display()))?;
     Ok(DaemonEndpoint {
         url: format!("ws://{DAEMON_ADDR}"),
         token,
     })
 }
 
-fn jucode_dir() -> PathBuf {
+fn lynshen_dir() -> PathBuf {
     let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));
-    PathBuf::from(home.unwrap_or_default()).join(".jucode")
+    PathBuf::from(home.unwrap_or_default()).join(".lynshen")
 }
 
 fn read_json(path: &std::path::Path) -> serde_json::Value {
@@ -426,7 +426,7 @@ fn write_json(path: &std::path::Path, value: &serde_json::Value) -> Result<(), S
 
 /// Whether new writes to auth.json encrypt credentials at rest.
 ///
-/// Off by default: auth.json is shared with the `jucode` CLI engine, which
+/// Off by default: auth.json is shared with the `lynshen` CLI engine, which
 /// reads the same keys and doesn't know the envelope format, so turning this on
 /// is a deliberate choice for people who only drive the engine through Desktop.
 /// See `docs/secrets.md`.
@@ -448,7 +448,7 @@ struct AuthStore {
 
 impl AuthStore {
     fn app_local() -> Self {
-        let dir = jucode_dir();
+        let dir = lynshen_dir();
         Self {
             auth: dir.join("auth.json"),
             config: dir.join("config.json"),
@@ -517,14 +517,14 @@ fn window_effect() -> Option<&'static str> {
 
 #[tauri::command]
 fn read_config() -> serde_json::Value {
-    read_json(&jucode_dir().join("config.json"))
+    read_json(&lynshen_dir().join("config.json"))
 }
 
 /// Shallow-merges `patch`'s top-level keys into config.json. Applies to newly
 /// created sessions (the engine reads config at startup).
 #[tauri::command]
 fn write_config(patch: serde_json::Value) -> Result<(), String> {
-    let path = jucode_dir().join("config.json");
+    let path = lynshen_dir().join("config.json");
     let mut current = read_json_strict(&path)?;
     if let (Some(cur), Some(p)) = (current.as_object_mut(), patch.as_object()) {
         for (key, value) in p {
@@ -583,9 +583,9 @@ fn app_data_write(app: AppHandle, file: String, content: String) -> Result<(), S
     std::fs::rename(&tmp, &path).map_err(|e| format!("写入 {} 失败：{e}", path.display()))
 }
 
-/// Returns the provider names the user is authenticated with. JuCode is now
-/// an OAuth login (tokens live in the top-level `jucode` block, not the
-/// `providers` map), so it's reported as "jucode" whenever a refresh token
+/// Returns the provider names the user is authenticated with. LynShen is now
+/// an OAuth login (tokens live in the top-level `lynshen` block, not the
+/// `providers` map), so it's reported as "lynshen" whenever a refresh token
 /// is present.
 #[tauri::command]
 fn read_auth_providers() -> Vec<String> {
@@ -604,13 +604,13 @@ fn read_auth_providers() -> Vec<String> {
         }
     }
     let logged_in = auth
-        .get("jucode")
+        .get("lynshen")
         .and_then(|j| j.get("refresh_token"))
         .and_then(|v| v.as_str())
         .map(|s| !s.trim().is_empty())
         .unwrap_or(false);
-    if logged_in && !providers.iter().any(|p| p == "jucode") {
-        providers.push("jucode".to_string());
+    if logged_in && !providers.iter().any(|p| p == "lynshen") {
+        providers.push("lynshen".to_string());
     }
     providers
 }
@@ -630,13 +630,13 @@ fn set_auth_key(provider: String, key: String) -> Result<(), String> {
     write_auth(&mut current)
 }
 
-/// Removes a provider's stored credential — logout (jucode) / clear key (others).
-/// For jucode, `jucode logout` revokes this computer's device authorization
+/// Removes a provider's stored credential — logout (lynshen) / clear key (others).
+/// For lynshen, `lynshen logout` revokes this computer's device authorization
 /// and drops the OAuth tokens.
 #[tauri::command(async)]
 fn remove_auth_key(provider: String) -> Result<(), String> {
-    if provider == "jucode" {
-        *jucode_session_cache() = None;
+    if provider == "lynshen" {
+        *lynshen_session_cache() = None;
         let mut cmd = Command::new(resolve_bin());
         no_window(&mut cmd);
         shell_env::apply_to_command(&mut cmd, true, &[], &[]);
@@ -644,7 +644,7 @@ fn remove_auth_key(provider: String) -> Result<(), String> {
             .arg("logout")
             .stdin(Stdio::null())
             .output()
-            .map_err(|e| format!("could not run jucode: {e}"))?;
+            .map_err(|e| format!("could not run lynshen: {e}"))?;
         if !out.status.success() {
             return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
         }
@@ -664,24 +664,24 @@ fn unix_now() -> u64 {
         .unwrap_or(0)
 }
 
-/// A cached JuCode session: API URL, access token, its expiry, and the
+/// A cached LynShen session: API URL, access token, its expiry, and the
 /// auth.json modification time it was read at.
-type JucodeSession = (String, String, u64, Option<std::time::SystemTime>);
+type LynShenSession = (String, String, u64, Option<std::time::SystemTime>);
 
-fn jucode_session_cache() -> std::sync::MutexGuard<'static, Option<JucodeSession>> {
-    static CACHE: Mutex<Option<JucodeSession>> = Mutex::new(None);
+fn lynshen_session_cache() -> std::sync::MutexGuard<'static, Option<LynShenSession>> {
+    static CACHE: Mutex<Option<LynShenSession>> = Mutex::new(None);
     CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// The JuCode gateway URL and an access token, from `jucode token` (the
+/// The LynShen gateway URL and an access token, from `lynshen token` (the
 /// engine owns login and refreshing), kept until two minutes before it
 /// expires or until auth.json changes (a logout, a login to another
 /// account).
-fn jucode_session() -> Result<(String, String), String> {
+fn lynshen_session() -> Result<(String, String), String> {
     let auth_mtime = std::fs::metadata(AuthStore::app_local().auth)
         .and_then(|meta| meta.modified())
         .ok();
-    let mut cache = jucode_session_cache();
+    let mut cache = lynshen_session_cache();
     if let Some((api, token, expires_at, read_at)) = cache.as_ref() {
         if *expires_at > unix_now() + 120 && *read_at == auth_mtime {
             return Ok((api.clone(), token.clone()));
@@ -695,12 +695,12 @@ fn jucode_session() -> Result<(String, String), String> {
         .arg("token")
         .stdin(Stdio::null())
         .output()
-        .map_err(|e| format!("could not run jucode: {e}"))?;
+        .map_err(|e| format!("could not run lynshen: {e}"))?;
     if !out.status.success() {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
     }
     let session: serde_json::Value =
-        serde_json::from_slice(&out.stdout).map_err(|e| format!("jucode token: {e}"))?;
+        serde_json::from_slice(&out.stdout).map_err(|e| format!("lynshen token: {e}"))?;
     let text = |key: &str| {
         session
             .get(key)
@@ -710,13 +710,13 @@ fn jucode_session() -> Result<(String, String), String> {
     };
     let (api, token) = (text("api_url"), text("access_token"));
     if token.is_empty() {
-        return Err("not logged in to JuCode".to_string());
+        return Err("not logged in to LynShen".to_string());
     }
     let expires_at = session
         .get("expires_at")
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
-    // `jucode token` may have refreshed and rewritten auth.json.
+    // `lynshen token` may have refreshed and rewritten auth.json.
     let auth_mtime = std::fs::metadata(AuthStore::app_local().auth)
         .and_then(|meta| meta.modified())
         .ok();
@@ -724,16 +724,16 @@ fn jucode_session() -> Result<(String, String), String> {
     Ok((api, token))
 }
 
-fn jucode_get(path: &str) -> Result<serde_json::Value, String> {
-    jucode_send("GET", path, None)
+fn lynshen_get(path: &str) -> Result<serde_json::Value, String> {
+    lynshen_send("GET", path, None)
 }
 
-fn jucode_send(
+fn lynshen_send(
     method: &str,
     path: &str,
     body: Option<&serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
-    let (api, token) = jucode_session()?;
+    let (api, token) = lynshen_session()?;
     let url = format!("{api}{path}");
     let request = ureq::request(method, &url)
         .timeout(std::time::Duration::from_secs(30))
@@ -757,34 +757,34 @@ fn jucode_send(
 /// Account overview (profile + balance + active plan) for the GUI.
 #[tauri::command(async)]
 fn fetch_account_info() -> Result<serde_json::Value, String> {
-    jucode_get("/v1/oauth/userinfo")
+    lynshen_get("/v1/oauth/userinfo")
 }
 
-/// Every model the JuCode account can reach, across all of its groups (the
+/// Every model the LynShen account can reach, across all of its groups (the
 /// OAuth token routes to any of them), for the "models to show" picker.
 #[tauri::command(async)]
-fn fetch_jucode_models() -> Result<serde_json::Value, String> {
-    jucode_get("/v1/models")
+fn fetch_lynshen_models() -> Result<serde_json::Value, String> {
+    lynshen_get("/v1/models")
 }
 
 /// The groups the account may route through, with rate multipliers and the
 /// models each serves.
 #[tauri::command(async)]
-fn fetch_jucode_groups() -> Result<serde_json::Value, String> {
-    jucode_get("/v1/open/groups")
+fn fetch_lynshen_groups() -> Result<serde_json::Value, String> {
+    lynshen_get("/v1/open/groups")
 }
 
 /// Plan quota usage (5h / weekly / monthly used vs cap).
 #[tauri::command(async)]
 fn fetch_usage() -> Result<serde_json::Value, String> {
-    jucode_get("/v1/oauth/usage")
+    lynshen_get("/v1/oauth/usage")
 }
 
 /// This account's coding-agent usage across its computers (uploaded by each
-/// daemon; see JuCode-CLI crates/daemon/src/usage.rs).
+/// daemon; see LynShen-CLI crates/daemon/src/usage.rs).
 #[tauri::command(async)]
 fn fetch_agent_usage_summary(days: u32, tz_offset: i32) -> Result<serde_json::Value, String> {
-    jucode_get(&format!(
+    lynshen_get(&format!(
         "/v1/oauth/agent-usage/summary?days={days}&tz_offset={tz_offset}"
     ))
 }
@@ -792,19 +792,19 @@ fn fetch_agent_usage_summary(days: u32, tz_offset: i32) -> Result<serde_json::Va
 /// The latest coding-agent turns, every computer on the account.
 #[tauri::command(async)]
 fn fetch_agent_usage_recent(limit: u32) -> Result<serde_json::Value, String> {
-    jucode_get(&format!("/v1/oauth/agent-usage/recent?limit={limit}"))
+    lynshen_get(&format!("/v1/oauth/agent-usage/recent?limit={limit}"))
 }
 
 /// The settings this account syncs between computers.
 #[tauri::command(async)]
 fn fetch_cloud_settings() -> Result<serde_json::Value, String> {
-    jucode_get("/v1/oauth/settings")
+    lynshen_get("/v1/oauth/settings")
 }
 
 /// Saves synced settings (`settings`: key → value, null removes).
 #[tauri::command(async)]
 fn put_cloud_settings(settings: serde_json::Value) -> Result<serde_json::Value, String> {
-    jucode_send("PUT", "/v1/oauth/settings", Some(&serde_json::json!({ "settings": settings })))
+    lynshen_send("PUT", "/v1/oauth/settings", Some(&serde_json::json!({ "settings": settings })))
 }
 
 /// The end of the engine's and the daemon's logs, for a bug report (the
@@ -814,9 +814,9 @@ fn put_cloud_settings(settings: serde_json::Value) -> Result<serde_json::Value, 
 fn diagnostic_logs() -> Vec<serde_json::Value> {
     use std::io::{Seek, SeekFrom};
     const TAIL: u64 = 256 * 1024;
-    let dir = jucode_dir();
+    let dir = lynshen_dir();
     [
-        ("jucode.log", dir.join("logs").join("jucode.log")),
+        ("lynshen.log", dir.join("logs").join("lynshen.log")),
         ("daemon.log", dir.join("daemon").join("daemon.log")),
     ]
     .into_iter()
@@ -838,7 +838,7 @@ fn diagnostic_logs() -> Vec<serde_json::Value> {
 /// A bug report or suggestion, as a support ticket of the signed-in user.
 #[tauri::command(async)]
 fn submit_feedback(ticket: serde_json::Value) -> Result<serde_json::Value, String> {
-    jucode_send("POST", "/v1/oauth/tickets", Some(&ticket))
+    lynshen_send("POST", "/v1/oauth/tickets", Some(&ticket))
 }
 
 /// Anonymous usage counts (src/lib/telemetry.svelte.ts), with this app's
@@ -872,6 +872,46 @@ fn fetch_deepseek_balance() -> Result<serde_json::Value, String> {
         .filter(|k| !k.is_empty())
         .ok_or_else(|| "未配置 DeepSeek API key".to_string())?;
     ureq::get("https://api.deepseek.com/user/balance")
+        .timeout(std::time::Duration::from_secs(30))
+        .set("Authorization", &format!("Bearer {key}"))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+}
+
+/// Monoize 网关（LynShen Console，https://www.lynshen.org）的账户余额，用
+/// auth.json 里 providers.monoize 的 key 请求 /user/balance。网关按 DeepSeek
+/// /user/balance 的格式作答，前端沿用同一套解析。
+#[tauri::command(async)]
+fn fetch_monoize_balance() -> Result<serde_json::Value, String> {
+    let key = read_auth()
+        .get("providers")
+        .and_then(|p| p.get("monoize"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|k| !k.is_empty())
+        .ok_or_else(|| "未配置 Monoize API key".to_string())?;
+    ureq::get("https://www.lynshen.org/user/balance")
+        .timeout(std::time::Duration::from_secs(30))
+        .set("Authorization", &format!("Bearer {key}"))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+}
+
+/// Monoize 网关当前可调用的模型（GET /v1/models），用于在设置里刷新模型列表。
+#[tauri::command(async)]
+fn fetch_monoize_models() -> Result<serde_json::Value, String> {
+    let key = read_auth()
+        .get("providers")
+        .and_then(|p| p.get("monoize"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|k| !k.is_empty())
+        .ok_or_else(|| "未配置 Monoize API key".to_string())?;
+    ureq::get("https://www.lynshen.org/v1/models")
         .timeout(std::time::Duration::from_secs(30))
         .set("Authorization", &format!("Bearer {key}"))
         .call()
@@ -1127,7 +1167,7 @@ fn transcribe_audio(
     if audio_base64.len() > 14_000_000 {
         return Err("Audio recording is larger than 10 MB".to_string());
     }
-    let config = resolve_asr_config(&read_json(&jucode_dir().join("config.json")))?;
+    let config = resolve_asr_config(&read_json(&lynshen_dir().join("config.json")))?;
     let key = read_auth()
         .get("providers")
         .and_then(|providers| providers.get(config.provider.auth_key))
@@ -1148,7 +1188,7 @@ fn transcribe_audio(
     }
     let mime = mime.unwrap_or_else(|| "audio/wav".to_string());
     let language = language.unwrap_or_else(|| "auto".to_string());
-    let boundary = format!("jucode-asr-{}", std::process::id());
+    let boundary = format!("lynshen-asr-{}", std::process::id());
     let request = build_asr_request(&config, &key, &audio, &mime, &language, &boundary)?;
     let mut http = ureq::post(&request.url).timeout(std::time::Duration::from_secs(120));
     for (name, value) in &request.headers {
@@ -1259,7 +1299,7 @@ fn generate_text(
 // ---------------------------------------------------------------------------
 // IDE features (file manager / git / terminal), backed by the Tauri layer
 // operating directly on the project working directory — independent of the
-// jucode agent engine.
+// lynshen agent engine.
 // ---------------------------------------------------------------------------
 
 const MAX_TEXT_READ: u64 = 2_000_000;
@@ -1269,11 +1309,11 @@ fn project_root() -> String {
     resolve_cwd().display().to_string()
 }
 
-/// The directory chat sessions run in (`~/.jucode/chats`), created when
+/// The directory chat sessions run in (`~/.lynshen/chats`), created when
 /// missing so the file panel can list it before the first engine starts.
 #[tauri::command]
 fn chats_dir() -> Result<String, String> {
-    let dir = jucode_dir().join("chats");
+    let dir = lynshen_dir().join("chats");
     std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     Ok(dir.display().to_string())
 }
@@ -1439,7 +1479,7 @@ struct EnvReport {
     git_install: InstallAdvice,
 }
 
-/// First-run environment check: is `git` available, and can the `jucode` engine
+/// First-run environment check: is `git` available, and can the `lynshen` engine
 /// binary be resolved? Drives the setup wizard.
 #[tauri::command(async)]
 fn check_environment() -> EnvReport {
@@ -1457,7 +1497,7 @@ fn check_environment() -> EnvReport {
     };
 
     let bin = resolve_bin();
-    // resolve_bin() returns a bare "jucode" as its last fallback; treat that as a
+    // resolve_bin() returns a bare "lynshen" as its last fallback; treat that as a
     // PATH lookup rather than a relative-to-cwd path.
     let engine_path = if bin.components().count() == 1 {
         which(&bin.to_string_lossy())
@@ -1572,12 +1612,12 @@ fn install_dependency(name: String) -> Result<InstallOutcome, String> {
     }
 }
 
-// --- external tool dependencies (node/npm, ffmpeg, codex, jucode, claude) ---
+// --- external tool dependencies (node/npm, ffmpeg, codex, lynshen, claude) ---
 
 /// Presence + install plan for one tool (drives the dependencies panel).
 #[derive(Serialize)]
 struct DepReport {
-    /// Stable id (`node` / `ffmpeg` / `codex` / `jucode` / `claude`).
+    /// Stable id (`node` / `ffmpeg` / `codex` / `lynshen` / `claude`).
     id: String,
     present: bool,
     /// Resolved binary path when present, else empty.
@@ -1587,7 +1627,7 @@ struct DepReport {
 }
 
 /// The tools reported to the dependencies panel, in install order (node first —
-/// it provides npm for codex/jucode).
+/// it provides npm for codex/lynshen).
 const DEPS: [installer::Dep; 7] = [
     installer::Dep::Node,
     installer::Dep::Ffmpeg,
@@ -1595,7 +1635,7 @@ const DEPS: [installer::Dep; 7] = [
     installer::Dep::Gh,
     installer::Dep::Claude,
     installer::Dep::Codex,
-    installer::Dep::Jucode,
+    installer::Dep::LynShen,
 ];
 
 /// Status of every external tool: presence (resolved via PATH) and the
@@ -1605,12 +1645,12 @@ fn check_dependencies() -> Vec<DepReport> {
     let os = std::env::consts::OS;
     let has = |c: &str| which(c).is_some();
     // The agents are found the way sessions find them (settings aside): the
-    // app's own jucode, then PATH and the installers' usual directories
+    // app's own lynshen, then PATH and the installers' usual directories
     // (Claude Code's installer puts it in ~/.local/bin, often not on a GUI
     // app's PATH).
     let found = |dep: installer::Dep| {
         let kind = match dep {
-            installer::Dep::Jucode => BackendKind::Jucode,
+            installer::Dep::LynShen => BackendKind::LynShen,
             installer::Dep::Claude => BackendKind::Claude,
             installer::Dep::Codex => BackendKind::Codex,
             // Without the Command Line Tools, macOS's /usr/bin/git is only a
@@ -1978,7 +2018,7 @@ fn walk_files(root: &Path, dir: &Path, out: &mut Vec<String>) {
 /// local paths, not inline data).
 #[tauri::command]
 fn save_temp_image(data: Vec<u8>, ext: String) -> Result<String, String> {
-    let dir = std::env::temp_dir().join("jucode-paste");
+    let dir = std::env::temp_dir().join("lynshen-paste");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     // Best-effort: drop paste images older than a day so this temp dir doesn't
     // grow without bound across sessions.
@@ -2376,11 +2416,11 @@ fn validate_git_args(args: &[String]) -> Result<(), String> {
 // --- 并行任务（git worktree）桥 ---------------------------------------------
 //
 // 目录约定：worktree 一律放在主仓库的兄弟目录
-// `<repo-parent>/.jucode-worktrees/<repo-name>/<task-slug>` 下（不在主工作树
+// `<repo-parent>/.lynshen-worktrees/<repo-name>/<task-slug>` 下（不在主工作树
 // 内部，也不会被主仓库的 git status 看到）。add/remove 的路径都会 canonicalize
 // 后与该容器目录比对，拒绝任何容器外的路径。
 
-/// 并行任务 worktree 的容器目录：`<repo-parent>/.jucode-worktrees/<repo-name>`。
+/// 并行任务 worktree 的容器目录：`<repo-parent>/.lynshen-worktrees/<repo-name>`。
 fn worktree_base_dir(repo_root: &Path) -> Result<PathBuf, String> {
     let canon = repo_root
         .canonicalize()
@@ -2392,7 +2432,7 @@ fn worktree_base_dir(repo_root: &Path) -> Result<PathBuf, String> {
     let parent = canon
         .parent()
         .ok_or_else(|| "repository has no parent directory".to_string())?;
-    Ok(parent.join(".jucode-worktrees").join(name))
+    Ok(parent.join(".lynshen-worktrees").join(name))
 }
 
 /// 任务 slug：小写字母/数字/连字符，不以连字符开头结尾（与前端 slugify 一致）。
@@ -2649,10 +2689,10 @@ fn git_plumb(dir: &Path, index: Option<&Path>, args: &[&str]) -> Result<String, 
     cmd.args(args)
         .current_dir(dir)
         .env("GIT_TERMINAL_PROMPT", "0")
-        .env("GIT_AUTHOR_NAME", "JuCode")
-        .env("GIT_AUTHOR_EMAIL", "checkpoint@jucode.local")
-        .env("GIT_COMMITTER_NAME", "JuCode")
-        .env("GIT_COMMITTER_EMAIL", "checkpoint@jucode.local");
+        .env("GIT_AUTHOR_NAME", "LynShen")
+        .env("GIT_AUTHOR_EMAIL", "checkpoint@lynshen.local")
+        .env("GIT_COMMITTER_NAME", "LynShen")
+        .env("GIT_COMMITTER_EMAIL", "checkpoint@lynshen.local");
     if let Some(idx) = index {
         cmd.env("GIT_INDEX_FILE", idx);
     }
@@ -2673,7 +2713,7 @@ fn git_plumb(dir: &Path, index: Option<&Path>, args: &[&str]) -> Result<String, 
 #[tauri::command(async)]
 fn git_checkpoint_capture(cwd: String) -> Result<String, String> {
     let dir = PathBuf::from(&cwd);
-    let idx = std::env::temp_dir().join(format!("jucode-ckpt-{}.idx", std::process::id()));
+    let idx = std::env::temp_dir().join(format!("lynshen-ckpt-{}.idx", std::process::id()));
     let _ = std::fs::remove_file(&idx);
     let has_head = git_plumb(&dir, None, &["rev-parse", "--verify", "HEAD"]).is_ok();
     if has_head {
@@ -2687,13 +2727,13 @@ fn git_checkpoint_capture(cwd: String) -> Result<String, String> {
         git_plumb(
             &dir,
             None,
-            &["commit-tree", &tree, "-p", &head, "-m", "jucode-checkpoint"],
+            &["commit-tree", &tree, "-p", &head, "-m", "lynshen-checkpoint"],
         )?
     } else {
         git_plumb(
             &dir,
             None,
-            &["commit-tree", &tree, "-m", "jucode-checkpoint"],
+            &["commit-tree", &tree, "-m", "lynshen-checkpoint"],
         )?
     };
     Ok(commit)
@@ -2768,7 +2808,7 @@ fn default_shell() -> String {
 
 /// Opens a pseudo-terminal in the project root. Without `command` it runs the
 /// user's shell (the embedded terminal panel), exactly as before. With
-/// `command` it runs one of the allowlisted agent CLIs (`jucode` / `codex` /
+/// `command` it runs one of the allowlisted agent CLIs (`lynshen` / `codex` /
 /// `claude`) as a real interactive TUI: the name is parsed against the fixed
 /// backend set, extra `args` are validated against a per-backend token
 /// allowlist (see `backend::validate_tui_args` — raw argv from the webview is
@@ -3008,7 +3048,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let mut tray = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("JuCode")
+        .tooltip("LynShen")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main_window(app),
             "new-session" => {
@@ -3057,7 +3097,7 @@ fn set_dev_dock_icon() {
 pub fn run() {
     let builder = tauri::Builder::default();
     // 单实例插件必须最先注册：第二次启动只聚焦已有窗口；启用 deep-link feature 后
-    // argv 里的 jucode:// 链接会自动转发给 deep-link 插件（Windows/Linux）。
+    // argv 里的 lynshen:// 链接会自动转发给 deep-link 插件（Windows/Linux）。
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -3174,9 +3214,11 @@ pub fn run() {
             diagnostic_logs,
             submit_feedback,
             send_telemetry,
-            fetch_jucode_models,
-            fetch_jucode_groups,
+            fetch_lynshen_models,
+            fetch_lynshen_groups,
             fetch_deepseek_balance,
+            fetch_monoize_balance,
+            fetch_monoize_models,
             transcribe_audio,
             generate_text,
             git_checkpoint_capture,
@@ -3265,13 +3307,13 @@ mod tests {
 
     #[test]
     fn credentials_are_protected_wherever_they_are_reached_from() {
-        let home = std::env::temp_dir().join(format!("jucode-protected-{}", std::process::id()));
+        let home = std::env::temp_dir().join(format!("lynshen-protected-{}", std::process::id()));
         std::fs::create_dir_all(home.join(".ssh")).unwrap();
         let home = home.canonicalize().unwrap();
         assert!(super::is_protected_in(&home, &home.join(".ssh/id_ed25519")));
         assert!(super::is_protected_in(
             &home,
-            &home.join(".jucode/auth.json")
+            &home.join(".lynshen/auth.json")
         ));
         assert!(!super::is_protected_in(&home, &home.join("project/.env")));
         let _ = std::fs::remove_dir_all(home);
@@ -3289,7 +3331,7 @@ mod tests {
     }
 
     fn tmp(name: &str) -> std::path::PathBuf {
-        let p = std::env::temp_dir().join(format!("jucode-test-{}-{}", std::process::id(), name));
+        let p = std::env::temp_dir().join(format!("lynshen-test-{}-{}", std::process::id(), name));
         let _ = std::fs::remove_file(&p);
         p
     }
@@ -3392,7 +3434,7 @@ mod tests {
     #[test]
     fn which_prefers_cmd_over_extensionless_shim() {
         use super::which_in;
-        let dir = std::env::temp_dir().join(format!("jucode-which-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("lynshen-which-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("codex"), b"#!/bin/sh\n").unwrap();
@@ -3413,7 +3455,7 @@ mod tests {
     #[test]
     fn checkpoint_capture_and_restore_roundtrip() {
         use std::process::Command;
-        let dir = std::env::temp_dir().join(format!("jucode-ckpt-it-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("lynshen-ckpt-it-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let git = |args: &[&str]| {
@@ -3473,7 +3515,7 @@ mod tests {
     /// An `AuthStore` over throwaway paths, with the switch preset.
     fn auth_store(name: &str, encrypt: bool) -> (super::AuthStore, std::path::PathBuf) {
         let dir =
-            std::env::temp_dir().join(format!("jucode-authstore-{}-{name}", std::process::id()));
+            std::env::temp_dir().join(format!("lynshen-authstore-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
@@ -3494,7 +3536,7 @@ mod tests {
     fn plaintext_auth() -> serde_json::Value {
         serde_json::json!({
             "providers": { "deepseek": "sk-legacy" },
-            "jucode": {
+            "lynshen": {
                 "access_token": "at-1",
                 "refresh_token": "rt-1",
                 "access_expires_at": 9,
@@ -3526,7 +3568,7 @@ mod tests {
             serde_json::json!("sk-legacy")
         );
         assert_eq!(back["providers"]["mimo"], serde_json::json!("sk-mimo"));
-        assert_eq!(back["jucode"]["refresh_token"], serde_json::json!("rt-1"));
+        assert_eq!(back["lynshen"]["refresh_token"], serde_json::json!("rt-1"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -3822,7 +3864,7 @@ mod tests {
     /// Creates <tmp>/<name>/repo and returns (tmp_root, repo_root).
     fn tmp_repo(name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
         let root =
-            std::env::temp_dir().join(format!("jucode-wt-test-{}-{}", std::process::id(), name));
+            std::env::temp_dir().join(format!("lynshen-wt-test-{}-{}", std::process::id(), name));
         let repo = root.join("repo");
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&repo).unwrap();
@@ -3837,7 +3879,7 @@ mod tests {
             base,
             root.canonicalize()
                 .unwrap()
-                .join(".jucode-worktrees")
+                .join(".lynshen-worktrees")
                 .join("repo")
         );
         let _ = std::fs::remove_dir_all(&root);

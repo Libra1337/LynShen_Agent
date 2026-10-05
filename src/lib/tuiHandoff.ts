@@ -15,11 +15,11 @@ export function isValidResumeSessionId(s: string): boolean {
 /** Backends whose session can move to the native TUI. ACP agents have no
  *  fixed TUI binary and are never offered a handoff. */
 export function canHandOffToTui(backend: BackendId): boolean {
-	return backend === 'jucode' || backend === 'claude' || backend === 'codex';
+	return backend === 'lynshen' || backend === 'claude' || backend === 'codex';
 }
 
 /** Extra argv for the TUI spawn of a handed-off session (exactly the shapes
- *  `validate_tui_args` accepts). jucode has no resume argv — see
+ *  `validate_tui_args` accepts). lynshen has no resume argv — see
  *  `tuiResumeCommand`. */
 export function tuiResumeArgs(backend: BackendId, sid: string): string[] {
 	if (!isValidResumeSessionId(sid)) return [];
@@ -28,8 +28,8 @@ export function tuiResumeArgs(backend: BackendId, sid: string): string[] {
 	return [];
 }
 
-/** The `/resume <id>` line written into a fresh jucode TUI pty (the jucode
+/** The `/resume <id>` line written into a fresh lynshen TUI pty (the lynshen
  *  TUI resumes via slash command, not argv). Undefined for other backends. */
 export function tuiResumeCommand(backend: BackendId, sid: string): string | undefined {
-	return backend === 'jucode' && isValidResumeSessionId(sid) ? `/resume ${sid}\n` : undefined;
+	return backend === 'lynshen' && isValidResumeSessionId(sid) ? `/resume ${sid}\n` : undefined;
 }

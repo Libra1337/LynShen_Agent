@@ -1,4 +1,4 @@
-//! Earlier versions ran Claude Code / Codex on the JuCode gateway by
+//! Earlier versions ran Claude Code / Codex on the LynShen gateway by
 //! rewriting `~/.claude/settings.json` and `~/.codex/*` (with backups here);
 //! `restore_leftovers` puts those files back once. The daemon now gives the
 //! gateway to each session's process alone.
@@ -40,7 +40,7 @@ impl Paths {
     }
 
     fn dir(&self) -> PathBuf {
-        self.home.join(".jucode").join("tool-switch")
+        self.home.join(".lynshen").join("tool-switch")
     }
 
     fn state(&self) -> PathBuf {
@@ -74,11 +74,11 @@ impl Paths {
 }
 
 /// Puts back the Claude Code / Codex files an earlier version overwrote
-/// (a tool still marked `jucode` in the state file). Run once at startup.
+/// (a tool still marked `lynshen` in the state file). Run once at startup.
 pub fn restore_leftovers() {
     let paths = Paths::live();
     for tool in [Tool::Claude, Tool::Codex] {
-        if read_mode(&paths, tool) == "jucode" {
+        if read_mode(&paths, tool) == "lynshen" {
             if let Err(error) = restore(&paths, tool) {
                 eprintln!(
                     "[tool-switch] restoring {} config failed: {error}",
@@ -93,7 +93,7 @@ fn read_mode(paths: &Paths, tool: Tool) -> String {
     let v = read_json(&paths.state());
     v.get(tool.as_str())
         .and_then(Value::as_str)
-        .filter(|m| *m == "jucode")
+        .filter(|m| *m == "lynshen")
         .unwrap_or("system")
         .to_string()
 }
@@ -173,7 +173,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let p = std::env::temp_dir().join(format!("jucode-tool-switch-{name}-{n}"));
+        let p = std::env::temp_dir().join(format!("lynshen-tool-switch-{name}-{n}"));
         let _ = fs::remove_dir_all(&p);
         fs::create_dir_all(&p).unwrap();
         p
@@ -196,7 +196,7 @@ mod tests {
         )
         .unwrap();
         fs::write(&live, "{\"env\":{\"ANTHROPIC_AUTH_TOKEN\":\"tok\"}}\n").unwrap();
-        write_mode(&p, Tool::Claude, "jucode").unwrap();
+        write_mode(&p, Tool::Claude, "lynshen").unwrap();
         restore(&p, Tool::Claude).unwrap();
         assert!(fs::read_to_string(&live).unwrap().contains("sk-sys"));
         assert_eq!(read_mode(&p, Tool::Claude), "system");

@@ -1,5 +1,5 @@
 // Workspaces, projects and project files as the daemon keeps them
-// (JuCode-CLI docs/daemon-protocol.md, "Projects and files"). The remote page
+// (LynShen-CLI docs/daemon-protocol.md, "Projects and files"). The remote page
 // reads everything through here; the list stays current from the daemon's
 // `workspaces` broadcasts. One per paired computer (see connection.svelte.ts).
 
@@ -13,7 +13,7 @@ export interface ProjectView {
 	id: string;
 	name: string;
 	path: string;
-	/** The chats project (`~/.jucode/chats`). */
+	/** The chats project (`~/.lynshen/chats`). */
 	chats?: boolean;
 	/** Folder chrome set on the desktop, kept by the daemon unchecked. */
 	color?: unknown;

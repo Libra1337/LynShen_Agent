@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Settings → 扩展 → MCP 服务器: server management + read-only extensions info.
 	// Changes go to the daemon, which saves them and applies them to every open
-	// JuCode session; the live view (connection state, tools) comes from the
+	// LynShen session; the live view (connection state, tools) comes from the
 	// active session's engine when there is one.
 	import { onMount } from 'svelte';
 	import PlusIcon from 'phosphor-svelte/lib/PlusIcon';

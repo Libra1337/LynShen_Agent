@@ -55,7 +55,7 @@
 	import { SessionStore, listedSessions } from '$lib/session.svelte';
 	import { workspaces } from '$lib/workbench/workspaceStore.svelte';
 	import { autoRetry } from '$lib/autoRetry.svelte';
-	import { refreshJucodeModels } from '$lib/jucodeModels';
+	import { refreshLynShenModels } from '$lib/lynshenModels';
 	import {
 		activateTab,
 		closeTab,
@@ -147,7 +147,7 @@
 		}
 	}
 	const notifyDone = (title: string) =>
-		notify('JuCode', t('shell.notifyDone', { title: title || t('shell.untitled') }));
+		notify('LynShen', t('shell.notifyDone', { title: title || t('shell.untitled') }));
 	// An agent's question, pending action or report while the window is in
 	// the background.
 	agentDirectory.onArrival = (kind, agent, text, agentId) => {
@@ -288,9 +288,9 @@
 			.then((bs) => {
 				let custom: ProviderOption[] = [];
 				try {
-					custom = JSON.parse(localStorage.getItem('jucode-custom-providers') || '[]');
+					custom = JSON.parse(localStorage.getItem('lynshen-custom-providers') || '[]');
 				} catch (e) {
-					console.error('failed to restore jucode-custom-providers', e);
+					console.error('failed to restore lynshen-custom-providers', e);
 					custom = [];
 				}
 				providersList = [
@@ -301,12 +301,12 @@
 			.catch(() => {});
 	}
 	// Target endpoint for one-shot AI text (commit / PR). Prefer the active
-	// session's provider; fall back to the default jucode gateway or the first
+	// session's provider; fall back to the default lynshen gateway or the first
 	// configured provider. Strip any `[1m]`-style alias suffix from the model id.
 	const llmTarget = $derived.by(() => {
 		const pick =
 			providersList.find((p) => p.id === chat?.provider) ??
-			providersList.find((p) => p.id === 'jucode') ??
+			providersList.find((p) => p.id === 'lynshen') ??
 			providersList[0];
 		if (!pick) return null;
 		const model =
@@ -325,7 +325,7 @@
 
 	function toggleSidebar() {
 		showSidebar = !showSidebar;
-		localStorage.setItem('jucode-sidebar-visible', showSidebar ? '1' : '0');
+		localStorage.setItem('lynshen-sidebar-visible', showSidebar ? '1' : '0');
 	}
 
 	function startSidebarResize(e: PointerEvent) {
@@ -338,7 +338,7 @@
 		};
 		const up = () => {
 			sbResizing = false;
-			localStorage.setItem('jucode-sidebar-width', String(sidebarWidth));
+			localStorage.setItem('lynshen-sidebar-width', String(sidebarWidth));
 			window.removeEventListener('pointermove', move);
 			window.removeEventListener('pointerup', up);
 		};
@@ -594,7 +594,7 @@
 		if (!c || c.engineState === 'exited') return false;
 		if (!c.busy) {
 			// Snapshot the working tree before the turn (codex/claude rewinds
-			// restore files from it; jucode checkpoints engine-side).
+			// restore files from it; lynshen checkpoints engine-side).
 			const cwd = activeProject?.path;
 			if (cwd && (c.backendId === 'codex' || c.backendId === 'claude')) {
 				const idx = c.userTurns;
@@ -868,7 +868,7 @@
 		taskDialogFor = p;
 	}
 
-	// ---------- 深链（jucode://） ----------
+	// ---------- 深链（lynshen://） ----------
 	const normPath = (p: string) => p.replace(/\/+$/, '');
 	/** 打开（或聚焦）路径对应的项目；不存在则在目录有效时创建。 */
 	async function openProjectPath(path: string, focusSession = true): Promise<Project | null> {
@@ -888,8 +888,8 @@
 	}
 	/**
 	 * 深链路由：
-	 *   jucode://open?project=<绝对路径(urlencoded)>          打开/聚焦该项目（目录存在则创建）
-	 *   jucode://session/<会话id>?project=<绝对路径>          打开项目并恢复该会话
+	 *   lynshen://open?project=<绝对路径(urlencoded)>          打开/聚焦该项目（目录存在则创建）
+	 *   lynshen://session/<会话id>?project=<绝对路径>          打开项目并恢复该会话
 	 */
 	async function handleDeepLink(raw: string) {
 		let url: URL;
@@ -898,7 +898,7 @@
 		} catch {
 			return;
 		}
-		if (url.protocol !== 'jucode:') return;
+		if (url.protocol !== 'lynshen:') return;
 		const route = url.host || url.pathname.replace(/^\/+/, '').split('/')[0];
 		const projectPath = url.searchParams.get('project') ?? '';
 		if (route === 'open') {
@@ -984,9 +984,9 @@
 		const onUiError = () => telemetry.track('error:ui');
 		window.addEventListener('error', onUiError);
 		window.addEventListener('unhandledrejection', onUiError);
-		const savedSb = Number(localStorage.getItem('jucode-sidebar-width'));
+		const savedSb = Number(localStorage.getItem('lynshen-sidebar-width'));
 		if (savedSb >= 240 && savedSb <= 460) sidebarWidth = savedSb;
-		if (localStorage.getItem('jucode-sidebar-visible') === '0') showSidebar = false;
+		if (localStorage.getItem('lynshen-sidebar-visible') === '0') showSidebar = false;
 		const cleanups: Array<() => void> = [];
 		let disposed = false;
 		(async () => {
@@ -1004,7 +1004,7 @@
 				// dropped tool frame is inspectable after the fact.
 				s.chat.captureFrame(data);
 				// Route the raw line through the session's adapter (the daemon already
-				// speaks the jucode dialect for every engine). Parse, translate and
+				// speaks the lynshen dialect for every engine). Parse, translate and
 				// each handle() are isolated so one bad frame or event
 				// can't silently drop the sibling events that follow it (e.g. a tool's
 				// completion riding in the same frame as something that threw).
@@ -1150,14 +1150,14 @@
 					providers = p;
 					// Display names and windows the gateway changed since the models
 					// were picked (the engines read them from config.json).
-					if (p.includes('jucode'))
-						refreshJucodeModels()
+					if (p.includes('lynshen'))
+						refreshLynShenModels()
 							.then((changed) => changed && loadProviders())
 							.catch(() => {});
 					// First run: show the setup wizard only when nothing is configured yet
 					// (a genuinely fresh machine). Pre-configured users skip it silently.
-					if (!localStorage.getItem('jucode-setup-done')) {
-						if (p.length > 0) localStorage.setItem('jucode-setup-done', '1');
+					if (!localStorage.getItem('lynshen-setup-done')) {
+						if (p.length > 0) localStorage.setItem('lynshen-setup-done', '1');
 						else showSetup = true;
 					}
 				})
@@ -1222,7 +1222,7 @@
 			onRename={(id, name) => workspaces.rename(id, name)}
 			onChrome={(id, chrome) => workspaces.setChrome(id, chrome)}
 			onDelete={deleteWorkspace}
-			loggedIn={providers.includes('jucode')}
+			loggedIn={providers.includes('lynshen')}
 			updateAvailable={updater.available}
 			settingsOpen={showSettings}
 			onManageAccount={() => openSettings('account')}
@@ -1274,7 +1274,7 @@
 				<div class="stage">
 					{#if store.loaded && store.shownProjects.length === 0}
 						<div class="nochat" data-tauri-drag-region>
-							<span class="welcome-mark">JuCode</span>
+							<span class="welcome-mark">LynShen</span>
 							<p class="welcome-tip">{t('shell.noChat')}</p>
 							<div class="welcome-actions">
 								<Button variant="primary" size="sm" onclick={addProject}>{t('shell.startFromProject')}</Button>
@@ -1426,7 +1426,7 @@
 	</div>
 
 	{#if showMarket}
-		<Marketplace backend={active?.backendId ?? 'jucode'} onClose={() => (showMarket = false)} />
+		<Marketplace backend={active?.backendId ?? 'lynshen'} onClose={() => (showMarket = false)} />
 	{/if}
 
 	<UpdatePrompt />
@@ -1435,7 +1435,7 @@
 			sessionId={activeId}
 			startAt={setupView}
 			{chat}
-			loggedIn={providers.includes('jucode')}
+			loggedIn={providers.includes('lynshen')}
 			configured={providers.length > 0}
 			onRefreshAuth={refreshAuth}
 			onOpenSettings={(section) => {

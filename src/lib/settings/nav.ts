@@ -18,16 +18,16 @@ export type SectionKey =
 	| 'updates';
 
 // Grouped by what a setting applies to: the app itself, every coding agent,
-// or only sessions run by the JuCode CLI engine (its ~/.jucode/config.json).
+// or only sessions run by the LynShen CLI engine (its ~/.lynshen/config.json).
 export const GROUPS: { key: string; sections: SectionKey[] }[] = [
 	{ key: 'app', sections: ['general', 'account', 'usage', 'voice'] },
 	{ key: 'agents', sections: ['agents', 'acp', 'daemon', 'market'] },
-	{ key: 'jucode', sections: ['providers', 'models', 'mcp', 'network'] },
+	{ key: 'lynshen', sections: ['providers', 'models', 'mcp', 'network'] },
 	{ key: 'about', sections: ['updates'] }
 ];
 
-/** Sections whose settings only the JuCode CLI engine reads. */
-export const JUCODE_ONLY = new Set<SectionKey>(GROUPS.find((g) => g.key === 'jucode')!.sections);
+/** Sections whose settings only the LynShen CLI engine reads. */
+export const LYNSHEN_ONLY = new Set<SectionKey>(GROUPS.find((g) => g.key === 'lynshen')!.sections);
 
 const KEYS = new Set<string>(GROUPS.flatMap((g) => g.sections));
 
@@ -54,7 +54,7 @@ export const ROWS: SearchRow[] = [
 	{ section: 'general', id: 'html-open', titleKey: 'settings.behavior.htmlOpen', descKey: 'settings.behavior.htmlOpenHint' },
 	{ section: 'general', id: 'feedback', titleKey: 'settings.help.feedback', descKey: 'settings.help.feedbackHint' },
 	{ section: 'general', id: 'telemetry', titleKey: 'settings.help.telemetry', descKey: 'settings.help.telemetryHint' },
-	{ section: 'account', id: 'account-login', titleKey: 'settings.page.jucodeAccount', descKey: 'settings.page.jucodeAccountDesc' },
+	{ section: 'account', id: 'account-login', titleKey: 'settings.page.lynshenAccount', descKey: 'settings.page.lynshenAccountDesc' },
 	{ section: 'account', id: 'account-models', titleKey: 'shell.modelSetup.manage', descKey: 'settings.page.manageModelsDesc' },
 	{ section: 'account', id: 'account-sync', titleKey: 'settings.sync.title', descKey: 'settings.sync.desc' },
 	{ section: 'account', id: 'account-usage', titleKey: 'settings.usage.groupLabel', descKey: 'settings.usage.balance' },

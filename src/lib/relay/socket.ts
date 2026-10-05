@@ -1,5 +1,5 @@
 // A WebSocket-shaped connection to the local daemon's protocol, carried
-// through the JuCode relay inside a Noise IK session (JuCode-CLI
+// through the LynShen relay inside a Noise IK session (LynShen-CLI
 // docs/relay-protocol.md §3.2, §4). DaemonClient uses it in place of a plain
 // WebSocket: "open" means the daemon accepted this device, and text frames in
 // and out are encrypted and chunked.
@@ -38,7 +38,7 @@ export class RelayError extends Error {
 }
 
 export interface RelayOptions {
-	/** Relay base, e.g. `wss://app.jucode.net/relay/v1`. */
+	/** Relay base, e.g. `wss://app.lynshen.net/relay/v1`. */
 	relay: string;
 	hostId: string;
 	hostStatic: Uint8Array;

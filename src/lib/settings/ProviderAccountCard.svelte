@@ -5,6 +5,7 @@
 	import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
 	import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
 	import WalletIcon from 'phosphor-svelte/lib/WalletIcon';
+	import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
 	import { t } from '$lib/i18n';
 	import { fmtBalance } from '$lib/money';
 	import Vendor from '$lib/Vendor.svelte';
@@ -36,9 +37,12 @@
 		isDefault,
 		open,
 		loggingIn,
-		jucodeBal,
+		lynshenBal,
 		deepseekBal,
 		deepseekTotal,
+		monoizeBal,
+		monoizeTotal,
+		monoizeModelsMsg,
 		keyInput = $bindable(),
 		cap,
 		onCardClick,
@@ -46,16 +50,20 @@
 		onLogout,
 		onSaveKey,
 		onSetDefault,
-		onDelete
+		onDelete,
+		onRefreshModels
 	}: {
 		provider: Provider;
 		authed: boolean;
 		isDefault: boolean;
 		open: boolean;
 		loggingIn: boolean;
-		jucodeBal: AccountInfo | null;
+		lynshenBal: AccountInfo | null;
 		deepseekBal: DeepseekBalance | null;
 		deepseekTotal: { total_balance: string; currency: string } | null;
+		monoizeBal: DeepseekBalance | null;
+		monoizeTotal: { total_balance: string; currency: string } | null;
+		monoizeModelsMsg: string;
 		keyInput: string;
 		cap: (s: string) => string;
 		onCardClick: (p: Provider, authed: boolean) => void;
@@ -64,6 +72,7 @@
 		onSaveKey: (id: string) => void;
 		onSetDefault: (p: Provider) => void;
 		onDelete: (id: string) => void;
+		onRefreshModels: () => void;
 	} = $props();
 	import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
 	import { modelSetup } from '$lib/modelSetupState.svelte';
@@ -80,18 +89,20 @@
 			<span class="pcard-url">{#if provider.name}{provider.id} · {/if}{provider.base_url}</span>
 		</span>
 		<span class="pcard-right">
-			{#if provider.id === 'jucode' && loggingIn && !authed}
+			{#if provider.id === 'lynshen' && loggingIn && !authed}
 				<span class="bal wait"><span class="spin"></span> {t('settings.account.authorizing')}</span>
-			{:else if authed && provider.id === 'jucode' && jucodeBal}
-				<span class="bal"><WalletIcon size={12} /> {fmtBalance(jucodeBal.balance)} {jucodeBal.currency ?? ''}</span>
+			{:else if authed && provider.id === 'lynshen' && lynshenBal}
+				<span class="bal"><WalletIcon size={12} /> {fmtBalance(lynshenBal.balance)} {lynshenBal.currency ?? ''}</span>
 			{:else if authed && provider.id === 'deepseek' && deepseekTotal}
 				<span class="bal"><WalletIcon size={12} /> {fmtBalance(deepseekTotal.total_balance)} {deepseekTotal.currency}</span>
+			{:else if authed && provider.id === 'monoize' && monoizeTotal}
+				<span class="bal"><WalletIcon size={12} /> {fmtBalance(monoizeTotal.total_balance)} {monoizeTotal.currency}</span>
 			{:else if authed}
-				<span class="stat ok">{provider.id === 'jucode' ? t('settings.account.loggedIn') : t('settings.account.keyed')}</span>
+				<span class="stat ok">{provider.id === 'lynshen' ? t('settings.account.loggedIn') : t('settings.account.keyed')}</span>
 			{:else}
-				<span class="stat">{provider.id === 'jucode' ? t('settings.account.notLoggedIn') : t('settings.account.notKeyed')}</span>
+				<span class="stat">{provider.id === 'lynshen' ? t('settings.account.notLoggedIn') : t('settings.account.notKeyed')}</span>
 			{/if}
-			{#if provider.id === 'jucode' && !authed}
+			{#if provider.id === 'lynshen' && !authed}
 				<SignInIcon size={15} class="dimx" />
 			{:else}
 				<CaretDownIcon size={16} class="chev {open ? 'up' : ''}" />
@@ -101,17 +112,24 @@
 
 	{#if open}
 		<div class="pcard-body">
-			{#if provider.id === 'jucode'}
+			{#if provider.id === 'lynshen'}
 				<AccountPanel />
 				<div class="cardact">
 					{#if !isDefault}<Button variant="secondary" size="sm" onclick={() => onSetDefault(provider)}>{t('settings.account.setDefault')}</Button>{/if}
 					<Button size="sm" onclick={() => (modelSetup.open = true)}><ListChecksIcon size={13} /> {t('shell.modelSetup.manage')}</Button>
 					<Button variant="primary" size="sm" onclick={onLogin}><SignInIcon size={13} /> {t('settings.account.relogin')}</Button>
-					<Button variant="danger" size="sm" onclick={() => onLogout('jucode')}><SignOutIcon size={13} /> {t('settings.account.logout')}</Button>
+					<Button variant="danger" size="sm" onclick={() => onLogout('lynshen')}><SignOutIcon size={13} /> {t('settings.account.logout')}</Button>
 				</div>
 			{:else}
 				{#if provider.id === 'deepseek' && authed}
 					<ProviderBalance balance={deepseekBal} />
+				{/if}
+				{#if provider.id === 'monoize' && authed}
+					<ProviderBalance balance={monoizeBal} />
+					<div class="mrow">
+						<Button variant="secondary" size="sm" onclick={onRefreshModels}><ArrowClockwiseIcon size={13} /> {t('settings.account.refreshModels')}</Button>
+						{#if monoizeModelsMsg}<span class="mmsg">{monoizeModelsMsg}</span>{/if}
+					</div>
 				{/if}
 				<div class="ekey">
 					<TextField bind:value={keyInput} type="password" placeholder={t('settings.account.keyPlaceholder', { id: provider.id })} mono />
@@ -285,5 +303,14 @@
 	}
 	.ekey :global(.tf) {
 		flex: 1;
+	}
+	.mrow {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.mmsg {
+		font-size: var(--fs-xs);
+		color: var(--dim);
 	}
 </style>

@@ -1,4 +1,4 @@
-// Requirements on one computer (JuCode-CLI daemon requirements.rs, protocol
+// Requirements on one computer (LynShen-CLI daemon requirements.rs, protocol
 // "Requirements"): what the user means to get done, the sessions working on
 // it and the progress the daemon keeps across them. The list as the daemon
 // broadcasts it, and its ops. The desktop keeps one; the remote page one per

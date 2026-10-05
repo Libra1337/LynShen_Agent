@@ -1,4 +1,4 @@
-"""JuCode backend mark (src/lib/jucode-mark.svg): the app icon's glyph — the
+"""LynShen backend mark (src/lib/lynshen-mark.svg): the app icon's glyph — the
 Instrument Serif "Ju" and the violet text cursor — as a square SVG. The
 letters take currentColor so the mark follows the theme like the other
 backend marks.
@@ -48,4 +48,4 @@ svg = (
     f'<rect fill="{ACCENT}" x="{r(caret_x)}" y="{r(ymin)}" width="{r(caret_w)}" height="{r(caret_bottom - ymin)}" rx="{r(caret_w / 2)}"/>'
     '</svg>\n'
 )
-open('src/lib/jucode-mark.svg', 'w').write(svg)
+open('src/lib/lynshen-mark.svg', 'w').write(svg)

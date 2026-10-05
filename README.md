@@ -1,6 +1,6 @@
-# JuCode Desktop
+# LynShen Desktop
 
-A desktop workbench for coding agents. One window runs JuCode's own agent,
+A desktop workbench for coding agents. One window runs LynShen's own agent,
 Claude Code, Codex and any [ACP](https://agentclientprotocol.com) agent side by
 side, across projects, with the files, git and terminal of each project next to
 the conversation.
@@ -10,29 +10,29 @@ Status: closed beta.
 ## Download
 
 Get the latest build from
-[Releases](https://github.com/JuCode-Team/JuCode-Desktop/releases/latest):
+[Releases](https://github.com/LynShen-Team/LynShen-Desktop/releases/latest):
 
 | Platform | File |
 | --- | --- |
-| macOS, Apple Silicon | `JuCode_<version>_aarch64.dmg` |
-| Windows x64 | `JuCode_<version>_x64-setup.exe` (or `.msi`) |
-| Linux x64 | `JuCode_<version>_amd64.AppImage`, `.deb` or `.rpm` |
+| macOS, Apple Silicon | `LynShen_<version>_aarch64.dmg` |
+| Windows x64 | `LynShen_<version>_x64-setup.exe` (or `.msi`) |
+| Linux x64 | `LynShen_<version>_amd64.AppImage`, `.deb` or `.rpm` |
 
 The beta builds are not code-signed yet, so macOS and Windows warn on first
 launch. [docs/install.md](docs/install.md) shows how to open the app and grant
 the permissions it asks for. The app updates itself after that.
 
-The app ships its own JuCode CLI (kept in `~/.jucode/bin`, updated with the
-app; Settings → Agents can make it a `jucode` terminal command). On first
-launch a welcome page signs you in to JuCode, then walks through the coding
+The app ships its own LynShen CLI (kept in `~/.lynshen/bin`, updated with the
+app; Settings → Agents can make it a `lynshen` terminal command). On first
+launch a welcome page signs you in to LynShen, then walks through the coding
 agent, the runtime (Git and the bundled engine) and the model. Claude Code and
 Codex are optional; it installs them from their official sources when you want
 them, and offers their upgrades later.
 
 ## What it does
 
-- **Several agents, one window.** JuCode, Claude Code, Codex and ACP agents,
-  each in its own session. A session can also run the real TUI of `jucode`,
+- **Several agents, one window.** LynShen, Claude Code, Codex and ACP agents,
+  each in its own session. A session can also run the real TUI of `lynshen`,
   `codex` or `claude` in a terminal tab.
 - **Workbench.** Projects by directory, sessions per project, split panes,
   a right dock with plan, files, git (stage, commit, discard, diff, GitHub pull
@@ -44,44 +44,44 @@ them, and offers their upgrades later.
 - **Conversation tools.** Streaming markdown, tool cards with diffs and output,
   approvals, rewind (conversation and files), branch tree, resume, find, slash
   commands, `@` file mentions, images, voice input and screen capture.
-- **Models and providers.** The JuCode gateway (sign in with your JuCode
+- **Models and providers.** The LynShen gateway (sign in with your LynShen
   account), your own API keys, or the tools' own sign-in. Claude Code and Codex
-  sessions can run on this machine's login or on the JuCode gateway, with a
+  sessions can run on this machine's login or on the LynShen gateway, with a
   gateway group per session; their plan usage shows in the model menu.
-- **Background service.** Every session runs in the local JuCode daemon
-  (`jucode daemon`, started on demand), so it keeps going when the window
-  closes and can be followed from the JuCode web app through an end-to-end
+- **Background service.** Every session runs in the local LynShen daemon
+  (`lynshen daemon`, started on demand), so it keeps going when the window
+  closes and can be followed from the LynShen web app through an end-to-end
   encrypted relay.
 - **History.** Import existing Claude Code and Codex conversations of a project
   and continue them.
 - **Skills marketplace**, run by the daemon
-  ([docs/skills.md](https://github.com/JuCode-Team/JuCode-CLI/blob/main/docs/skills.md) in the CLI repository).
+  ([docs/skills.md](https://github.com/LynShen-Team/LynShen-CLI/blob/main/docs/skills.md) in the CLI repository).
 
 Keyboard: `⌘K` command palette · `⌘F` find · `⌘N` new session · `⌘B` session
 list · `⌘,` settings (Ctrl on Windows and Linux).
 
 ## Data and privacy
 
-- Credentials live in `~/.jucode/auth.json`, in plain text unless encryption
+- Credentials live in `~/.lynshen/auth.json`, in plain text unless encryption
   is turned on in settings ([docs/secrets.md](docs/secrets.md)).
-- Prompts and code go to the model provider of the session: the JuCode gateway,
+- Prompts and code go to the model provider of the session: the LynShen gateway,
   the provider of your own key, or the tool's own service.
 - With remote access turned on in settings, the daemon keeps a connection to
-  `wss://app.jucode.net/relay/v1`. Conversation content is
+  `wss://app.lynshen.net/relay/v1`. Conversation content is
   end-to-end encrypted; the relay sees connection metadata only.
 - Voice input sends the recording to the configured speech-to-text service.
-- Signed in to JuCode, the daemon reports each coding-agent turn's token
+- Signed in to LynShen, the daemon reports each coding-agent turn's token
   counts, model, engine and timing to your account (no prompts, code or
   project paths), so usage adds up across your computers. Preferences such as
   language, theme and default model sync through the account; keys, MCP
   servers, skills and agents stay on the computer.
-- The app checks GitHub Releases for updates, and the JuCode server when
+- The app checks GitHub Releases for updates, and the LynShen server when
   GitHub is unreachable or slow. It has no analytics.
 
 ## Architecture
 
 ```
-WebView (Svelte 5)  ── WebSocket (ops / events) ──▶  jucode daemon  ──▶  JuCode, Claude Code, Codex, ACP agents
+WebView (Svelte 5)  ── WebSocket (ops / events) ──▶  lynshen daemon  ──▶  LynShen, Claude Code, Codex, ACP agents
        │
        └── invoke ──▶  src-tauri (Rust): daemon start, files, git, PTY, config, installers, updates
 ```
@@ -94,15 +94,15 @@ WebView (Svelte 5)  ── WebSocket (ops / events) ──▶  jucode daemon  �
 - Logic without UI lives in plain TypeScript modules with unit tests.
 
 The daemon protocol is documented in the CLI repository:
-[docs/daemon-protocol.md](https://github.com/JuCode-Team/JuCode-CLI/blob/main/docs/daemon-protocol.md).
+[docs/daemon-protocol.md](https://github.com/LynShen-Team/LynShen-CLI/blob/main/docs/daemon-protocol.md).
 
 ## Development
 
 Requirements: Node with pnpm, a Rust toolchain, the
 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) of your
-platform, and a `jucode` binary. Check out
-[JuCode-CLI](https://github.com/JuCode-Team/JuCode-CLI) next to this repository
-and run `cargo build` there, or point `JUCODE_BIN` at a binary.
+platform, and a `lynshen` binary. Check out
+[LynShen-CLI](https://github.com/LynShen-Team/LynShen-CLI) next to this repository
+and run `cargo build` there, or point `LYNSHEN_BIN` at a binary.
 
 ```sh
 pnpm install
@@ -114,13 +114,13 @@ pnpm tauri build    # package the app
 
 Environment variables:
 
-- `JUCODE_BIN`, `CLAUDE_BIN`, `CODEX_BIN`: use this binary for the engine.
-- `JUCODE_CWD`: the directory the agent works in when none is given (default:
+- `LYNSHEN_BIN`, `CLAUDE_BIN`, `CODEX_BIN`: use this binary for the engine.
+- `LYNSHEN_CWD`: the directory the agent works in when none is given (default:
   where the app was launched).
 
-Release builds bundle the JuCode CLI release named in
-`src-tauri/jucode-cli.version` (`--config src-tauri/tauri.bundle.conf.json`);
-development builds use `JUCODE_BIN` or the sibling checkout. Releases and
+Release builds bundle the LynShen CLI release named in
+`src-tauri/lynshen-cli.version` (`--config src-tauri/tauri.bundle.conf.json`);
+development builds use `LYNSHEN_BIN` or the sibling checkout. Releases and
 updates: [docs/updater.md](docs/updater.md).
 
 ### Provider catalog
@@ -134,9 +134,9 @@ the vendored file.
 ## License
 
 Apache License 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).
-Copyright 2026 Jucode Innovations INC.
+Copyright 2026 LynShen Innovations INC.
 
-The license covers the code. The JuCode name and logo are trademarks of Jucode
+The license covers the code. The LynShen name and logo are trademarks of LynShen
 Innovations INC. and are not licensed for use by forks. Claude Code, Codex and
 other tools the app works with belong to their owners and are installed from
 their official sources.

@@ -1,28 +1,28 @@
 # Engine backends
 
-Every session runs in the local `jucode daemon` (JuCode-CLI
+Every session runs in the local `lynshen daemon` (LynShen-CLI
 `docs/daemon-protocol.md`), whichever backend it uses:
 
 | id       | what the daemon runs |
 |----------|----------------------|
-| `jucode` | the JuCode engine, in-process |
+| `lynshen` | the LynShen engine, in-process |
 | `claude` | `claude --print --input-format stream-json …` |
 | `codex`  | `codex app-server` |
-| `acp`    | a registered ACP agent (`jucode acp`, `gemini --experimental-acp`, …), command line from the registry (`docs/acp.md`) |
+| `acp`    | a registered ACP agent (`lynshen acp`, `gemini --experimental-acp`, …), command line from the registry (`docs/acp.md`) |
 
-The daemon translates each engine into the jucode event protocol and client
+The daemon translates each engine into the lynshen event protocol and client
 ops into the engine's own frames, so the desktop talks one protocol to all of
 them: `ChatState` (the reducer behind the chat UI) and every view are
-backend-agnostic, and each session's adapter is the jucode one.
+backend-agnostic, and each session's adapter is the lynshen one.
 
 ## Sessions in the daemon
 
 `src/lib/daemon.ts` keeps one WebSocket to the daemon, which the desktop
-starts on demand (`daemon_endpoint`, with the jucode backend's binary and
+starts on demand (`daemon_endpoint`, with the lynshen backend's binary and
 environment from Settings). `SessionStore.#spawn` opens a session with
 `session_create`, or reopens one with `session_open` by its conversation id
 (restore, restart, provider or gateway switch). Claude Code and Codex
-sessions pass an engine spec: approval mode, the JuCode gateway switch, the
+sessions pass an engine spec: approval mode, the LynShen gateway switch, the
 binary and environment from Settings, and claude's `resume_at` for a rewind.
 
 - Closing the desktop only disconnects: sessions keep running, and deferred
@@ -34,19 +34,19 @@ binary and environment from Settings, and claude's `resume_at` for a rewind.
 - A daemon that can't be reached is retried with backoff for about 4.5
   minutes before the tab shows an error.
 
-## The adapter (`types.ts`, `jucode.ts`)
+## The adapter (`types.ts`, `lynshen.ts`)
 
 ```ts
 interface EngineAdapter {
   readonly id: BackendId;
   readonly caps: BackendCaps;
   onStart(io: AdapterIO, ctx: SessionCtx): void;
-  translate(raw: unknown): NormalizedEvent[];   // NormalizedEvent = jucode AgentEvent
+  translate(raw: unknown): NormalizedEvent[];   // NormalizedEvent = lynshen AgentEvent
   encodeOp(op: Op): string[] | null;
 }
 ```
 
-The jucode adapter passes events through, checks the `hello` protocol
+The lynshen adapter passes events through, checks the `hello` protocol
 version and maps approval-mode names between the desktop's trio and the
 engine's (`read-only` ↔ `manual`, `full-auto` ↔ `full-access`).
 `router.ts` holds each session's adapter and its op queue while the engine
@@ -69,7 +69,7 @@ is (re)starting; `dispatch(sessionId, op)` is how every UI call site sends.
 | `checkpoints`   | /rewind palette entry, checkpoint picker, per-message rewind |
 | `contextUsage`  | composer context ring |
 | `compact`       | /compact palette entry (compaction_start/end/failed events) |
-| `modelPicker`   | composer model button, /model palette entry, provider switch (provider switch itself is jucode-only: it rewrites the native engine's config) |
+| `modelPicker`   | composer model button, /model palette entry, provider switch (provider switch itself is lynshen-only: it rewrites the native engine's config) |
 | `resume`        | /resume palette entry, history picker, tab persistence |
 | `subagents`     | subagent status strip |
 | `transcriptReplay` | resume replays the transcript into the message list |
@@ -129,7 +129,7 @@ never test `backendId` directly.
 - `pty_open` — native TUI tabs, with a fixed per-backend argv allowlist
   (`src-tauri/src/backend.rs`).
 
-Binary resolution order: `JUCODE_BIN`/`CODEX_BIN`/`CLAUDE_BIN` env override →
+Binary resolution order: `LYNSHEN_BIN`/`CODEX_BIN`/`CLAUDE_BIN` env override →
 settings path override → PATH → well-known dirs (`/opt/homebrew/bin`,
 `/usr/local/bin`, `~/.cargo/bin`, `~/.local/bin`, claude's `~/.claude/local`,
-Windows equivalents) → (jucode only) sibling dev build.
+Windows equivalents) → (lynshen only) sibling dev build.

@@ -4,8 +4,8 @@
 [package]
 name = "desktop"
 version = "0.4.8"
-description = "JuCode desktop GUI"
-authors = ["Jucode Innovations INC."]
+description = "LynShen desktop GUI"
+authors = ["LynShen Innovations INC."]
 license = "Apache-2.0"
 edition = "2021"
 
@@ -23,7 +23,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # binary. Windows upgrades from the old `desktop.exe` are handled by Tauri's
 # NSIS installer (it deletes the previous MainBinaryName and retargets shortcuts).
 [[bin]]
-name = "JuCode"
+name = "LynShen"
 path = "src/main.rs"
 
 [build-dependencies]

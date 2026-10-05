@@ -195,7 +195,7 @@ mod tests {
     /// Builds a fake ~/.claude fixture; unique per test to allow parallelism.
     fn fixture(name: &str) -> PathBuf {
         let home = std::env::temp_dir().join(format!(
-            "jucode-claude-history-{}-{name}",
+            "lynshen-claude-history-{}-{name}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&home);
@@ -215,8 +215,8 @@ mod tests {
     fn munges_cwd_like_claude_does() {
         // Verified live: '/', '.' and '_' all become '-', case is preserved.
         assert_eq!(
-            munge_cwd("/Users/apple/dev/JuCode-Desktop"),
-            "-Users-apple-dev-JuCode-Desktop"
+            munge_cwd("/Users/apple/dev/LynShen-Desktop"),
+            "-Users-apple-dev-LynShen-Desktop"
         );
         assert_eq!(munge_cwd("/tmp/a.b_c"), "-tmp-a-b-c");
         // Non-ASCII collapses to '-' too (one dash per character).

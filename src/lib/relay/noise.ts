@@ -1,6 +1,6 @@
 // Noise_IK_25519_ChaChaPoly_SHA256, initiator side, after the Noise Protocol
 // Framework rev 34 (§5 processing rules, §7.5 IK), plus the relay's chunking
-// layer (JuCode-CLI docs/relay-protocol.md §4). The daemon is the responder;
+// layer (LynShen-CLI docs/relay-protocol.md §4). The daemon is the responder;
 // the client knows its static key from the pairing link.
 
 import { x25519 } from '@noble/curves/ed25519.js';
@@ -9,7 +9,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { hmac } from '@noble/hashes/hmac.js';
 
 export const PROTOCOL_NAME = 'Noise_IK_25519_ChaChaPoly_SHA256';
-export const PROLOGUE = new TextEncoder().encode('jucode-relay-v1');
+export const PROLOGUE = new TextEncoder().encode('lynshen-relay-v1');
 /** Largest plaintext chunk per transport message (§4). */
 export const CHUNK_SIZE = 65000;
 const TAG = 16;

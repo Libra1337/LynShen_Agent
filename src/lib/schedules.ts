@@ -1,4 +1,4 @@
-// An agent's scheduled tasks, kept by the jucode daemon: the wire shape,
+// An agent's scheduled tasks, kept by the lynshen daemon: the wire shape,
 // the human summary of when one repeats, and the checks the daemon applies.
 
 import { getLocale, t } from './i18n';

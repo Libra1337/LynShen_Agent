@@ -4,7 +4,7 @@
 
 import type { DaemonEndpoint } from './daemon';
 
-const TOKEN_KEY = 'jucode-remote-token';
+const TOKEN_KEY = 'lynshen-remote-token';
 
 export function remoteToken(): string | null {
 	try {

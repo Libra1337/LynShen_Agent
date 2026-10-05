@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 describe('SessionStore × backends', () => {
-	it('every backend runs in the daemon behind the jucode adapter', async () => {
+	it('every backend runs in the daemon behind the lynshen adapter', async () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
@@ -39,10 +39,10 @@ describe('SessionStore × backends', () => {
 		begin(id);
 		await flush();
 		expect(hostSession).toHaveBeenCalledWith(id, p.path, undefined, undefined, false, undefined);
-		expect(adapterFor(id)?.id).toBe('jucode');
-		expect(p.lastBackend).toBe('jucode');
+		expect(adapterFor(id)?.id).toBe('lynshen');
+		expect(p.lastBackend).toBe('lynshen');
 		const cl = store.addSession(p, undefined, 'claude');
-		expect(adapterFor(cl)?.id).toBe('jucode');
+		expect(adapterFor(cl)?.id).toBe('lynshen');
 	});
 
 	it('an explicit backend becomes the engine spec and the project default', async () => {
@@ -71,7 +71,7 @@ describe('SessionStore × backends', () => {
 		});
 	});
 
-	it('ops of any backend go out as jucode lines', async () => {
+	it('ops of any backend go out as lynshen lines', async () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
@@ -82,11 +82,11 @@ describe('SessionStore × backends', () => {
 		expect(lines).toContainEqual({ op: 'user_message', content: '你好' });
 	});
 
-	it('serialize records the backend only for non-jucode tabs and lastBackend', () => {
+	it('serialize records the backend only for non-lynshen tabs and lastBackend', () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
-		begin(store.addSession(p, undefined, 'jucode'));
+		begin(store.addSession(p, undefined, 'lynshen'));
 		begin(store.addSession(p, undefined, 'codex'));
 		for (const [i, s] of p.sessions.entries()) {
 			s.chat.sessionId = `sid-${i}`;
@@ -100,7 +100,7 @@ describe('SessionStore × backends', () => {
 		]);
 	});
 
-	it('restore maps saved backends (missing / unknown → jucode) and reopens them by id when shown', async () => {
+	it('restore maps saved backends (missing / unknown → lynshen) and reopens them by id when shown', async () => {
 		const store = new SessionStore();
 		await store.restore([
 			{
@@ -116,7 +116,7 @@ describe('SessionStore × backends', () => {
 			}
 		]);
 		const sessions = store.projects[0].sessions;
-		expect(sessions.map((s) => s.backendId)).toEqual(['jucode', 'claude', 'jucode']);
+		expect(sessions.map((s) => s.backendId)).toEqual(['lynshen', 'claude', 'lynshen']);
 		expect(store.projects[0].lastBackend).toBe('claude');
 		// Listed, not started: each opens when it is first shown.
 		expect(sessions.every((s) => s.dormant)).toBe(true);

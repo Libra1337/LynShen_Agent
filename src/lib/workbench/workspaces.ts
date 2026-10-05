@@ -13,9 +13,9 @@ export const WORKSPACES_VERSION = 1;
 
 // Legacy localStorage keys this file replaces (read once for migration; never
 // written again — app-data is the only source of truth for workspace/layout).
-export const LEGACY_PROJECTS_KEY = 'jucode-projects';
-export const LEGACY_DOCK_TABS_KEY = 'jucode-dock-tabs';
-export const LEGACY_DOCK_ACTIVE_KEY = 'jucode-dock-active';
+export const LEGACY_PROJECTS_KEY = 'lynshen-projects';
+export const LEGACY_DOCK_TABS_KEY = 'lynshen-dock-tabs';
+export const LEGACY_DOCK_ACTIVE_KEY = 'lynshen-dock-active';
 
 /** Tool panel kinds a tile tab may reference (besides chat:/tui: tabs). */
 export const DOCK_PANELS = ['plan', 'goal', 'changes', 'turns', 'files', 'git', 'term', 'browser', 'diag'] as const;

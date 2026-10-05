@@ -28,8 +28,8 @@
 	} = $props();
 
 	const conn = useHost();
-	const DRAFT = `jucode-dispatch-draft:${conn.id}`;
-	const SETTINGS = 'jucode-dispatch-settings';
+	const DRAFT = `lynshen-dispatch-draft:${conn.id}`;
+	const SETTINGS = 'lynshen-dispatch-settings';
 
 	function load<T>(key: string, fallback: T): T {
 		try {

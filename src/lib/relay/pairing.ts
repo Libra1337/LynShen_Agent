@@ -1,16 +1,16 @@
-// The PWA's relay pairing state (JuCode-CLI docs/relay-protocol.md §1, §2):
+// The PWA's relay pairing state (LynShen-CLI docs/relay-protocol.md §1, §2):
 // the computers it is paired with, read from `#pair=` link fragments, and
 // this device's own X25519 key (one per browser, used for every computer),
 // all in localStorage.
 
 import { fromBase64Url, generateKeyPair, toBase64Url, type KeyPair } from './noise';
 
-export const RELAY_URL = 'wss://app.jucode.net/relay/v1';
-const HOSTS_KEY = 'jucode-relay-hosts';
+export const RELAY_URL = 'wss://app.lynshen.net/relay/v1';
+const HOSTS_KEY = 'lynshen-relay-hosts';
 /** The single computer kept before there was a list; moved into it once. */
-const LEGACY_HOST_KEY = 'jucode-relay-host';
-const ACTIVE_KEY = 'jucode-relay-active';
-const DEVICE_KEY = 'jucode-relay-device';
+const LEGACY_HOST_KEY = 'lynshen-relay-host';
+const ACTIVE_KEY = 'lynshen-relay-active';
+const DEVICE_KEY = 'lynshen-relay-device';
 
 export interface RelayHost {
 	host_id: string;

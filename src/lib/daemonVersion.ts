@@ -1,4 +1,4 @@
-// A release build ships its own jucode (src-tauri/src/app_cli.rs). After an
+// A release build ships its own lynshen (src-tauri/src/app_cli.rs). After an
 // app update the daemon still runs the previous one: it is asked to restart
 // once no session is running, so no running task is cut off. A daemon too old
 // to do that is replaced right away.

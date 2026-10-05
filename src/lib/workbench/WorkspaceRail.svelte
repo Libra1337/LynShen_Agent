@@ -41,7 +41,7 @@
 		onRename: (id: string, name: string) => void;
 		onChrome: (id: string, chrome: { color?: string | null; icon?: TabIcon | null }) => void;
 		onDelete: (id: string) => void;
-		/** Signed in to the JuCode account (not tied to any one chat). */
+		/** Signed in to the LynShen account (not tied to any one chat). */
 		loggedIn: boolean;
 		updateAvailable?: boolean;
 		/** The settings page is in front: the gear shows as selected. */

@@ -1,6 +1,6 @@
 <script lang="ts">
 	// New long-lived agent: id, name, working directory and role. Created in
-	// the local jucode daemon; the parent opens its first session.
+	// the local lynshen daemon; the parent opens its first session.
 	import { onMount, tick } from 'svelte';
 	import RobotIcon from 'phosphor-svelte/lib/RobotIcon';
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';

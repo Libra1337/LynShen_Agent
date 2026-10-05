@@ -3,8 +3,8 @@
 // conversations opened recently (IndexedDB, larger). Shown at once on the
 // next visit and replaced by what the computer sends once it is reached.
 
-const LISTS = 'jucode-remote-lists:';
-const DB = 'jucode-remote';
+const LISTS = 'lynshen-remote-lists:';
+const DB = 'lynshen-remote';
 const STORE = 'sessions';
 /** Conversations kept; the least recently opened go first. */
 const KEEP_SESSIONS = 40;

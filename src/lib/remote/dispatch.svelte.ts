@@ -1,4 +1,4 @@
-// Dispatches on one paired computer (JuCode-CLI daemon dispatch.rs): the
+// Dispatches on one paired computer (LynShen-CLI daemon dispatch.rs): the
 // list as the daemon broadcasts it, and the ops that start one or answer
 // its plan.
 

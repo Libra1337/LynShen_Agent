@@ -30,8 +30,8 @@ const chat = {
 		modeApplyNow: '中断本轮，立即生效',
 		steerTitle: '打断当前回合，立即执行队首消息',
 		steerAction: '插队执行',
-		composerPlaceholder: '给 JuCode 指派一个任务…  (拖入/粘贴图片 · + 附加文件 · / 唤起命令)',
-		chatPlaceholder: '问点什么，或让 JuCode 帮你调研…',
+		composerPlaceholder: '给 LynShen 指派一个任务…  (拖入/粘贴图片 · + 附加文件 · / 唤起命令)',
+		chatPlaceholder: '问点什么，或让 LynShen 帮你调研…',
 		attachTitle: '附加文件',
 		voiceTitle: '语音输入',
 		voiceStopTitle: '停止录音并转写',
@@ -113,7 +113,7 @@ const chat = {
 		windowUnset: '未设置窗口',
 		manageModels: '管理模型',
 		providerLocalDesc: '用这台电脑上 {tool} 的登录或配置',
-		providerAuto: 'JuCode 自动',
+		providerAuto: 'LynShen 自动',
 		quota: {
 			title: '套餐额度',
 			hours: '{n} 小时',
@@ -207,11 +207,11 @@ const chat = {
 			requestId: '请求 ID',
 			thisTool: '该工具',
 			action: { restart: '重启会话', login: '去登录', account: '查看账户', compact: '压缩对话', model: '换个模型' },
-			jucodeAuth: {
-				title: 'JuCode 登录凭据已过期',
+			lynshenAuth: {
+				title: 'LynShen 登录凭据已过期',
 				hint: '会话启动时拿到的登录凭据有效期约 1 小时，现在已经失效。重启会话会换上新凭据，对话内容保留。'
 			},
-			jucodeLogin: { title: 'JuCode 未登录或登录已过期', hint: '在设置中重新登录 JuCode 后再试。' },
+			lynshenLogin: { title: 'LynShen 未登录或登录已过期', hint: '在设置中重新登录 LynShen 后再试。' },
 			toolAuth: {
 				title: '{subject} 的账号登录已失效',
 				hint: '这个会话使用 {subject} 自己的账号。在终端重新登录后再试：Codex 运行 codex login，Claude Code 运行 claude 并按提示登录。'
@@ -282,8 +282,8 @@ const chat = {
 		modeApplyNow: 'Stop this turn to apply now',
 		steerTitle: 'Interrupt the current turn and run the first queued message now',
 		steerAction: 'Run now',
-		composerPlaceholder: 'Assign JuCode a task…  (drop/paste images · + to attach files · / for commands)',
-		chatPlaceholder: 'Ask anything, or have JuCode research it…',
+		composerPlaceholder: 'Assign LynShen a task…  (drop/paste images · + to attach files · / for commands)',
+		chatPlaceholder: 'Ask anything, or have LynShen research it…',
 		attachTitle: 'Attach files',
 		voiceTitle: 'Voice input',
 		voiceStopTitle: 'Stop recording and transcribe',
@@ -365,7 +365,7 @@ const chat = {
 		windowUnset: 'Window not set',
 		manageModels: 'Manage models',
 		providerLocalDesc: 'The login or config of {tool} on this computer',
-		providerAuto: 'JuCode auto',
+		providerAuto: 'LynShen auto',
 		quota: {
 			title: 'Plan usage',
 			hours: '{n} hours',
@@ -459,11 +459,11 @@ const chat = {
 			requestId: 'Request ID',
 			thisTool: 'the tool',
 			action: { restart: 'Restart session', login: 'Sign in', account: 'View account', compact: 'Compact', model: 'Change model' },
-			jucodeAuth: {
-				title: 'JuCode credential expired',
+			lynshenAuth: {
+				title: 'LynShen credential expired',
 				hint: 'The credential this session started with lasts about an hour and has run out. Restarting the session takes a new one and keeps the conversation.'
 			},
-			jucodeLogin: { title: 'Not signed in to JuCode', hint: 'Sign in to JuCode in Settings, then try again.' },
+			lynshenLogin: { title: 'Not signed in to LynShen', hint: 'Sign in to LynShen in Settings, then try again.' },
 			toolAuth: {
 				title: '{subject} sign-in expired',
 				hint: 'This session uses {subject}’s own account. Sign in again in a terminal (Codex: codex login; Claude Code: run claude and log in), then retry.'

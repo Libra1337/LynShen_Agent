@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "JuCode",
+  "productName": "LynShen",
   "version": "0.4.8",
-  "identifier": "com.jucode.desktop",
+  "identifier": "com.lynshen.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "JuCode",
+        "title": "LynShen",
         "width": 1320,
         "height": 880,
         "minWidth": 1040,
@@ -41,14 +41,14 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/JuCode-Team/JuCode-Desktop/releases/latest/download/latest.json"
+        "https://github.com/LynShen-Team/LynShen-Desktop/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI2MkRDQTQ5NTA2NkI4NzMKUldSenVHWlFTY290Sm4xNUZDTmFocXpxRmFTOW14NDFKaWRiby9RdFFPQnNKQ2o0L05KSHhTVE0K"
     },
     "deep-link": {
       "desktop": {
         "schemes": [
-          "jucode"
+          "lynshen"
         ]
       }
     }
@@ -57,9 +57,9 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
-    "publisher": "Jucode Innovations INC.",
+    "publisher": "LynShen Innovations INC.",
     "license": "Apache-2.0",
-    "copyright": "Copyright © 2026 Jucode Innovations INC. Licensed under the Apache License 2.0.",
+    "copyright": "Copyright © 2026 LynShen Innovations INC. Licensed under the Apache License 2.0.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

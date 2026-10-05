@@ -1,4 +1,4 @@
-//! App updates from two sources: GitHub Releases first, and the JuCode server
+//! App updates from two sources: GitHub Releases first, and the LynShen server
 //! (the same signed bundles, mirrored by the backend) when GitHub cannot be
 //! reached or downloads too slowly, as is common from mainland China. The
 //! updater plugin checks signatures either way.
@@ -11,7 +11,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 const GITHUB_MANIFEST: &str =
-    "https://github.com/JuCode-Team/JuCode-Desktop/releases/latest/download/latest.json";
+    "https://github.com/LynShen-Team/LynShen-Desktop/releases/latest/download/latest.json";
 const CHECK_TIMEOUT: Duration = Duration::from_secs(10);
 /// The first bytes of the bundle must arrive at least this fast from GitHub.
 const PROBE_BYTES: u64 = 512 * 1024;
@@ -21,7 +21,7 @@ const PROBE_TIME: Duration = Duration::from_secs(4);
 #[serde(rename_all = "lowercase")]
 pub enum Source {
     Github,
-    Jucode,
+    LynShen,
 }
 
 /// The update found by the last check, for `update_install`.
@@ -46,23 +46,23 @@ pub enum DownloadEvent {
     Finished,
 }
 
-/// The JuCode server's mirror of the desktop manifest, on the API the user's
+/// The LynShen server's mirror of the desktop manifest, on the API the user's
 /// config names (regional domains differ).
-fn jucode_manifest() -> String {
+fn lynshen_manifest() -> String {
     format!("{}/v1/public/releases/desktop/latest.json", api_base())
 }
 
-/// The JuCode API this app talks to without a login (`jucode_api_url` in
+/// The LynShen API this app talks to without a login (`lynshen_api_url` in
 /// config.json; regional domains differ).
 pub fn api_base() -> String {
     let api = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(|home| std::path::PathBuf::from(home).join(".jucode").join("config.json"))
+        .map(|home| std::path::PathBuf::from(home).join(".lynshen").join("config.json"))
         .and_then(|path| std::fs::read_to_string(path).ok())
         .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-        .and_then(|config| config["jucode_api_url"].as_str().map(str::to_string))
+        .and_then(|config| config["lynshen_api_url"].as_str().map(str::to_string))
         .filter(|api| !api.trim().is_empty())
-        .unwrap_or_else(|| "https://api.jucode.net".to_string());
+        .unwrap_or_else(|| "https://api.lynshen.net".to_string());
     api.trim_end_matches('/').to_string()
 }
 
@@ -99,7 +99,7 @@ fn downloads_fast(url: &str) -> bool {
 }
 
 /// Looks for an update: on GitHub, else (unreachable, or too slow to download
-/// from) on the JuCode server.
+/// from) on the LynShen server.
 #[tauri::command]
 pub async fn update_check(app: AppHandle, pending: State<'_, Pending>) -> Result<Option<Found>, String> {
     let found = match check_at(&app, GITHUB_MANIFEST).await {
@@ -113,15 +113,15 @@ pub async fn update_check(app: AppHandle, pending: State<'_, Pending>) -> Result
                 Some((update, Source::Github))
             } else {
                 // Slow GitHub: the mirror when it has this version, else GitHub after all.
-                match check_at(&app, &jucode_manifest()).await {
-                    Ok(Some(mirror)) if mirror.version == update.version => Some((mirror, Source::Jucode)),
+                match check_at(&app, &lynshen_manifest()).await {
+                    Ok(Some(mirror)) if mirror.version == update.version => Some((mirror, Source::LynShen)),
                     _ => Some((update, Source::Github)),
                 }
             }
         }
-        Err(github) => match check_at(&app, &jucode_manifest()).await {
-            Ok(update) => update.map(|update| (update, Source::Jucode)),
-            Err(jucode) => return Err(format!("GitHub: {github}; JuCode: {jucode}")),
+        Err(github) => match check_at(&app, &lynshen_manifest()).await {
+            Ok(update) => update.map(|update| (update, Source::LynShen)),
+            Err(lynshen) => return Err(format!("GitHub: {github}; LynShen: {lynshen}")),
         },
     };
     let result = found.as_ref().map(|(update, source)| Found {
@@ -152,11 +152,11 @@ async fn install(update: &Update, on_event: &Channel<DownloadEvent>) -> Result<(
         .map_err(|e| e.to_string())
 }
 
-/// The lowest version the JuCode server still accepts ("" when it names
+/// The lowest version the LynShen server still accepts ("" when it names
 /// none or cannot be reached: an unreachable server never locks the app).
 #[tauri::command]
 pub async fn update_policy() -> String {
-    let manifest = jucode_manifest();
+    let manifest = lynshen_manifest();
     let url = manifest.replace("/latest.json", "/policy");
     tauri::async_runtime::spawn_blocking(move || {
         ureq::AgentBuilder::new()
@@ -175,7 +175,7 @@ pub async fn update_policy() -> String {
 }
 
 /// Downloads and installs the update the last check found; a GitHub download
-/// that fails is retried once from the JuCode server.
+/// that fails is retried once from the LynShen server.
 #[tauri::command]
 pub async fn update_install(
     app: AppHandle,
@@ -191,10 +191,10 @@ pub async fn update_install(
     match install(&update, &on_event).await {
         Ok(()) => Ok(()),
         Err(github) if source == Source::Github => {
-            match check_at(&app, &jucode_manifest()).await {
+            match check_at(&app, &lynshen_manifest()).await {
                 Ok(Some(mirror)) if mirror.version == update.version => install(&mirror, &on_event)
                     .await
-                    .map_err(|jucode| format!("GitHub: {github}; JuCode: {jucode}")),
+                    .map_err(|lynshen| format!("GitHub: {github}; LynShen: {lynshen}")),
                 _ => Err(github),
             }
         }
@@ -217,6 +217,6 @@ mod tests {
 
     #[test]
     fn the_mirror_manifest_is_under_the_public_api() {
-        assert!(jucode_manifest().ends_with("/v1/public/releases/desktop/latest.json"));
+        assert!(lynshen_manifest().ends_with("/v1/public/releases/desktop/latest.json"));
     }
 }

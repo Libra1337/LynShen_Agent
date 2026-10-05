@@ -1,7 +1,7 @@
 <script lang="ts">
-	// Welcome → 模型: the JuCode engine's default model and effort
-	// (~/.jucode/config.json `model` / `reasoning_effort`, the same fields as
-	// Settings → 模型), and the "models to show" picker for a JuCode account.
+	// Welcome → 模型: the LynShen engine's default model and effort
+	// (~/.lynshen/config.json `model` / `reasoning_effort`, the same fields as
+	// Settings → 模型), and the "models to show" picker for a LynShen account.
 	import { onMount } from 'svelte';
 	import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
 	import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
@@ -98,7 +98,7 @@
 	}
 </script>
 
-{#if backend !== 'jucode'}
+{#if backend !== 'lynshen'}
 	<div class="note">
 		<Notice tone="info">{t('setup.welcome.model.otherBackend', { name: BACKEND_LABELS[backend] })}</Notice>
 	</div>
@@ -142,7 +142,7 @@
 	{/if}
 
 	<div class="row actions">
-		{#if loggedIn && provider === 'jucode'}
+		{#if loggedIn && provider === 'lynshen'}
 			<Button size="sm" onclick={() => (modelSetup.open = true)}><ListChecksIcon size={14} /> {t('setup.welcome.model.pick')}</Button>
 		{/if}
 		<Button variant="ghost" size="sm" onclick={onOpenProviders}><KeyIcon size={14} /> {t('setup.welcome.model.providers')}</Button>

@@ -1,15 +1,15 @@
 # Native TUI tabs
 
-A TUI tab runs the **real interactive CLI** — `jucode`, `codex` or `claude` —
+A TUI tab runs the **real interactive CLI** — `lynshen`, `codex` or `claude` —
 inside the desktop app: a pty (portable-pty) on the Rust side, xterm.js on the
 front. Nothing is re-rendered or emulated; what you see is exactly what the
 terminal would show.
 
 ## Opening a tab
 
-- **Command palette** (⌘K): "Open TUI: JuCode / Codex / Claude Code". This
+- **Command palette** (⌘K): "Open TUI: LynShen / Codex / Claude Code". This
   re-activates an existing tab for that backend if one is open.
-- **Dock "+" menu** (mosaic leaf or classic tab bar): the `TUI · jucode` /
+- **Dock "+" menu** (mosaic leaf or classic tab bar): the `TUI · lynshen` /
   `TUI · codex` / `TUI · claude` entries. Each pick spawns a fresh tab, so you
   can deliberately run several at once.
 
@@ -30,12 +30,12 @@ the process; restarting after exit spawns a new one.
 The webview never passes argv or a program path directly:
 
 - `pty_open` accepts a `command` **name** that must parse as one of the fixed
-  backends (`jucode` / `codex` / `claude`); anything else is rejected.
+  backends (`lynshen` / `codex` / `claude`); anything else is rejected.
 - Extra `args` are validated against a per-backend exact-token allowlist
-  (`backend::validate_tui_args`): none for jucode, `resume` for codex,
+  (`backend::validate_tui_args`): none for lynshen, `resume` for codex,
   `--continue` / `--resume` for claude. No values, no free-form flags.
 - The binary resolves exactly like engine spawns (`backend::resolve_backend_bin`):
-  env override (`JUCODE_BIN` …) → settings path (`bin_override`, validated) →
+  env override (`LYNSHEN_BIN` …) → settings path (`bin_override`, validated) →
   PATH → well-known install dirs.
 - The TUI child gets the login-shell env snapshot overlaid (see
   `shell_env.rs`) so PATH / proxy / CA vars match the user's terminal, plus

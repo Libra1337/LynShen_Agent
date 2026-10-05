@@ -1,6 +1,6 @@
-// Client for `jucode daemon` (JuCode-CLI docs/daemon-protocol.md): one
+// Client for `lynshen daemon` (LynShen-CLI docs/daemon-protocol.md): one
 // WebSocket carries every hosted session. To the rest of the desktop a hosted
-// session looks like a jucode child process: frames arrive through `onFrame`
+// session looks like a lynshen child process: frames arrive through `onFrame`
 // keyed by the desktop session id, `send` writes one op line, and `onExit`
 // fires when the session stops or the connection drops — so the existing
 // adapter, ChatState and restart logic apply unchanged.
@@ -143,7 +143,7 @@ export class DaemonClient {
 		if (this.#socket?.readyState === OPEN) this.#write({ op: 'unwatch', session });
 	}
 
-	/** Writes one op line (as composed by the jucode adapter) to the
+	/** Writes one op line (as composed by the lynshen adapter) to the
 	 *  desktop session's daemon session. */
 	async send(desktopId: string, line: string): Promise<void> {
 		const session = this.#toDaemon.get(desktopId);
@@ -201,7 +201,7 @@ export class DaemonClient {
 								} else {
 									reject(
 										new Error(
-											`jucode daemon speaks protocol ${String(frame.protocol)}, this client speaks ${DAEMON_PROTOCOL}`
+											`lynshen daemon speaks protocol ${String(frame.protocol)}, this client speaks ${DAEMON_PROTOCOL}`
 										)
 									);
 									socket.close();
@@ -212,10 +212,10 @@ export class DaemonClient {
 						};
 						socket.onerror = () => {
 							if (!greeted)
-								reject(new Error(`cannot reach jucode daemon at ${url} — is it running?`));
+								reject(new Error(`cannot reach lynshen daemon at ${url} — is it running?`));
 						};
 						socket.onclose = () => {
-							if (!greeted) reject(new Error(`jucode daemon at ${url} refused the connection`));
+							if (!greeted) reject(new Error(`lynshen daemon at ${url} refused the connection`));
 							if (this.#socket === socket) this.#lost();
 						};
 					})
@@ -260,7 +260,7 @@ export class DaemonClient {
 		this.#socket = null;
 		this.onDisconnect();
 		for (const pending of this.#pending.values())
-			pending.reject(new Error('connection to jucode daemon lost'));
+			pending.reject(new Error('connection to lynshen daemon lost'));
 		this.#pending.clear();
 		for (const resolve of this.#closing.values()) resolve();
 		const hosted = [...this.#toDaemon.keys()];
@@ -292,7 +292,7 @@ export class DaemonClient {
 
 	#write(frame: Frame) {
 		if (!this.#socket || this.#socket.readyState !== OPEN)
-			throw new Error('not connected to jucode daemon');
+			throw new Error('not connected to lynshen daemon');
 		this.#socket.send(JSON.stringify(frame));
 	}
 }

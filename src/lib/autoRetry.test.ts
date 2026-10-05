@@ -9,7 +9,7 @@ vi.mock('./protocol', () => ({
 	sendLine: vi.fn(() => Promise.resolve()),
 	sessionMeta: vi.fn(() => Promise.resolve()),
 	projectRoot: vi.fn(() => Promise.resolve('/tmp/demo')),
-	chatsDir: vi.fn(() => Promise.resolve('/home/u/.jucode/chats')),
+	chatsDir: vi.fn(() => Promise.resolve('/home/u/.lynshen/chats')),
 	writeConfig: vi.fn(() => Promise.resolve()),
 	git: vi.fn(() => Promise.resolve('')),
 	sessionHistory: vi.fn(() => Promise.resolve([]))
@@ -54,15 +54,15 @@ afterEach(() => vi.useRealTimers());
 describe('auto retry', () => {
 	it('retries connection and upstream failures, not limits or credentials', () => {
 		expect(retryable('API Error: Connection error.', 'claude')).toBe(true);
-		expect(retryable('io error: Software caused connection abort (os error 53)', 'jucode')).toBe(true);
+		expect(retryable('io error: Software caused connection abort (os error 53)', 'lynshen')).toBe(true);
 		expect(retryable('stream disconnected before completion: error sending request', 'codex')).toBe(true);
-		expect(retryable('LLM API returned HTTP 503: {"error":"no_available_provider"}', 'jucode')).toBe(true);
-		expect(retryable('LLM API returned HTTP 429: rate limit', 'jucode')).toBe(false);
-		expect(retryable('LLM API returned HTTP 401: invalid api key', 'jucode')).toBe(false);
+		expect(retryable('LLM API returned HTTP 503: {"error":"no_available_provider"}', 'lynshen')).toBe(true);
+		expect(retryable('LLM API returned HTTP 429: rate limit', 'lynshen')).toBe(false);
+		expect(retryable('LLM API returned HTTP 401: invalid api key', 'lynshen')).toBe(false);
 	});
 
-	it('JuCode picks the failed turn up with no new message, after the wait, at most three times', async () => {
-		const { chat, id, retry } = await started('jucode');
+	it('LynShen picks the failed turn up with no new message, after the wait, at most three times', async () => {
+		const { chat, id, retry } = await started('lynshen');
 		const fail = () => {
 			chat.handle({ type: 'connecting' });
 			chat.handle({ type: 'error', message: 'io error: connection reset by peer' });
@@ -88,7 +88,7 @@ describe('auto retry', () => {
 	});
 
 	it('a new message from the user calls the waiting retry off', async () => {
-		const { chat, id, retry } = await started('jucode');
+		const { chat, id, retry } = await started('lynshen');
 		chat.handle({ type: 'error', message: 'API Error: Connection error.' });
 		chat.handle({ type: 'status', message: 'ready' });
 		retry.failed(chat, 'API Error: Connection error.', true);

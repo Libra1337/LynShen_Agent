@@ -166,7 +166,7 @@
 		chat.backendId === 'acp' ? chat.acpAgentName || BACKEND_LABELS.acp : BACKEND_LABELS[chat.backendId]
 	);
 
-	// Capability gating for the session's engine backend (jucode = everything).
+	// Capability gating for the session's engine backend (lynshen = everything).
 	const bcaps = $derived(caps(chat));
 
 	// --- rich contenteditable editing surface ------------------------------
@@ -595,7 +595,7 @@
 
 	// Gauge against the auto-compaction limit, so a full ring means "about to
 	// compact" (falls back to the window if the engine didn't send a limit).
-	// Only jucode reports a real compaction threshold; claude/codex send limit 0,
+	// Only lynshen reports a real compaction threshold; claude/codex send limit 0,
 	// so we gauge against the raw window and label it "context used" instead of
 	// "to compaction" (which would be misleading — the CLI compacts before 100%).
 	const ctxAtThreshold = $derived(chat.contextLimit > 0);
@@ -869,7 +869,7 @@
 					<!-- Model changes slide the name in; the top effort sweeps in the model's colour. -->
 					{#key chat.model}
 						<span class="mswap">
-							{#if chat.backendId === 'jucode' && chat.model}<Vendor model={chat.model} size={15} />{:else}<BackendIcon backend={chat.backendId} size={15} />{/if}
+							{#if chat.backendId === 'lynshen' && chat.model}<Vendor model={chat.model} size={15} />{:else}<BackendIcon backend={chat.backendId} size={15} />{/if}
 							<span class="m">{chat.modelLabel || chat.model || backendLabel}</span>
 						</span>
 					{/key}

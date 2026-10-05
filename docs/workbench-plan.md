@@ -1,6 +1,6 @@
-# JuCode Desktop 工作台架构规划（Workbench Plan）
+# LynShen Desktop 工作台架构规划（Workbench Plan）
 
-> 基准代码：`main@6f83aa4`。定位声明：JuCode Desktop 是一个 **终端 / TUI 编码代理管理器**，不是完整的 AI IDE。本文给出从当前代码到北极星目标的架构方案。
+> 基准代码：`main@6f83aa4`。定位声明：LynShen Desktop 是一个 **终端 / TUI 编码代理管理器**，不是完整的 AI IDE。本文给出从当前代码到北极星目标的架构方案。
 
 ## Owner decisions（2026-08-28，已锁定）
 
@@ -11,10 +11,10 @@
 - 内嵌浏览器保留元素拾取器；它只做用户控制的 **preview + pick**，不是 browser-use 自动化。
 - GitHub PR 能力作为 **插件** 实现，不进入 core。
 - 保留 MiMo ASR，并扩展更多 ASR 协议/provider。
-- ACP 是新增 backend；保留原生 jucode / codex / claude backend。
+- ACP 是新增 backend；保留原生 lynshen / codex / claude backend。
 - 模型选择器使用四分组。
 - IM 是独立 agent：OpenClaw 网关优先、confirm-before-assign；v1 不做 always-on daemon，后续有明确需要再评估。
-- 技能源为官方 JuCode 技能 + [anthropics/skills](https://github.com/anthropics/skills)。
+- 技能源为官方 LynShen 技能 + [anthropics/skills](https://github.com/anthropics/skills)。
 - Provider 目录使用 models.dev 快照 + BYOK + OpenRouter featured；不引入 LiteLLM。
 - 不做 memory、computer-use、内置 browser-use。
 
@@ -23,14 +23,14 @@
 以下每条均在 `6f83aa4` 上核实过，附代码出处：
 
 - **技术栈**：Tauri 2 + Svelte 5（runes）。前端入口 `src/routes/+page.svelte`，Rust 侧 `src-tauri/src/lib.rs`。
-- **多引擎后端**：jucode / codex / claude 三个后端通过统一的 `EngineAdapter` 接口接入（`src/lib/backends/index.ts` 的 `createAdapter(id: BackendId)`，实现在 `src/lib/backends/{jucode,codex,claude}.ts`）。事件被归一化为 `NormalizedEvent` 流。
-- **布局**：侧边栏（`src/lib/Sidebar.svelte`）+ 聊天主区 + 可选 CodeMirror 编辑器（`src/lib/editor/EditorPane.svelte`）+ 右侧 Dock。右侧 Dock 共 **9 种面板类型**（`src/lib/RightDock.svelte` 的 `ALL_PANELS`：plan / goal / changes / turns / files / git / term / browser / diag），同一时刻只有一个激活标签；标签持久化在 `localStorage`（key `jucode-dock-tabs`）。
+- **多引擎后端**：lynshen / codex / claude 三个后端通过统一的 `EngineAdapter` 接口接入（`src/lib/backends/index.ts` 的 `createAdapter(id: BackendId)`，实现在 `src/lib/backends/{lynshen,codex,claude}.ts`）。事件被归一化为 `NormalizedEvent` 流。
+- **布局**：侧边栏（`src/lib/Sidebar.svelte`）+ 聊天主区 + 可选 CodeMirror 编辑器（`src/lib/editor/EditorPane.svelte`）+ 右侧 Dock。右侧 Dock 共 **9 种面板类型**（`src/lib/RightDock.svelte` 的 `ALL_PANELS`：plan / goal / changes / turns / files / git / term / browser / diag），同一时刻只有一个激活标签；标签持久化在 `localStorage`（key `lynshen-dock-tabs`）。
 - **项目 ⊃ 会话，但没有 Workspace**：`src/lib/session.svelte.ts` 的 `SavedProject` 持久化 `{id, name, path, tabs[], worktree?, lastBackend?}`，即一个 Project 已经容纳多个会话标签，但不存在跨项目的 Workspace 实体。
 - **内嵌浏览器是原生子窗口**：`src-tauri/src/browser.rs` 用 `WebviewWindowBuilder` 创建原生子 `WebviewWindow`（非 DOM iframe），全局单例（`BROWSER_LABEL`），由前端 `src/lib/BrowserPanel.svelte` 定位覆盖到面板区域。带 DOM 元素拾取器（`src/lib/browser.svelte.ts`、`src-tauri/src/browser_init.js`）。
 - **PTY 已存在但只跑用户 shell**：Rust 侧基于 `portable-pty`（`src-tauri/src/lib.rs` 中 `pty_open/pty_write/pty_resize/pty_close`），前端 `src/lib/TerminalPanel.svelte` 用 `@xterm/xterm` 渲染。当前 `pty_open` 启动的是用户默认 shell，**不是** agent 交互式 TUI。
 - **没有任何 ACP**（Agent Client Protocol）代码。
 - **模型选择器已存在**：`src/lib/Composer.svelte` 的 `modelRows/modelActive` 弹层，由各 adapter 的 `model_status` / `set_model` 驱动；支持自定义 OpenAI 兼容 provider（`src/lib/settings/CustomProviderForm.svelte`，字段 `id/base_url/api_key/models`）。**MiMo 是 ASR（语音输入），不是 LLM**（`src/lib/audio.ts`、`src/lib/protocol.ts`）。
-- **MCP / 技能 UI 仅对 jucode 后端生效**：`src/lib/settings/McpSection.svelte`、`src/lib/Marketplace.svelte`（经 `/skills install` 命令下发），codex / claude 后端不接入这套 UI。
+- **MCP / 技能 UI 仅对 lynshen 后端生效**：`src/lib/settings/McpSection.svelte`、`src/lib/Marketplace.svelte`（经 `/skills install` 命令下发），codex / claude 后端不接入这套 UI。
 - **没有任何 IM 集成**。
 - **已有的"偏 IDE"能力清单**：CodeMirror 编辑器（含 diff gutter / AI 高亮）、内嵌浏览器 + DOM 拾取器、屏幕捕获（`src-tauri/src/capture.rs`）、并行任务 worktree（`src/lib/gitops.ts` 的 `parseWorktreeList` 等）、Git 面板、GitHub PR 桥（`src/lib/gitops.ts` 封装 `gh pr view/create`，UI 在 `src/lib/GitPanel.svelte`）。
 
@@ -40,8 +40,8 @@
 2. **马赛克（mosaic）标签布局**：多个标签同时可见、类 Windows Snap 的吸附分屏、双击最大化/还原、拖拽时显示分屏预览。
 3. **Workspace 包含多个标签页**（跨项目）。
 4. ACP 包装质量对标 VS Code agents UI / T3code。
-5. MCP + 技能插件管理；官方 JuCode 技能 + Anthropic 技能（[anthropics/skills](https://github.com/anthropics/skills)；注意其中 docx/pdf/pptx/xlsx 四个文档技能是 **source-available 而非 OSS 许可**，且 Claude Code 无法使用这些预置文档技能）。
-6. 模型切换四分组：Codex 官方 / Claude 官方 / JuCode 已配置全部模型；区分"官方 provider"与"内置 provider"。
+5. MCP + 技能插件管理；官方 LynShen 技能 + Anthropic 技能（[anthropics/skills](https://github.com/anthropics/skills)；注意其中 docx/pdf/pptx/xlsx 四个文档技能是 **source-available 而非 OSS 许可**，且 Claude Code 无法使用这些预置文档技能）。
+6. 模型切换四分组：Codex 官方 / Claude 官方 / LynShen 已配置全部模型；区分"官方 provider"与"内置 provider"。
 7. 更多 LLM provider 通过 **复用** 接入，而不是写 10+ 个 adapter。
 8. **不是完整 IDE**：不做 memory、不做 computer-use、不做 browser-use。
 9. 唯一的第三方集成是 **IM**：微信（经腾讯 openclaw-weixin / iLink 插件接入——**不要**将其表述为"合法官方机器人 API"）、OpenClaw/Cloudbot、Telegram、Discord、飞书。
@@ -54,7 +54,7 @@
 在 `SavedProject` 之上加一层 Workspace，而不是重写会话层：
 
 ```
-Workspace ─┬─ Project A ─┬─ Session(GUI, jucode)
+Workspace ─┬─ Project A ─┬─ Session(GUI, lynshen)
            │             └─ Session(TUI, codex)   ← PTY 标签
            ├─ Project B ── Session(GUI, claude)
            └─ layout: TileTree                     ← 布局归 Workspace
@@ -74,7 +74,7 @@ Workspace ─┬─ Project A ─┬─ Session(GUI, jucode)
 
 ### 3.3 原生 TUI 标签 = PTY 里跑交互式 CLI
 
-- 复用现有 PTY 通道：给 `pty_open`（`src-tauri/src/lib.rs:2197`）加可选 `cmd/args` 参数，直接拉起 `jucode` / `codex` / `claude` 交互式 CLI，而不是用户 shell；前端复用 `TerminalPanel.svelte` 的 xterm 渲染。
+- 复用现有 PTY 通道：给 `pty_open`（`src-tauri/src/lib.rs:2197`）加可选 `cmd/args` 参数，直接拉起 `lynshen` / `codex` / `claude` 交互式 CLI，而不是用户 shell；前端复用 `TerminalPanel.svelte` 的 xterm 渲染。
 - **v1：独立会话**。TUI 标签就是一个独立的 agent 会话，与 GUI 会话互不共享状态。这是零协议成本的正确起点。
 - **v2（可选）：显式交接（handoff）**。GUI 会话可"转为 TUI"：GUI 侧关闭 adapter，拿会话/thread id，在 PTY 里以 resume 方式拉起 CLI（codex 有 `thread/resume`，claude 有 `--session-id` + 会话文件，见 `src/lib/backends/{codex,claude}.ts`）。反向同理。
 - **永远不做"双活"**：同一引擎会话绝不同时被 GUI adapter 和 TUI 进程持有——两个客户端抢一个 stdio/会话文件没有可靠语义。
@@ -87,11 +87,11 @@ Workspace ─┬─ Project A ─┬─ Session(GUI, jucode)
 
 ### 3.5 模型与 Provider
 
-- 模型选择器改为四分组：**Codex 官方 / Claude 官方 / JuCode 内置 / 自定义**。数据源分别是 codex adapter 的 `model_status`、claude adapter 的 `list_models`、jucode 后端配置、`CustomProviderForm` 的 BYOK 条目。UI 上明确标注"官方 provider"与"内置 provider"。
+- 模型选择器改为四分组：**Codex 官方 / Claude 官方 / LynShen 内置 / 自定义**。数据源分别是 codex adapter 的 `model_status`、claude adapter 的 `list_models`、lynshen 后端配置、`CustomProviderForm` 的 BYOK 条目。UI 上明确标注"官方 provider"与"内置 provider"。
 - 扩展更多 provider 走 **目录 + BYOK 复用**，不写 10+ adapter：
   - 内置一份 [models.dev](https://models.dev) 目录快照（构建期生成的 JSON），提供 provider → base_url / 模型清单的预填；用户只填 API key，落到现有自定义 OpenAI 兼容 provider 通道。
   - OpenRouter 作为 featured 条目置顶（一个 key 覆盖长尾模型）。
-  - **不在桌面端内嵌 LiteLLM**：那是一个 Python 代理服务，与"轻量桌面应用"冲突；聚合应发生在 jucode 后端或用户自己的网关。
+  - **不在桌面端内嵌 LiteLLM**：那是一个 Python 代理服务，与"轻量桌面应用"冲突；聚合应发生在 lynshen 后端或用户自己的网关。
 - MiMo 保留为 ASR provider，并把语音输入层抽象到更多 ASR 协议/provider；ASR 配置与 LLM provider 目录分开。
 
 ### 3.6 收敛"IDE 化"能力（已锁定）
@@ -112,9 +112,9 @@ Workspace ─┬─ Project A ─┬─ Session(GUI, jucode)
 
 ### 3.8 技能与 MCP 管理
 
-- 现有 Marketplace（`src/lib/Marketplace.svelte`）与 MCP 设置（`McpSection.svelte`）是 jucode-only。规划为统一插件管理页：
-  - **技能源**：官方 JuCode 技能 + [anthropics/skills](https://github.com/anthropics/skills)。展示时标注许可：anthropics/skills 中 docx / pdf / pptx / xlsx 为 source-available（非 OSS），且 **Claude Code 无法使用这些预置文档技能**，UI 需按后端做可用性过滤。
-  - **MCP**：配置按后端能力分发（jucode 走现有 `/mcp` 命令通道；claude / codex 写各自配置文件）。
+- 现有 Marketplace（`src/lib/Marketplace.svelte`）与 MCP 设置（`McpSection.svelte`）是 lynshen-only。规划为统一插件管理页：
+  - **技能源**：官方 LynShen 技能 + [anthropics/skills](https://github.com/anthropics/skills)。展示时标注许可：anthropics/skills 中 docx / pdf / pptx / xlsx 为 source-available（非 OSS），且 **Claude Code 无法使用这些预置文档技能**，UI 需按后端做可用性过滤。
+  - **MCP**：配置按后端能力分发（lynshen 走现有 `/mcp` 命令通道；claude / codex 写各自配置文件）。
   - 技能的下载传输路径可按审计与缓存要求实现，但不得改变上述两个已锁定技能源。
 
 ### 3.9 本地数据与密钥
@@ -127,7 +127,7 @@ Workspace ─┬─ Project A ─┬─ Session(GUI, jucode)
 | 阶段 | 内容 | 涉及模块 |
 | --- | --- | --- |
 | M1 | 平铺树 + 多可见面板 + 双击最大化 + 分屏预览；Workspace 实体与迁移 | `src/lib/workbench/`（新）、`session.svelte.ts`、`+page.svelte` |
-| M2 | 原生 TUI 标签（PTY 跑 jucode/codex/claude CLI，独立会话） | `src-tauri/src/lib.rs`（pty_open 扩展）、`TerminalPanel.svelte` |
+| M2 | 原生 TUI 标签（PTY 跑 lynshen/codex/claude CLI，独立会话） | `src-tauri/src/lib.rs`（pty_open 扩展）、`TerminalPanel.svelte` |
 | M3 | 模型选择器四分组；models.dev 快照 + BYOK + OpenRouter featured；扩展 ASR provider；serve/CLI 功能对齐残留（`/pin`、`command_list`） | `Composer.svelte`、`settings/`、`audio.ts`、`protocol.ts`、`backends/` |
 | M4 | ACP backend（flag 后，保留原生 backend）；技能/MCP 统一管理页；GitHub PR 插件化 | `backends/acp.ts`（新）、`Marketplace.svelte`、`McpSection.svelte`、插件接口 |
 | M5 | IM 桥（MCP server + OpenClaw 网关 + 确认队列） | 新 crate/模块，见 `docs/im-bridge.md` |

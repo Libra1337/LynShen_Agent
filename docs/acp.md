@@ -2,8 +2,8 @@
 
 The desktop can drive any agent CLI that speaks the
 [Agent Client Protocol](https://agentclientprotocol.com) (JSON-RPC 2.0 over
-stdio, protocol v1) as a fourth engine backend, next to the native `jucode`,
-`codex` and `claude` adapters. `jucode acp` works out of the box; other agents
+stdio, protocol v1) as a fourth engine backend, next to the native `lynshen`,
+`codex` and `claude` adapters. `lynshen acp` works out of the box; other agents
 (e.g. `gemini --experimental-acp`) can be registered in Settings.
 
 ## Where the pieces live
@@ -11,7 +11,7 @@ stdio, protocol v1) as a fourth engine backend, next to the native `jucode`,
 | piece | file |
 |---|---|
 | Agent registry (Rust-owned, validated) | `src-tauri/src/acp_registry.rs` → `~app-config/acp-agents.json` |
-| Process and JSON-RPC ↔ AgentEvents | the daemon, JuCode-CLI `crates/daemon/src/engines/acp.rs` |
+| Process and JSON-RPC ↔ AgentEvents | the daemon, LynShen-CLI `crates/daemon/src/engines/acp.rs` |
 | Session start (registry entry → daemon `engine: "acp"`) | `src/lib/session.svelte.ts` (`#spawn`) |
 | Settings UI (add / edit / remove agents) | `src/lib/settings/AcpSection.svelte` |
 | New-session picker rows | `src/lib/Composer.svelte` (below the native engines) |
@@ -65,7 +65,7 @@ current one settles (same UX as claude's stdin queue).
   the next turn instead.
 - **Hunk-subset approvals** — permission responses are whole-call option
   picks; there is no per-hunk protocol.
-- **Resume / transcript replay** — `session/load` is optional (jucode acp
+- **Resume / transcript replay** — `session/load` is optional (lynshen acp
   does not advertise it), so ACP conversations are not persisted as
   restorable tabs (`startup.session_id` stays empty on purpose).
 - **Model picker** — `session/set_model` is optional; off until provable.

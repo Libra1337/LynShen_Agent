@@ -35,6 +35,8 @@
 		listProviders,
 		fetchAccountInfo,
 		fetchDeepseekBalance,
+		fetchMonoizeBalance,
+		fetchMonoizeModels,
 		type AccountInfo,
 		type DeepseekBalance
 	} from '$lib/protocol';
@@ -75,7 +77,7 @@
 	import ProviderCatalogPicker from './ProviderCatalogPicker.svelte';
 	import CustomProviderForm from './CustomProviderForm.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
-	import { GROUPS, JUCODE_ONLY, resolveSection, searchRows, type SearchRow, type SectionKey } from './nav';
+	import { GROUPS, LYNSHEN_ONLY, resolveSection, searchRows, type SearchRow, type SectionKey } from './nav';
 
 	let {
 		sessionId,
@@ -186,7 +188,7 @@
 		builtin: boolean;
 		source?: 'catalog' | 'custom';
 	}
-	const CUSTOM_KEY = 'jucode-custom-providers';
+	const CUSTOM_KEY = 'lynshen-custom-providers';
 	const FORMATS = [
 		{ value: 'responses', label: 'Responses' },
 		{ value: 'anthropic', label: 'Anthropic' },
@@ -222,9 +224,9 @@
 	]);
 	// Usable: has a key / login, or is a custom endpoint (which may need none).
 	const usable = (p: Provider) => keyed.includes(p.id) || !p.builtin;
-	// The page lists what the user has added (plus JuCode, the login entry, and
+	// The page lists what the user has added (plus LynShen, the login entry, and
 	// whatever is the default); the rest is offered by the add dialog.
-	const addedProviders = $derived(allProviders.filter((p) => usable(p) || p.id === 'jucode' || p.id === cfg.provider));
+	const addedProviders = $derived(allProviders.filter((p) => usable(p) || p.id === 'lynshen' || p.id === cfg.provider));
 	const addable = $derived<CatalogProvider[]>([
 		...allProviders
 			.filter((p) => !addedProviders.includes(p))
@@ -252,7 +254,7 @@
 				value: `${p.id}::${m.name}`,
 				label: m.name,
 				provider: p.id,
-				group: p.id === 'jucode' ? t('settings.behavior.groupJucode') : t('settings.behavior.groupByok'),
+				group: p.id === 'lynshen' ? t('settings.behavior.groupLynShen') : t('settings.behavior.groupByok'),
 				context_window: m.context_window,
 				authed: keyed.includes(p.id)
 			}))
@@ -407,7 +409,7 @@
 		editing = null;
 		onAuthChange?.();
 	}
-	// Logout (jucode) / clear stored key (other providers).
+	// Logout (lynshen) / clear stored key (other providers).
 	async function logout(id: string) {
 		await removeAuthKey(id);
 		keyed = await readAuthProviders();
@@ -450,17 +452,17 @@
 		editing = null;
 	}
 
-	// ---------- JuCode login ----------
+	// ---------- LynShen login ----------
 	let loggingIn = $state(false);
 	let loginError = $state('');
 	let loginMark = 0;
-	const jucodeAuthed = $derived(keyed.includes('jucode'));
+	const lynshenAuthed = $derived(keyed.includes('lynshen'));
 	function login() {
 		loginError = '';
 		loginMark = chat?.messages.length ?? 0;
 		// A bare /login answers with a provider picker; name the provider so the
 		// engine starts the OAuth flow (and opens the browser) directly.
-		dispatch(sessionId, { op: 'command', input: '/login jucode' });
+		dispatch(sessionId, { op: 'command', input: '/login lynshen' });
 		loggingIn = true;
 	}
 	// While a login is in flight, poll auth state so the page flips to 已登录
@@ -473,13 +475,13 @@
 			loggingIn = false;
 			return;
 		}
-		if (keyed.includes('jucode')) {
+		if (keyed.includes('lynshen')) {
 			loggingIn = false;
 			return;
 		}
 		const timer = setInterval(async () => {
 			keyed = await readAuthProviders();
-			if (keyed.includes('jucode')) {
+			if (keyed.includes('lynshen')) {
 				loggingIn = false;
 				loadBalances();
 				onAuthChange?.();
@@ -491,21 +493,48 @@
 
 	// Per-provider balances shown on the cards — independent of which provider is
 	// the default, so several can be logged in and show balances at once.
-	let jucodeBal = $state<AccountInfo | null>(null);
+	let lynshenBal = $state<AccountInfo | null>(null);
 	let deepseekBal = $state<DeepseekBalance | null>(null);
 	const deepseekTotal = $derived(deepseekBal?.balance_infos?.[0] ?? null);
+	let monoizeBal = $state<DeepseekBalance | null>(null);
+	const monoizeTotal = $derived(monoizeBal?.balance_infos?.[0] ?? null);
+	let monoizeModelsMsg = $state('');
 	function loadBalances() {
-		if (keyed.includes('jucode')) fetchAccountInfo().then((a) => (jucodeBal = a)).catch(() => (jucodeBal = null));
-		else jucodeBal = null;
+		if (keyed.includes('lynshen')) fetchAccountInfo().then((a) => (lynshenBal = a)).catch(() => (lynshenBal = null));
+		else lynshenBal = null;
 		if (keyed.includes('deepseek')) fetchDeepseekBalance().then((b) => (deepseekBal = b)).catch(() => (deepseekBal = null));
 		else deepseekBal = null;
+		if (keyed.includes('monoize')) fetchMonoizeBalance().then((b) => (monoizeBal = b)).catch(() => (monoizeBal = null));
+		else monoizeBal = null;
 	}
 
-	// Card click: not-logged-in jucode kicks off OAuth directly (no expand); other
+	// Monoize: pull the gateway's live model list (/v1/models) into the stored
+	// provider entry, keeping the catalog's window/effort metadata where the id
+	// matches and adding new ids as name-only models.
+	async function refreshMonoizeModels() {
+		monoizeModelsMsg = t('settings.account.refreshing');
+		try {
+			const list = await fetchMonoizeModels();
+			const entry = custom.find((c) => c.id === 'monoize');
+			if (!entry) {
+				monoizeModelsMsg = t('settings.account.refreshNeedProvider');
+				return;
+			}
+			const known = new Map(entry.models.map((m) => [m.name, m]));
+			entry.models = list.map((m) => known.get(m.id) ?? { name: m.id });
+			custom = [...custom];
+			persistCustom();
+			monoizeModelsMsg = t('settings.account.refreshed', { count: entry.models.length });
+		} catch (e) {
+			monoizeModelsMsg = String(e);
+		}
+	}
+
+	// Card click: not-logged-in lynshen kicks off OAuth directly (no expand); other
 	// (key-based) providers expand to reveal the key input. Logged-in cards expand
 	// to show details.
 	function cardClick(p: Provider, authed: boolean) {
-		if (p.id === 'jucode' && !authed) {
+		if (p.id === 'lynshen' && !authed) {
 			if (!loggingIn) login();
 			return;
 		}
@@ -581,7 +610,7 @@
 		<div class="main">
 			<div class="col">
 				<h1>{t(`settings.section.${current}`)}</h1>
-				{#if JUCODE_ONLY.has(current)}<p class="scope">{t('settings.page.jucodeOnly')}</p>{/if}
+				{#if LYNSHEN_ONLY.has(current)}<p class="scope">{t('settings.page.lynshenOnly')}</p>{/if}
 
 				{#if current === 'general'}
 					<SettingsSection title={t('settings.page.appearance')}>
@@ -654,22 +683,22 @@
 					</SettingsSection>
 				{:else if current === 'account'}
 					{@render loginNotice()}
-					<SettingsSection title={t('settings.page.jucodeAccount')}>
+					<SettingsSection title={t('settings.page.lynshenAccount')}>
 						<SettingsRow
 							id="account-login"
-							title={jucodeAuthed ? t('settings.account.loggedIn') : t('settings.account.notLoggedIn')}
-							description={jucodeAuthed ? t('settings.page.jucodeLoggedInDesc') : t('settings.page.jucodeAccountDesc')}
+							title={lynshenAuthed ? t('settings.account.loggedIn') : t('settings.account.notLoggedIn')}
+							description={lynshenAuthed ? t('settings.page.lynshenLoggedInDesc') : t('settings.page.lynshenAccountDesc')}
 						>
-							{#if jucodeAuthed}
+							{#if lynshenAuthed}
 								<Button size="sm" onclick={login}><SignInIcon size={14} /> {t('settings.account.relogin')}</Button>
-								<Button variant="danger" size="sm" onclick={() => logout('jucode')}><SignOutIcon size={14} /> {t('settings.account.logout')}</Button>
+								<Button variant="danger" size="sm" onclick={() => logout('lynshen')}><SignOutIcon size={14} /> {t('settings.account.logout')}</Button>
 							{:else if loggingIn}
 								<Button variant="primary" size="sm" disabled>{t('settings.account.authorizing')}</Button>
 							{:else}
 								<Button variant="primary" size="sm" onclick={login}><SignInIcon size={14} /> {t('settings.page.login')}</Button>
 							{/if}
 						</SettingsRow>
-						{#if jucodeAuthed}
+						{#if lynshenAuthed}
 							<SettingsRow id="account-models" title={t('shell.modelSetup.manage')} description={t('settings.page.manageModelsDesc')}>
 								<Button size="sm" onclick={() => (modelSetup.open = true)}><ListChecksIcon size={14} /> {t('settings.page.manage')}</Button>
 							</SettingsRow>
@@ -685,7 +714,7 @@
 							</SettingsRow>
 						{/if}
 					</SettingsSection>
-					{#if jucodeAuthed}
+					{#if lynshenAuthed}
 						<SettingsSection>
 							<SettingsRow id="account-usage" stacked>
 								<AccountPanel />
@@ -738,9 +767,12 @@
 								isDefault={cfg.provider === p.id}
 								open={editing === p.id}
 								{loggingIn}
-								{jucodeBal}
+								{lynshenBal}
 								{deepseekBal}
 								{deepseekTotal}
+								{monoizeBal}
+								{monoizeTotal}
+								{monoizeModelsMsg}
 								bind:keyInput
 								{cap}
 								onCardClick={cardClick}
@@ -749,6 +781,7 @@
 								onSaveKey={saveKey}
 								onSetDefault={selectProvider}
 								onDelete={deleteProvider}
+								onRefreshModels={refreshMonoizeModels}
 							/>
 						{/each}
 						<button class="addrow" id="set-provider-add" onclick={openCreate}><PlusIcon size={16} /> {t('settings.custom.add')}</button>
@@ -849,7 +882,7 @@
 						</SettingsRow>
 					</SettingsSection>
 				{:else if current === 'mcp'}
-					<!-- The JuCode CLI's servers; only a JuCode session can apply edits live. -->
+					<!-- The LynShen CLI's servers; only a LynShen session can apply edits live. -->
 					<McpSection {sessionId} chat={caps(chat).mcpManage ? chat : undefined} />
 				{:else if current === 'market'}
 					<SettingsSection>

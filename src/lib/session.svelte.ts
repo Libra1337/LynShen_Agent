@@ -3,7 +3,7 @@ import { acpAgentsList, closeSession, daemon, hostSession, sessionMeta, sessionH
 import type { EngineSpec } from './daemon';
 import { canHandOffToTui, isValidResumeSessionId } from './tuiHandoff';
 import { normalizeBackendId, type BackendId } from './backends';
-import { createJucodeAdapter } from './backends/jucode';
+import { createLynShenAdapter } from './backends/lynshen';
 import { clearDraft, dispatch, dropHeldOps, holdOps, ioFor, markDraft, registerAdapter, unregisterAdapter } from './backends/router';
 import { buildBackendOpts, defaultBackendFor } from './backends/settings';
 import { toEngineMode } from './approval';
@@ -40,14 +40,14 @@ export interface SavedProject extends SavedTabChrome {
 		/** The conversation was handed to the native TUI (resume by `sid`).
 		 *  Omitted for the default GUI surface so old layouts stay clean. */
 		surface?: 'tui';
-		/** Claude Code / Codex through the JuCode gateway (Session.gateway). */
+		/** Claude Code / Codex through the LynShen gateway (Session.gateway). */
 		gateway?: boolean;
 		/** Claude Code: the model it last ran on (Session.model). */
 		model?: string;
 	} & SavedTabChrome)[];
 	/** 并行任务 worktree 项目的元数据（isWorktree/mainRepoPath/branch/baseBranch/slug）。 */
 	worktree?: WorktreeMeta;
-	/** 本项目最近一次新建会话所用的引擎后端（缺省 = jucode）。 */
+	/** 本项目最近一次新建会话所用的引擎后端（缺省 = lynshen）。 */
 	lastBackend?: string;
 	/** lastBackend 为 'acp' 时：上次选择的 ACP agent。 */
 	lastAcpAgent?: { id: string; name: string };
@@ -163,7 +163,7 @@ export class SessionStore {
 			chat.acpAgentId = acpAgent.id;
 			chat.acpAgentName = acpAgent.name;
 		}
-		const adapter = createJucodeAdapter();
+		const adapter = createLynShenAdapter();
 		registerAdapter(id, adapter);
 		return { id, chat, backendId, adapter, ...(acpAgent ? { acpAgent } : {}) };
 	}
@@ -173,8 +173,8 @@ export class SessionStore {
 	 *  the user sent meanwhile. `extraOpts` carries per-start choices (claude's
 	 *  `permission_mode`, `resume_session_at`); `resume` names the conversation
 	 *  to reopen when it is not the session's own; `agent` starts it as that
-	 *  long-lived agent. The daemon translates every engine into jucode
-	 *  events, so the session's adapter is the jucode one. */
+	 *  long-lived agent. The daemon translates every engine into lynshen
+	 *  events, so the session's adapter is the lynshen one. */
 	#spawn(
 		s: Session,
 		cwd: string | undefined,
@@ -206,8 +206,8 @@ export class SessionStore {
 			...(base?.bin_override ? { bin: base.bin_override } : {}),
 			...(base?.env ? { env: base.env } : {})
 		};
-		// This session alone talks to the JuCode gateway (see Session.gateway).
-		const gateway = s.gateway !== undefined ? { jucode_gateway: s.gateway } : {};
+		// This session alone talks to the LynShen gateway (see Session.gateway).
+		const gateway = s.gateway !== undefined ? { lynshen_gateway: s.gateway } : {};
 		const engine: Promise<EngineSpec | undefined> =
 			s.backendId === 'claude'
 				? Promise.resolve({
@@ -297,11 +297,11 @@ export class SessionStore {
 		backend?: BackendId,
 		acpAgent?: { id: string; name: string }
 	) {
-		// Only the jucode engine has a chat mode.
-		let backendId = project.chats ? 'jucode' : (backend ?? defaultBackendFor(project.lastBackend));
+		// Only the lynshen engine has a chat mode.
+		let backendId = project.chats ? 'lynshen' : (backend ?? defaultBackendFor(project.lastBackend));
 		let agent = backendId === 'acp' ? (acpAgent ?? project.lastAcpAgent) : undefined;
 		if (backendId === 'acp' && !agent) {
-			backendId = 'jucode'; // no agent to launch — never spawn a bare 'acp'
+			backendId = 'lynshen'; // no agent to launch — never spawn a bare 'acp'
 			agent = undefined;
 		}
 		const s = this.#newSession(backendId, agent);
@@ -382,7 +382,7 @@ export class SessionStore {
 		chat.bindRunKey(id);
 		chat.switching = true;
 		unregisterAdapter(id);
-		const adapter = createJucodeAdapter();
+		const adapter = createLynShenAdapter();
 		registerAdapter(id, adapter);
 		s.chat = chat;
 		s.backendId = backend;
@@ -422,7 +422,7 @@ export class SessionStore {
 			chat.acpAgentId = agent.id;
 			chat.acpAgentName = agent.name;
 		}
-		const adapter = createJucodeAdapter();
+		const adapter = createLynShenAdapter();
 		registerAdapter(s.id, adapter);
 		s.chat = chat;
 		s.backendId = backend;
@@ -624,7 +624,7 @@ export class SessionStore {
 		project: Project,
 		sid: string,
 		title: string,
-		backend: BackendId = 'jucode',
+		backend: BackendId = 'lynshen',
 		archived = false,
 		chrome?: SavedTabChrome,
 		reuseId?: string,
@@ -667,7 +667,7 @@ export class SessionStore {
 		project: Project,
 		reuseId: string,
 		title: string,
-		backend: BackendId = 'jucode',
+		backend: BackendId = 'lynshen',
 		archived = false,
 		chrome?: SavedTabChrome,
 		acpAgent?: { id: string; name: string }
@@ -723,11 +723,11 @@ export class SessionStore {
 			project = { id: this.uid(), name: base(agent.cwd), path: agent.cwd, sessions: [] };
 			this.projects.push(project);
 		}
-		const s = this.#newSession('jucode');
+		const s = this.#newSession('lynshen');
 		if (title) s.chat.title = title;
 		if (agent.id) s.chat.agent = agent.id;
 		if (sid) {
-			// The daemon holds the conversation; the backend stays jucode.
+			// The daemon holds the conversation; the backend stays lynshen.
 			s.restored = true;
 			s.chat.sessionId = sid;
 		}
@@ -869,15 +869,15 @@ export class SessionStore {
 		}
 	}
 
-	/** Run this Claude Code / Codex session through the JuCode gateway
-	 *  (`jucode`, optionally on `model`) or the provider in the user's own
+	/** Run this Claude Code / Codex session through the LynShen gateway
+	 *  (`lynshen`, optionally on `model`) or the provider in the user's own
 	 *  config (`system`). Only this session's process changes; other Claude
 	 *  Code / Codex sessions on the machine keep their config. */
-	async applyToolProfile(id: string, mode: 'system' | 'jucode', model?: string) {
+	async applyToolProfile(id: string, mode: 'system' | 'lynshen', model?: string) {
 		const s = this.allSessions.find((x) => x.id === id);
 		if (!s) return;
 		if (s.backendId !== 'claude' && s.backendId !== 'codex') return;
-		s.gateway = mode === 'jucode';
+		s.gateway = mode === 'lynshen';
 		// A draft starts that way with its first message.
 		if (s.draft) {
 			if (model) {
@@ -896,7 +896,7 @@ export class SessionStore {
 		s.chat.engineState = 'connecting';
 		s.chat.messages.push({
 			kind: 'system',
-			text: mode === 'jucode' ? t('shell.toolSwitch.toJucode') : t('shell.toolSwitch.toSystem')
+			text: mode === 'lynshen' ? t('shell.toolSwitch.toLynShen') : t('shell.toolSwitch.toSystem')
 		});
 		try {
 			await closeSession(id);
@@ -971,7 +971,7 @@ export class SessionStore {
 	}
 
 	/** Picks a failed turn back up in place (autoRetry.ts decides when).
-	 *  `started`: the engine had begun the turn. JuCode runs the conversation
+	 *  `started`: the engine had begun the turn. LynShen runs the conversation
 	 *  again as it stands. A turn that produced nothing is undone and its
 	 *  message sent again where the engine can undo (Codex, Claude Code); one
 	 *  that did produce something, or that cannot be undone, gets a "continue"
@@ -991,7 +991,7 @@ export class SessionStore {
 			else c.optimisticUser(text, undefined, true);
 			dispatch(id, { op: 'user_message', content: text });
 		};
-		if (s.backendId === 'jucode') {
+		if (s.backendId === 'lynshen') {
 			c.messages.push({ kind: 'system', text: note });
 			dispatch(id, { op: 'continue' });
 			return;
@@ -1068,7 +1068,7 @@ export class SessionStore {
 		if (!this.allSessions.some((s) => s.id === this.activeId)) this.activeId = this.shownSessions[0]?.id ?? '';
 	}
 
-	/** Open the project's history: the JuCode conversations saved for its
+	/** Open the project's history: the LynShen conversations saved for its
 	 *  directory, as the daemon lists them, as a picker in one of its chats (the active
 	 *  one when it is in this project). Only a project with no chat at all gets
 	 *  a new one to show it in. */
@@ -1079,15 +1079,15 @@ export class SessionStore {
 		const chat = this.allSessions.find((s) => s.id === id)?.chat;
 		if (!chat) return;
 		try {
-			chat.handle({ type: 'resume_view', backend: 'jucode', history: true, items: await this.historyItems(p, chat) });
+			chat.handle({ type: 'resume_view', backend: 'lynshen', history: true, items: await this.historyItems(p, chat) });
 		} catch (e) {
 			chat.messages.push({ kind: 'system', text: t('shell.historyFail', { msg: String(e) }) });
 		}
 	}
 
-	/** The JuCode conversations saved for the project, as history picker rows. */
+	/** The LynShen conversations saved for the project, as history picker rows. */
 	async historyItems(p: Project, chat: ChatState) {
-		const sessions = (await sessionHistory(p.path)).filter((x) => x.engine === 'jucode');
+		const sessions = (await sessionHistory(p.path)).filter((x) => x.engine === 'lynshen');
 		return sessions.map((x) => ({
 			id: x.session,
 			label: x.title || x.session,
@@ -1118,7 +1118,7 @@ export class SessionStore {
 
 	/** Hand a conversation to the native TUI (same chat tile, `surface` flips
 	 *  to 'tui'): the tile re-renders as a TuiPanel resuming the same engine
-	 *  session by id (claude `--resume <id>`, codex `resume <id>`, jucode
+	 *  session by id (claude `--resume <id>`, codex `resume <id>`, lynshen
 	 *  `/resume <id>` written into the pty). The GUI engine is closed FIRST so
 	 *  two processes never hold the same conversation. Requires a usable
 	 *  engine session id — resume-by-id is the product, never a TUI picker —
@@ -1190,7 +1190,7 @@ export class SessionStore {
 			path: p.path,
 			...(p.worktree ? { worktree: p.worktree } : {}),
 			...(p.chats ? { chats: true } : {}),
-			...(p.lastBackend && p.lastBackend !== 'jucode' ? { lastBackend: p.lastBackend } : {}),
+			...(p.lastBackend && p.lastBackend !== 'lynshen' ? { lastBackend: p.lastBackend } : {}),
 			...(p.lastBackend === 'acp' && p.lastAcpAgent ? { lastAcpAgent: p.lastAcpAgent } : {}),
 			...(p.color ? { color: p.color } : {}),
 			...(p.icon ? { icon: p.icon } : {}),
@@ -1204,7 +1204,7 @@ export class SessionStore {
 					...(s.gateway ? { gateway: true } : {}),
 					...(s.backendId === 'claude' && (s.chat.model || s.model) ? { model: s.chat.model || s.model } : {}),
 					title: s.chat.title,
-					...(s.backendId !== 'jucode' ? { backend: s.backendId } : {}),
+					...(s.backendId !== 'lynshen' ? { backend: s.backendId } : {}),
 					...(s.backendId === 'acp' && s.acpAgent ? { acpAgent: s.acpAgent } : {}),
 					...(s.archived ? { archived: true } : {}),
 					...(s.pinned ? { pinned: true } : {}),
@@ -1226,7 +1226,7 @@ export class SessionStore {
 			// Already open: the same tab in a duplicated project entry.
 			if (this.allSessions.some((s) => (t.id && s.id === t.id) || (sid && s.chat.sessionId === sid))) continue;
 			// Tabs saved before multi-backend support carry no backend field →
-			// jucode (normalizeBackendId maps unknown/missing to the default).
+			// lynshen (normalizeBackendId maps unknown/missing to the default).
 			// Chrome fields are re-validated here (the file is user-editable).
 			let backend = normalizeBackendId(t.backend);
 			// An 'acp' tab needs its agent back to respawn; older files carry
@@ -1238,7 +1238,7 @@ export class SessionStore {
 					: undefined;
 			let acpAgent = backend === 'acp' ? (savedAgent ?? proj.lastAcpAgent) : undefined;
 			if (backend === 'acp' && !acpAgent) {
-				backend = 'jucode';
+				backend = 'lynshen';
 				acpAgent = undefined;
 			}
 			const chrome = {

@@ -16,7 +16,7 @@ const settings = {
 		group: {
 			app: '应用',
 			agents: '所有智能体',
-			jucode: 'JuCode CLI',
+			lynshen: 'LynShen CLI',
 			about: '关于'
 		},
 		section: {
@@ -43,13 +43,13 @@ const settings = {
 			conversation: '对话',
 			files: '打开文件',
 			help: '帮助与反馈',
-			jucodeOnly: '只对 JuCode CLI 的会话生效。Claude Code、Codex 和 ACP 智能体使用各自的配置。',
-			jucodeAccount: 'JuCode 账户',
-			jucodeAccountDesc: '登录后可使用 JuCode 托管的模型，并查看余额与套餐。',
-			jucodeLoggedInDesc: '可以使用 JuCode 托管的模型。重新登录可切换账户。',
+			lynshenOnly: '只对 LynShen CLI 的会话生效。Claude Code、Codex 和 ACP 智能体使用各自的配置。',
+			lynshenAccount: 'LynShen 账户',
+			lynshenAccountDesc: '登录后可使用 LynShen 托管的模型，并查看余额与套餐。',
+			lynshenLoggedInDesc: '可以使用 LynShen 托管的模型。重新登录可切换账户。',
 			login: '登录',
 			manage: '管理',
-			manageModelsDesc: '选择哪些 JuCode 模型出现在模型菜单里。',
+			manageModelsDesc: '选择哪些 LynShen 模型出现在模型菜单里。',
 			voiceKey: 'API 密钥',
 			voiceKeyDesc: '语音服务的密钥单独保存，与对话 Provider 的密钥互不影响。',
 			defaultProvider: '默认提供商',
@@ -84,6 +84,10 @@ const settings = {
 			updateKey: '更新密钥',
 			saveKey: '保存密钥',
 			clearKey: '清除密钥',
+			refreshModels: '刷新模型列表',
+			refreshing: '获取中…',
+			refreshed: '已同步 {count} 个模型',
+			refreshNeedProvider: '请先添加该 Provider',
 			keyPlaceholder: '{id} API key · sk-…'
 		},
 		voice: {
@@ -134,7 +138,7 @@ const settings = {
 			upgrade: '升级',
 			upgrading: '升级中…',
 			bundled: '随应用更新',
-			cliCommand: '在终端中使用 jucode 命令',
+			cliCommand: '在终端中使用 lynshen 命令',
 			cliCommandDone: '已添加：{path}。新开的终端窗口生效。',
 			pathPlaceholder: '{bin} 可执行文件路径（可选，覆盖自动查找）',
 			defaultLabel: '新会话默认后端',
@@ -152,7 +156,7 @@ const settings = {
 			remoteGroup: '远程访问',
 			remoteGroupHint: '在手机上查看工作台、回复 Agent。扫一次码配对，之后直接打开。',
 			relayToggle: '允许通过中继远程访问',
-			relayHint: '手机经 app.jucode.net 的中继连接这台电脑，不需要在同一网络。内容端到端加密，中继看不到。',
+			relayHint: '手机经 app.lynshen.net 的中继连接这台电脑，不需要在同一网络。内容端到端加密，中继看不到。',
 			relayConnected: '已连接中继 · 主机 {host}',
 			relayConnecting: '正在连接中继…',
 			relayOff: '已关闭',
@@ -178,7 +182,7 @@ const settings = {
 		},
 		acp: {
 			groupLabel: '外部智能体（ACP）',
-			hint: '注册通过 Agent Client Protocol 通信的智能体 CLI（如 jucode acp、gemini --experimental-acp）。注册后可在新会话的引擎选择器中选用。',
+			hint: '注册通过 Agent Client Protocol 通信的智能体 CLI（如 lynshen acp、gemini --experimental-acp）。注册后可在新会话的引擎选择器中选用。',
 			checking: '检测中…',
 			found: '已安装',
 			notFound: '未检测到命令',
@@ -202,11 +206,11 @@ const settings = {
 		},
 		help: {
 			feedback: '反馈问题',
-			feedbackHint: '提交问题或建议，可附截图和日志。会以工单提交到你的 JuCode 账户，回复可在控制台查看。',
+			feedbackHint: '提交问题或建议，可附截图和日志。会以工单提交到你的 LynShen 账户，回复可在控制台查看。',
 			feedbackOpen: '反馈问题',
 			telemetry: '发送匿名使用数据',
 			telemetryHint: '只统计启动次数、各功能的使用次数和错误类型，附带版本和系统。不含对话、代码、文件路径和提示词，也不关联账户。',
-			notice: 'JuCode 会发送匿名使用数据（功能使用次数和错误类型，不含任何内容），用于改进产品。可以在设置里关闭。',
+			notice: 'LynShen 会发送匿名使用数据（功能使用次数和错误类型，不含任何内容），用于改进产品。可以在设置里关闭。',
 			noticeAction: '设置'
 		},
 		behavior: {
@@ -214,7 +218,7 @@ const settings = {
 			selectModel: '选择模型',
 			noModels: '暂无模型 · 先在「提供商」登录或配置 Provider。',
 			notConfigured: '未配置',
-			groupJucode: 'JuCode 内置',
+			groupLynShen: 'LynShen 内置',
 			groupByok: '自定义 / BYOK',
 			htmlOpen: '对话中点击 HTML 链接时',
 			htmlOpenBrowser: '内置浏览器',
@@ -245,7 +249,7 @@ const settings = {
 			compactModelHint: '上下文压缩时生成摘要使用的模型。',
 			titles: '对话标题',
 			titleModel: '标题模型',
-			titleModelHint: '后台服务按对话内容为所有智能体的对话生成和更新名称：第 1、3 轮后各一次，之后每 5 轮一次；手动改过名的对话不会被覆盖。模型从 JuCode CLI 的默认提供商中选。',
+			titleModelHint: '后台服务按对话内容为所有智能体的对话生成和更新名称：第 1、3 轮后各一次，之后每 5 轮一次；手动改过名的对话不会被覆盖。模型从 LynShen CLI 的默认提供商中选。',
 			followMainModel: '跟随主模型',
 			network: '网络',
 			retryAttempts: '重试次数',
@@ -279,10 +283,10 @@ const settings = {
 			codexHint: 'Codex 自己配置的 MCP 服务器。可以在这里重连或登录；启用、停用和增删请改 ~/.codex/config.toml。',
 			signIn: '登录',
 			groupLabel: 'MCP 服务器',
-			hint: '管理 Model Context Protocol 服务器。更改会写入 ~/.jucode/config.json。',
+			hint: '管理 Model Context Protocol 服务器。更改会写入 ~/.lynshen/config.json。',
 			empty: 'MCP 让智能体接入外部工具（文件、搜索、数据库等标准化服务器）。',
 			addServer: '添加服务器',
-			noSession: '打开一个 JuCode 会话后，这里会显示各服务器的连接状态和工具。',
+			noSession: '打开一个 LynShen 会话后，这里会显示各服务器的连接状态和工具。',
 			state: {
 				connecting: '连接中',
 				connected: '已连接',
@@ -331,7 +335,7 @@ const settings = {
 		},
 		ext: {
 			groupLabel: '扩展工具',
-			hint: '专有扩展在 ~/.jucode/config.json 的 extensions 列表中配置，此处仅展示；可在会话中发送 /extensions 查看加载详情。',
+			hint: '专有扩展在 ~/.lynshen/config.json 的 extensions 列表中配置，此处仅展示；可在会话中发送 /extensions 查看加载详情。',
 			empty: '未配置扩展。',
 			lazy: '懒加载'
 		},
@@ -352,7 +356,7 @@ const settings = {
 		licenses: {
 			groupLabel: '条款与许可证',
 			title: '第三方许可证',
-			hint: 'JuCode 使用的开源组件及其许可证全文。JuCode 本身以 Apache License 2.0 发布。',
+			hint: 'LynShen 使用的开源组件及其许可证全文。LynShen 本身以 Apache License 2.0 发布。',
 			open: '查看',
 			loading: '加载中…',
 			missing: '这个版本没有附带第三方许可证文件。'
@@ -375,12 +379,12 @@ const settings = {
 		},
 		marketplace: {
 			title: '扩展市场',
-			subtitle: '从 JuCode 与 Anthropic 安装技能扩展。',
+			subtitle: '从 LynShen 与 Anthropic 安装技能扩展。',
 			search: '搜索扩展…',
 			all: '全部',
 			allTags: '全部标签',
 			sourceFilter: '技能来源',
-			needLogin: '需要登录 JuCode 账号后才能浏览市场（设置 → 登录）。',
+			needLogin: '需要登录 LynShen 账号后才能浏览市场（设置 → 登录）。',
 			loadFailed: '加载失败：{error}',
 			noMatch: '没有匹配的扩展',
 			installing: '安装中',
@@ -390,7 +394,7 @@ const settings = {
 			sourceAvailable: '仅源码可见 · 不可再分发',
 			notOffered: '不提供安装',
 			licenseNotice:
-				'Anthropic 的 docx、pdf、pptx 与 xlsx 技能仅源码可见且不可再分发，JuCode 不提供安装，可在 Anthropic 的仓库查看。'
+				'Anthropic 的 docx、pdf、pptx 与 xlsx 技能仅源码可见且不可再分发，LynShen 不提供安装，可在 Anthropic 的仓库查看。'
 		},
 		sync: {
 			title: '设置同步',
@@ -400,17 +404,17 @@ const settings = {
 			failed: '同步失败：{msg}'
 		},
 		overview: {
-			allHint: '本账号所有电脑上 JuCode 编码智能体的用量，费用以 JuCode 扣费为准。',
-			localHint: '这台电脑上 JuCode 编码智能体的用量，含各项目明细。',
+			allHint: '本账号所有电脑上 LynShen 编码智能体的用量，费用以 LynShen 扣费为准。',
+			localHint: '这台电脑上 LynShen 编码智能体的用量，含各项目明细。',
 			noData: '暂无用量数据，开始对话后这里会按天展示明细。',
 			loadFailed: '用量加载失败：{msg}',
-			cloudNeedsLogin: '登录 JuCode 后可查看所有电脑的用量，目前只显示这台电脑。',
+			cloudNeedsLogin: '登录 LynShen 后可查看所有电脑的用量，目前只显示这台电脑。',
 			scopeAll: '所有电脑',
 			scopeLocal: '这台电脑',
 			total: '总计',
 			other: '其他',
 			cost: '费用',
-			costHint: '仅 JuCode 渠道计费',
+			costHint: '仅 LynShen 渠道计费',
 			cachedOf: '其中缓存命中 {n}',
 			turns: '{n} 轮对话',
 			dimProvider: '渠道',
@@ -418,7 +422,7 @@ const settings = {
 			dimAgent: '智能体',
 			dimDevice: '电脑',
 			dimProject: '项目',
-			kindJucode: 'JuCode',
+			kindLynShen: 'LynShen',
 			kindThirdParty: '第三方',
 			kindLocal: '本机',
 			kindLegacy: '未区分（旧数据）',
@@ -455,7 +459,7 @@ const settings = {
 		group: {
 			app: 'App',
 			agents: 'All agents',
-			jucode: 'JuCode CLI',
+			lynshen: 'LynShen CLI',
 			about: 'About'
 		},
 		section: {
@@ -482,13 +486,13 @@ const settings = {
 			conversation: 'Conversation',
 			files: 'Opening files',
 			help: 'Help and feedback',
-			jucodeOnly: 'Applies only to JuCode CLI sessions. Claude Code, Codex and ACP agents use their own configuration.',
-			jucodeAccount: 'JuCode account',
-			jucodeAccountDesc: 'Sign in to use JuCode-hosted models and see your balance and plan.',
-			jucodeLoggedInDesc: 'JuCode-hosted models are available. Log in again to switch accounts.',
+			lynshenOnly: 'Applies only to LynShen CLI sessions. Claude Code, Codex and ACP agents use their own configuration.',
+			lynshenAccount: 'LynShen account',
+			lynshenAccountDesc: 'Sign in to use LynShen-hosted models and see your balance and plan.',
+			lynshenLoggedInDesc: 'LynShen-hosted models are available. Log in again to switch accounts.',
 			login: 'Sign in',
 			manage: 'Manage',
-			manageModelsDesc: 'Choose which JuCode models appear in the model menu.',
+			manageModelsDesc: 'Choose which LynShen models appear in the model menu.',
 			voiceKey: 'API key',
 			voiceKeyDesc: 'Voice keys are stored separately from chat provider keys.',
 			defaultProvider: 'Default provider',
@@ -523,6 +527,10 @@ const settings = {
 			updateKey: 'Update key',
 			saveKey: 'Save key',
 			clearKey: 'Clear key',
+			refreshModels: 'Refresh models',
+			refreshing: 'Fetching…',
+			refreshed: '{count} models',
+			refreshNeedProvider: 'Add the provider first',
 			keyPlaceholder: '{id} API key · sk-…'
 		},
 		voice: {
@@ -573,7 +581,7 @@ const settings = {
 			upgrade: 'Upgrade',
 			upgrading: 'Upgrading…',
 			bundled: 'Updates with the app',
-			cliCommand: 'Use the jucode command in a terminal',
+			cliCommand: 'Use the lynshen command in a terminal',
 			cliCommandDone: 'Added: {path}. New terminal windows pick it up.',
 			pathPlaceholder: '{bin} binary path (optional, overrides auto-detection)',
 			defaultLabel: 'Default backend for new sessions',
@@ -591,7 +599,7 @@ const settings = {
 			remoteGroup: 'Remote access',
 			remoteGroupHint: 'Check the desk and answer agents from your phone. Pair once by scanning, then just open it.',
 			relayToggle: 'Allow remote access through the relay',
-			relayHint: 'Your phone reaches this computer through the app.jucode.net relay, from any network. End-to-end encrypted: the relay cannot read anything.',
+			relayHint: 'Your phone reaches this computer through the app.lynshen.net relay, from any network. End-to-end encrypted: the relay cannot read anything.',
 			relayConnected: 'Connected to the relay · host {host}',
 			relayConnecting: 'Connecting to the relay…',
 			relayOff: 'Off',
@@ -617,7 +625,7 @@ const settings = {
 		},
 		acp: {
 			groupLabel: 'External agents (ACP)',
-			hint: 'Register agent CLIs that speak the Agent Client Protocol (e.g. jucode acp, gemini --experimental-acp). Registered agents appear in the engine picker for new sessions.',
+			hint: 'Register agent CLIs that speak the Agent Client Protocol (e.g. lynshen acp, gemini --experimental-acp). Registered agents appear in the engine picker for new sessions.',
 			checking: 'Checking…',
 			found: 'Installed',
 			notFound: 'Command not found',
@@ -641,18 +649,18 @@ const settings = {
 		},
 		help: {
 			feedback: 'Send feedback',
-			feedbackHint: 'Report a problem or suggest something, with screenshots and logs. It is sent as a ticket of your JuCode account; replies show in the console.',
+			feedbackHint: 'Report a problem or suggest something, with screenshots and logs. It is sent as a ticket of your LynShen account; replies show in the console.',
 			feedbackOpen: 'Send feedback',
 			telemetry: 'Send anonymous usage data',
 			telemetryHint: 'Counts starts, how often features are used and kinds of errors, with the version and system. No conversations, code, file paths or prompts, and not tied to your account.',
-			notice: 'JuCode sends anonymous usage data (how often features are used and kinds of errors, no content) to improve the product. You can turn it off in Settings.',
+			notice: 'LynShen sends anonymous usage data (how often features are used and kinds of errors, no content) to improve the product. You can turn it off in Settings.',
 			noticeAction: 'Settings'
 		},
 		behavior: {
 			defaultModel: 'Default model',
 			selectModel: 'Select a model',
 			noModels: 'No models yet · log in or configure a provider under Providers first.',
-			groupJucode: 'JuCode built-in',
+			groupLynShen: 'LynShen built-in',
 			groupByok: 'Custom / BYOK',
 			htmlOpen: 'Clicking an HTML link in chat',
 			htmlOpenBrowser: 'Built-in browser',
@@ -684,7 +692,7 @@ const settings = {
 			compactModelHint: 'The model used to generate summaries during context compaction.',
 			titles: 'Conversation titles',
 			titleModel: 'Title model',
-			titleModelHint: 'The background service names the conversations of every agent and renames them as they move on: after turns 1 and 3, then every 5th. A conversation you renamed yourself keeps its name. The model comes from the JuCode CLI default provider.',
+			titleModelHint: 'The background service names the conversations of every agent and renames them as they move on: after turns 1 and 3, then every 5th. A conversation you renamed yourself keeps its name. The model comes from the LynShen CLI default provider.',
 			followMainModel: 'Same as the main model',
 			network: 'Network',
 			retryAttempts: 'Retry attempts',
@@ -718,10 +726,10 @@ const settings = {
 			codexHint: 'MCP servers from Codex’s own config. Reconnect or sign in to them here; switch, add or remove them in ~/.codex/config.toml.',
 			signIn: 'Sign in',
 			groupLabel: 'MCP servers',
-			hint: 'Manage Model Context Protocol servers. Changes are written to ~/.jucode/config.json.',
+			hint: 'Manage Model Context Protocol servers. Changes are written to ~/.lynshen/config.json.',
 			empty: 'MCP lets the agent use external tools (files, search, databases and other standardized servers).',
 			addServer: 'Add server',
-			noSession: 'Open a JuCode session to see each server’s connection state and tools here.',
+			noSession: 'Open a LynShen session to see each server’s connection state and tools here.',
 			state: {
 				connecting: 'Connecting',
 				connected: 'Connected',
@@ -770,7 +778,7 @@ const settings = {
 		},
 		ext: {
 			groupLabel: 'Extension tools',
-			hint: 'Proprietary extensions are configured in the extensions list of ~/.jucode/config.json; this view is read-only. Send /extensions in a session for load details.',
+			hint: 'Proprietary extensions are configured in the extensions list of ~/.lynshen/config.json; this view is read-only. Send /extensions in a session for load details.',
 			empty: 'No extensions configured.',
 			lazy: 'lazy'
 		},
@@ -791,7 +799,7 @@ const settings = {
 		licenses: {
 			groupLabel: 'Terms and licenses',
 			title: 'Third-party licenses',
-			hint: 'The open-source components JuCode uses and their license texts. JuCode itself is released under the Apache License 2.0.',
+			hint: 'The open-source components LynShen uses and their license texts. LynShen itself is released under the Apache License 2.0.',
 			open: 'View',
 			loading: 'Loading…',
 			missing: 'This build ships no third-party license file.'
@@ -814,12 +822,12 @@ const settings = {
 		},
 		marketplace: {
 			title: 'Marketplace',
-			subtitle: 'Install skills from JuCode and Anthropic.',
+			subtitle: 'Install skills from LynShen and Anthropic.',
 			search: 'Search extensions…',
 			all: 'All',
 			allTags: 'All tags',
 			sourceFilter: 'Skill source',
-			needLogin: 'Log in to your JuCode account to browse the marketplace (Settings → Log in).',
+			needLogin: 'Log in to your LynShen account to browse the marketplace (Settings → Log in).',
 			loadFailed: 'Failed to load: {error}',
 			noMatch: 'No matching extensions',
 			installing: 'Installing',
@@ -829,7 +837,7 @@ const settings = {
 			sourceAvailable: 'Source-available · redistribution prohibited',
 			notOffered: 'Not offered',
 			licenseNotice:
-				'Anthropic’s docx, pdf, pptx, and xlsx skills are source-available and not for redistribution; JuCode does not install them. See them in Anthropic’s repository.'
+				'Anthropic’s docx, pdf, pptx, and xlsx skills are source-available and not for redistribution; LynShen does not install them. See them in Anthropic’s repository.'
 		},
 		sync: {
 			title: 'Settings sync',
@@ -839,17 +847,17 @@ const settings = {
 			failed: 'Sync failed: {msg}'
 		},
 		overview: {
-			allHint: 'JuCode coding agent usage on every computer of this account. Costs are what JuCode charged.',
-			localHint: 'JuCode coding agent usage on this computer, by project.',
+			allHint: 'LynShen coding agent usage on every computer of this account. Costs are what LynShen charged.',
+			localHint: 'LynShen coding agent usage on this computer, by project.',
 			noData: 'No usage data yet; daily details appear here once you start chatting.',
 			loadFailed: 'Could not load usage: {msg}',
-			cloudNeedsLogin: 'Sign in to JuCode to see every computer’s usage. Showing this computer only.',
+			cloudNeedsLogin: 'Sign in to LynShen to see every computer’s usage. Showing this computer only.',
 			scopeAll: 'All computers',
 			scopeLocal: 'This computer',
 			total: 'Total',
 			other: 'Other',
 			cost: 'Cost',
-			costHint: 'JuCode channel only',
+			costHint: 'LynShen channel only',
 			cachedOf: '{n} from cache',
 			turns: '{n} turns',
 			dimProvider: 'Channel',
@@ -857,7 +865,7 @@ const settings = {
 			dimAgent: 'Agent',
 			dimDevice: 'Computer',
 			dimProject: 'Project',
-			kindJucode: 'JuCode',
+			kindLynShen: 'LynShen',
 			kindThirdParty: 'Third-party',
 			kindLocal: 'Local',
 			kindLegacy: 'Unsorted (older data)',

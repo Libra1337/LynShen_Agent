@@ -145,7 +145,7 @@
 			<span class="sess-title">{title(s)}</span>
 			<!-- A session outside the projects names its folder. -->
 			{#if !p}<span class="where" title={s.cwd}>{baseName(s.cwd)}</span>{/if}
-			{#if s.engine && s.engine !== 'jucode'}
+			{#if s.engine && s.engine !== 'lynshen'}
 				<span class="chip"><BackendIcon backend={s.engine as 'claude'} size={12} /></span>
 			{/if}
 			{#if waiting(s)}<span class="tag">{t('shell.awaitShort')}</span>{/if}

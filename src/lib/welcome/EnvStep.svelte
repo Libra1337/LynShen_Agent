@@ -110,7 +110,7 @@
 	<div class="fixnote">
 		<Notice tone="warn">
 			<div class="fix-head">{t('setup.engineMissing.head')}</div>
-			<p class="fix-tip">{@html t('setup.engineMissing.tip', { bin: '<code>JUCODE_BIN</code>' })}</p>
+			<p class="fix-tip">{@html t('setup.engineMissing.tip', { bin: '<code>LYNSHEN_BIN</code>' })}</p>
 		</Notice>
 	</div>
 {/if}

@@ -8,7 +8,7 @@ vi.mock('$lib/protocol', () => ({
 
 import { sendOp, sendLine } from '$lib/protocol';
 import { dispatch, registerAdapter, unregisterAdapter, adapterFor, ioFor } from './router';
-import { createJucodeAdapter } from './jucode';
+import { createLynShenAdapter } from './lynshen';
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -16,8 +16,8 @@ beforeEach(() => {
 });
 
 describe('backend router dispatch', () => {
-	it('jucode sessions encode through their adapter (approval-mode names mapped)', () => {
-		registerAdapter('s-ju', createJucodeAdapter());
+	it('lynshen sessions encode through their adapter (approval-mode names mapped)', () => {
+		registerAdapter('s-ju', createLynShenAdapter());
 		expect(dispatch('s-ju', { op: 'user_message', content: 'hi' })).toBe(true);
 		expect(sendLine).toHaveBeenCalledWith('s-ju', JSON.stringify({ op: 'user_message', content: 'hi' }));
 		dispatch('s-ju', { op: 'set_approval_mode', mode: 'full-auto' });
@@ -32,7 +32,7 @@ describe('backend router dispatch', () => {
 	});
 
 	it('unregister removes the adapter (falls back to send_op)', () => {
-		const adapter = createJucodeAdapter();
+		const adapter = createLynShenAdapter();
 		registerAdapter('s-ju', adapter);
 		expect(adapterFor('s-ju')).toBe(adapter);
 		unregisterAdapter('s-ju');

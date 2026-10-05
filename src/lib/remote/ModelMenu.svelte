@@ -17,7 +17,7 @@
 	import EffortSlider from '$lib/composer/EffortSlider.svelte';
 	import { defaultEffort, effortLabel } from '$lib/composer/effort';
 	import { fmtContext, toolModels, type ToolModel } from '$lib/composer/modelRows';
-	import type { JucodeGroup } from '$lib/protocol';
+	import type { LynShenGroup } from '$lib/protocol';
 	import { modelColor, isTopEffort } from '$lib/modelColor';
 	import type { ChatState } from '$lib/chat.svelte';
 	import { t } from '$lib/i18n';
@@ -37,13 +37,13 @@
 		/** A pick the engine has not confirmed yet. */
 		pendingModel?: string;
 		/** Claude Code / Codex: where the session runs (this machine or the
-		 *  JuCode gateway), what the gateway offers (null while loading), and
+		 *  LynShen gateway), what the gateway offers (null while loading), and
 		 *  how to move. A model only the other side has moves the session. */
 		tool?: {
 			name: string;
-			onJucode: boolean;
+			onLynShen: boolean;
 			group: string;
-			catalog: { models: { name: string; context_window?: number }[]; groups: JucodeGroup[] } | null;
+			catalog: { models: { name: string; context_window?: number }[]; groups: LynShenGroup[] } | null;
 			onSwitch: (gateway: boolean, model: string, group?: string) => void;
 			onGroup: (group: string) => void;
 		};
@@ -83,33 +83,33 @@
 	const modelName = $derived(currentRow?.label || chat.modelLabel || chat.model);
 
 	// Claude Code / Codex: one list of this machine's catalog and the gateway's.
-	const merged = $derived(tool ? toolModels(models, tool.catalog?.models ?? [], tool.onJucode) : []);
+	const merged = $derived(tool ? toolModels(models, tool.catalog?.models ?? [], tool.onLynShen) : []);
 	const running = $derived<ToolModel | undefined>(
-		merged.find((m) => m.key === current || m.local === current || m.jucode === current) ?? merged.find((m) => m.active)
+		merged.find((m) => m.key === current || m.local === current || m.lynshen === current) ?? merged.find((m) => m.active)
 	);
 	function pickMerged(m: ToolModel) {
 		if (!tool) return;
-		const here = tool.onJucode ? m.jucode : m.local;
+		const here = tool.onLynShen ? m.lynshen : m.local;
 		if (here !== undefined) onPick(here);
-		else tool.onSwitch(!tool.onJucode, (tool.onJucode ? m.local : m.jucode) ?? m.key);
+		else tool.onSwitch(!tool.onLynShen, (tool.onLynShen ? m.local : m.lynshen) ?? m.key);
 	}
 	// Providers for the running model: this machine, the gateway's own
 	// choice, and its groups when more than one serves the model.
 	const served = $derived(
-		running?.jucode && tool?.catalog
+		running?.lynshen && tool?.catalog
 			? tool.catalog.groups
-					.filter((g) => g.models?.includes(running.jucode!))
+					.filter((g) => g.models?.includes(running.lynshen!))
 					.sort((a, b) => a.rate_multiplier - b.rate_multiplier)
 			: []
 	);
 	const groups = $derived(served.length > 1 ? served : []);
-	const providerCount = $derived((running?.local !== undefined ? 1 : 0) + (running?.jucode !== undefined ? 1 : 0) + groups.length);
+	const providerCount = $derived((running?.local !== undefined ? 1 : 0) + (running?.lynshen !== undefined ? 1 : 0) + groups.length);
 	function pickProvider(group: string | null) {
 		if (!tool || !running) return;
 		if (group === null) {
-			if (tool.onJucode && running.local !== undefined) tool.onSwitch(false, running.local);
-		} else if (tool.onJucode) tool.onGroup(group);
-		else if (running.jucode !== undefined) tool.onSwitch(true, running.jucode, group);
+			if (tool.onLynShen && running.local !== undefined) tool.onSwitch(false, running.local);
+		} else if (tool.onLynShen) tool.onGroup(group);
+		else if (running.lynshen !== undefined) tool.onSwitch(true, running.lynshen, group);
 		onClose();
 	}
 	const mult = (n: number) => `×${Number(n.toFixed(3))}`;
@@ -171,11 +171,11 @@
 							<span class="pop-label">{t('chat.providerLocal')}</span>
 							<span class="pop-desc">{t('chat.providerLocalDesc', { tool: tool.name })}</span>
 						</span>
-						<span class="pop-check" class:off={tool.onJucode}><CheckIcon size={16} /></span>
+						<span class="pop-check" class:off={tool.onLynShen}><CheckIcon size={16} /></span>
 					</button>
 				{/if}
-				{#if running.jucode !== undefined}
-					{@const auto = tool.onJucode && !groups.some((g) => g.id === tool.group)}
+				{#if running.lynshen !== undefined}
+					{@const auto = tool.onLynShen && !groups.some((g) => g.id === tool.group)}
 					<button class="pop-row" onclick={() => pickProvider('')}>
 						<span class="pop-txt">
 							<span class="pop-label">{t('chat.providerAuto')}</span>
@@ -187,7 +187,7 @@
 						<button class="pop-row" onclick={() => pickProvider(g.id)}>
 							<span class="pop-txt"><span class="pop-label">{g.name}</span></span>
 							<span class="ctx">{mult(g.rate_multiplier)}</span>
-							<span class="pop-check" class:off={!tool.onJucode || tool.group !== g.id}><CheckIcon size={16} /></span>
+							<span class="pop-check" class:off={!tool.onLynShen || tool.group !== g.id}><CheckIcon size={16} /></span>
 						</button>
 					{/each}
 				{/if}
@@ -217,7 +217,7 @@
 							<span class="pop-ico"><Vendor model={m.vendor} size={16} /></span>
 							<span class="pop-txt"><span class="pop-label">{m.label}</span></span>
 							<span class="ctx">
-								{[m.local !== undefined && t('chat.providerLocal'), m.jucode !== undefined && 'JuCode', fmtContext(m.context_window)]
+								{[m.local !== undefined && t('chat.providerLocal'), m.lynshen !== undefined && 'LynShen', fmtContext(m.context_window)]
 									.filter(Boolean)
 									.join(' · ')}
 							</span>

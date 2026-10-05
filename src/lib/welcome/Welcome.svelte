@@ -44,9 +44,9 @@
 		/** The session the /login runs in, to catch a failed login. */
 		sessionId: string;
 		chat?: ChatState;
-		/** Signed in to a JuCode account. */
+		/** Signed in to a LynShen account. */
 		loggedIn: boolean;
-		/** Any provider has a login or key (JuCode or the user's own). */
+		/** Any provider has a login or key (LynShen or the user's own). */
 		configured: boolean;
 		/** The first view; by default sign-in unless already signed in. */
 		startAt?: 'login' | 'guide';
@@ -93,7 +93,7 @@
 	});
 	const doneCount = $derived(STEPS.filter((s) => done[s]).length);
 
-	// ---------- JuCode login ----------
+	// ---------- LynShen login ----------
 	let loggingIn = $state(false);
 	let loginError = $state('');
 	let loginMark = 0;
@@ -101,7 +101,7 @@
 		loginError = '';
 		loginMark = chat?.messages.length ?? 0;
 		// A bare /login answers with a provider picker; name the provider.
-		dispatch(sessionId, { op: 'command', input: '/login jucode' });
+		dispatch(sessionId, { op: 'command', input: '/login lynshen' });
 		loggingIn = true;
 	}
 	$effect(() => {
@@ -130,11 +130,11 @@
 	const legalTitle = (doc: LegalDocId) => LEGAL[doc][getLocale() === 'zh' ? 'zh' : 'en'].title;
 
 	function openSettings(section: SectionKey) {
-		localStorage.setItem('jucode-setup-done', '1');
+		localStorage.setItem('lynshen-setup-done', '1');
 		onOpenSettings(section);
 	}
 	function finish() {
-		localStorage.setItem('jucode-setup-done', '1');
+		localStorage.setItem('lynshen-setup-done', '1');
 		onClose();
 	}
 
@@ -159,7 +159,7 @@
 			<div class="raster" aria-hidden="true"><SignalRaster /></div>
 
 			<div class="copy">
-				<div class="wordmark">JuCode</div>
+				<div class="wordmark">LynShen</div>
 				<h1>{t('setup.welcome.login.title')}</h1>
 				<p class="lede">{t('setup.welcome.login.sub')}</p>
 
@@ -186,7 +186,7 @@
 			<header class="ghead">
 				<div class="band" aria-hidden="true"><SignalRaster /></div>
 				<div class="ghead-copy">
-					<div class="wordmark sm">JuCode</div>
+					<div class="wordmark sm">LynShen</div>
 					<h1>{t('setup.welcome.guide.title')}</h1>
 					<p class="lede">{t('setup.welcome.guide.sub')}</p>
 				</div>

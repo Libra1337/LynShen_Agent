@@ -7,7 +7,7 @@
 
 import { prefs } from './prefs.svelte';
 
-const KEY = 'jucode-telemetry';
+const KEY = 'lynshen-telemetry';
 /** Sent at start and then this often. */
 const EVERY_MS = 30 * 60 * 1000;
 /** Days kept while unsent (the server takes the last week). */
