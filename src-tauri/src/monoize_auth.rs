@@ -1,19 +1,31 @@
-//! Monoize（LynShen Console，https://www.lynshen.org）账号体系接入。
+//! Monoize（LynShen Console）账号体系接入。
 //!
 //! 流程与 web 网关一致：注册 / 登录（网关开了内置 PoW 验证码，客户端直接
 //! 解算，无需人工交互）→ 拿到会话 token → 自动创建一条仅桌面端使用的
 //! API key（auth.json `providers.monoize`，界面不展示、不可复制）→
 //! 模型广场走会话接口（服务端按登录用户的分组过滤）。
 //!
-//! key 的"仅客户端可用"约束：key 由登录流程自动轮换生成，保存于本机凭据
+//! 网关有多个等价域名（防止一条突然无法连接）：请求依次尝试，只有网络层
+//! 失败（超时 / DNS / 拒绝连接）才切换下一个，网关自身返回的 4xx/5xx
+//! 原样透出。上次成功的域名优先。
+//!
+//! key 的“仅客户端可用”约束：key 由登录流程自动轮换生成，保存于本机凭据
 //! 文件且任何界面都不显示；退出登录时在网关侧删除。网关目前没有按客户端
 //! 绑定的强校验，如需服务端强约束可给 key 配 ip 白名单（见 docs）。
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-const BASE: &str = "https://www.lynshen.org/api";
+/// 等价的网关域名，按序容灾。
+pub(crate) const BASES: [&str; 3] = [
+    "https://www.lynshen.org",
+    "https://api.lynshen.org",
+    "https://lynshen.org",
+];
+/// 上次成功的域名下标（失败切换后更新）。
+static BASE_INDEX: AtomicUsize = AtomicUsize::new(0);
 /// 登录流程自动创建的 key 名字，轮换时按名删除重建。
 const KEY_NAME: &str = "lynshen-desktop";
 
@@ -23,8 +35,66 @@ fn session_path() -> PathBuf {
 
 fn http() -> ureq::Agent {
     ureq::AgentBuilder::new()
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(15))
         .build()
+}
+
+/// 带域名容灾的网关请求。`path` 是完整路径（dashboard 接口带 `/api` 前缀，
+/// key 级接口在根下）。网络层失败依次换域名；网关有应答时把响应体里的
+/// `message` 作为错误返回（登录失败原因等），不再切换。
+fn api_call(
+    method: &str,
+    path: &str,
+    bearer: Option<&str>,
+    body: Option<Value>,
+) -> Result<Value, String> {
+    let start = BASE_INDEX.load(Ordering::Relaxed);
+    let mut last_network_err = String::new();
+    for offset in 0..BASES.len() {
+        let index = (start + offset) % BASES.len();
+        let mut req = http().request(method, &format!("{}{}", BASES[index], path));
+        if let Some(token) = bearer {
+            req = req.set("Authorization", &format!("Bearer {token}"));
+        }
+        let result = match &body {
+            Some(payload) => req.send_json(payload.clone()),
+            None => req.call(),
+        };
+        match result {
+            Ok(resp) => {
+                BASE_INDEX.store(index, Ordering::Relaxed);
+                return resp.into_json::<Value>().map_err(|e| e.to_string());
+            }
+            Err(ureq::Error::Status(_, resp)) => {
+                // 网关有应答（含 401/409 等业务错误）：透出错误信息，不切换域名。
+                BASE_INDEX.store(index, Ordering::Relaxed);
+                let parsed = resp.into_json::<Value>().ok();
+                return Err(match &parsed {
+                    Some(v) => v["message"]
+                        .as_str()
+                        .map(String::from)
+                        .unwrap_or_else(|| v.to_string()),
+                    None => format!("gateway error via {}", BASES[index]),
+                });
+            }
+            Err(e) => {
+                last_network_err = format!("{}: {e}", BASES[index]);
+            }
+        }
+    }
+    Err(format!("all gateways unreachable ({last_network_err})"))
+}
+
+/// key 级接口（/user/balance、/v1/models）：用 auth.json 里存的 monoize key。
+pub(crate) fn gateway_key_get(path: &str) -> Result<Value, String> {
+    let key = crate::read_auth()
+        .get("providers")
+        .and_then(|p| p.get("monoize"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|k| !k.is_empty())
+        .ok_or_else(|| "未配置 Monoize API key".to_string())?;
+    api_call("GET", path, Some(&key), None)
 }
 
 // ---------- 内置 PoW 验证码（与网关 captcha.rs 的算法一致） ----------
@@ -78,13 +148,7 @@ fn digest_matches(digest: &[u8], target_hex: &str) -> bool {
 
 /// 拉一道挑战并解算，返回可直接随登录/注册提交的 captcha token。
 fn solve_captcha() -> Result<String, String> {
-    let agent = http();
-    let challenge: Value = agent
-        .post(&format!("{BASE}/dashboard/captcha/challenge"))
-        .call()
-        .map_err(|e| format!("captcha challenge failed: {e}"))?
-        .into_json()
-        .map_err(|e| e.to_string())?;
+    let challenge: Value = api_call("POST", "/api/dashboard/captcha/challenge", None, None)?;
     let token = challenge["token"]
         .as_str()
         .ok_or("captcha challenge has no token")?
@@ -115,12 +179,12 @@ fn solve_captcha() -> Result<String, String> {
         })
         .collect();
 
-    let redeem: Value = agent
-        .post(&format!("{BASE}/dashboard/captcha/redeem"))
-        .send_json(json!({ "token": token, "solutions": solutions }))
-        .map_err(|e| format!("captcha redeem failed: {e}"))?
-        .into_json()
-        .map_err(|e| e.to_string())?;
+    let redeem: Value = api_call(
+        "POST",
+        "/api/dashboard/captcha/redeem",
+        None,
+        Some(json!({ "token": token, "solutions": solutions })),
+    )?;
     if redeem["success"] != json!(true) {
         return Err("captcha redeem rejected the solutions".into());
     }
@@ -147,25 +211,31 @@ fn clear_session() {
 }
 
 fn store_api_key(key: &str) -> Result<(), String> {
-    crate::set_auth_key("monoize".to_string(), key.to_string())
+    crate::store_provider_key("monoize".to_string(), key.to_string())
+}
+
+/// 转义正则元字符，让模型/分组名按字面匹配。
+fn regex_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if "\\.^$|?*+()[]{}".contains(c) {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
 }
 
 /// 登录后调用：删掉旧的桌面 key，创建新的并写入凭据文件。
 /// 相同模型出现在多个分组/渠道时网关要求显式选择：绑定一律取第一个
-/// 选项；同时为每个 (模型, 分组) 生成一条字面量重写规则，让桌面端的
-/// `模型@分组` 名字（跨分组同名模型的区分后缀）重写回基础名。
+/// 选项；同时为跨分组同名模型生成 `模型@分组` → 基础名 的字面量重写
+/// 规则（网关的 replace 不支持捕获组，每把 key 上限 32 条）。
 /// 返回 (key_id, key)。
 fn provision_desktop_key(session_token: &str) -> Result<(String, String), String> {
-    let agent = http();
-    let auth = format!("Bearer {session_token}");
+    let bearer = format!("Bearer {session_token}");
 
-    let listed: Value = agent
-        .get(&format!("{BASE}/dashboard/tokens"))
-        .set("Authorization", &auth)
-        .call()
-        .map_err(|e| format!("list tokens failed: {e}"))?
-        .into_json()
-        .map_err(|e| e.to_string())?;
+    let listed: Value = api_call("GET", "/api/dashboard/tokens", Some(&bearer), None)
+        .map_err(|e| format!("list tokens failed: {e}"))?;
     // 旧 key 的明文只在创建时返回一次，轮换 = 删旧建新。
     let stale: Vec<String> = listed
         .as_array()
@@ -177,20 +247,13 @@ fn provision_desktop_key(session_token: &str) -> Result<(String, String), String
         })
         .unwrap_or_default();
     for id in stale {
-        let _ = agent
-            .delete(&format!("{BASE}/dashboard/tokens/{id}"))
-            .set("Authorization", &auth)
-            .call();
+        let _ = api_call("DELETE", &format!("/api/dashboard/tokens/{id}"), Some(&bearer), None);
     }
 
     // 渠道歧义：同一 (分组, 模型) 有多个渠道时，取第一个渠道绑定。
-    let conflicts: Value = agent
-        .get(&format!("{BASE}/dashboard/tokens/channel-conflicts"))
-        .set("Authorization", &auth)
-        .call()
-        .map_err(|e| format!("list channel conflicts failed: {e}"))?
-        .into_json()
-        .map_err(|e| e.to_string())?;
+    let conflicts: Value =
+        api_call("GET", "/api/dashboard/tokens/channel-conflicts", Some(&bearer), None)
+            .map_err(|e| format!("list channel conflicts failed: {e}"))?;
     let channel_bindings: Vec<Value> = conflicts
         .as_array()
         .map(|rows| {
@@ -207,16 +270,9 @@ fn provision_desktop_key(session_token: &str) -> Result<(String, String), String
         })
         .unwrap_or_default();
 
-    // `模型@分组` → 基础名 的字面量重写规则（网关的 replace 不支持捕获组，
-    // 且每把 key 最多 32 条）。只有跨分组同名模型需要后缀区分，所以只为
-    // 出现在 2 个及以上分组里的模型生成规则。
-    let groups: Value = agent
-        .get(&format!("{BASE}/dashboard/groups"))
-        .set("Authorization", &auth)
-        .call()
-        .map_err(|e| format!("list groups failed: {e}"))?
-        .into_json()
-        .map_err(|e| e.to_string())?;
+    // 逐分组拉模型，只为跨分组同名模型生成后缀重写规则（上限 32 条）。
+    let groups: Value = api_call("GET", "/api/dashboard/groups", Some(&bearer), None)
+        .map_err(|e| format!("list groups failed: {e}"))?;
     let mut group_models: Vec<(String, Vec<String>)> = Vec::new();
     let mut model_group_count: std::collections::BTreeMap<String, usize> = Default::default();
     for group in groups["groups"].as_array().cloned().unwrap_or_default() {
@@ -226,15 +282,13 @@ fn provision_desktop_key(session_token: &str) -> Result<(String, String), String
         ) else {
             continue;
         };
-        let models: Value = agent
-            .get(&format!(
-                "{BASE}/dashboard/marketplace/models?group_id={group_id}"
-            ))
-            .set("Authorization", &auth)
-            .call()
-            .map_err(|e| format!("list group models failed: {e}"))?
-            .into_json()
-            .map_err(|e| e.to_string())?;
+        let models: Value = api_call(
+            "GET",
+            &format!("/api/dashboard/marketplace/models?group_id={group_id}"),
+            Some(&bearer),
+            None,
+        )
+        .map_err(|e| format!("list group models failed: {e}"))?;
         let mut names = Vec::new();
         for row in models.as_array().cloned().unwrap_or_default() {
             if let Some(model) = row["model_id"].as_str() {
@@ -245,13 +299,13 @@ fn provision_desktop_key(session_token: &str) -> Result<(String, String), String
         group_models.push((group_name, names));
     }
     let mut model_redirects: Vec<Value> = Vec::new();
-    for (group_name, names) in &group_models {
+    'outer: for (group_name, names) in &group_models {
         for model in names {
             if model_group_count.get(model).copied().unwrap_or(0) < 2 {
                 continue;
             }
             if model_redirects.len() >= 32 {
-                break;
+                break 'outer;
             }
             model_redirects.push(json!({
                 "pattern": format!("^{}@{}$", regex_escape(model), regex_escape(group_name)),
@@ -260,17 +314,16 @@ fn provision_desktop_key(session_token: &str) -> Result<(String, String), String
         }
     }
 
-    let created: Value = agent
-        .post(&format!("{BASE}/dashboard/tokens"))
-        .set("Authorization", &auth)
-        .send_json(json!({
+    let created: Value = api_call(
+        "POST",
+        "/api/dashboard/tokens",
+        Some(&bearer),
+        Some(json!({
             "name": KEY_NAME,
             "channel_bindings": channel_bindings,
             "model_redirects": model_redirects,
-        }))
-        .map_err(extract_error_message)?
-        .into_json()
-        .map_err(|e| e.to_string())?;
+        })),
+    )?;
     let key = created["key"]
         .as_str()
         .ok_or("gateway returned no key")?
@@ -283,62 +336,21 @@ fn provision_desktop_key(session_token: &str) -> Result<(String, String), String
     Ok((id, key))
 }
 
-/// 转义正则元字符，让模型/分组名按字面匹配。
-fn regex_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        if "\\.^$|?*+()[]{}".contains(c) {
-            out.push('\\');
-        }
-        out.push(c);
-    }
-    out
-}
-
-/// 把网关 4xx/5xx 响应体里的错误信息透出来（登录失败原因等）。
-fn extract_error_message(e: ureq::Error) -> String {
-    let body = e
-        .into_response()
-        .and_then(|r| r.into_json::<Value>().ok());
-    if let Some(v) = body {
-        if let Some(message) = v["message"].as_str() {
-            return message.to_string();
-        }
-        return v.to_string();
-    }
-    "network error".to_string()
-}
-
-fn auth_call(method: &str, path: &str, token: &str, body: Option<Value>) -> Result<Value, String> {
-    let agent = http();
-    let req = agent.request(method, &format!("{BASE}{path}")).set("Authorization", &format!("Bearer {token}"));
-    let resp = match body {
-        Some(payload) => req
-            .send_json(payload)
-            .map_err(|e| format!("{path} failed: {e}"))?,
-        None => req
-            .call()
-            .map_err(|e| format!("{path} failed: {e}"))?,
-    };
-    resp.into_json::<Value>().map_err(|e| e.to_string())
-}
-
 /// 校验本地会话仍有效；失效时清掉本地状态并返回 None。
 fn current_session() -> Result<Option<Value>, String> {
     let session = read_session();
-    let token = session["token"].as_str().map(String::from);
-    let Some(token) = token else {
+    let Some(token) = session["token"].as_str().map(String::from) else {
         return Ok(None);
     };
-    match auth_call("GET", "/dashboard/auth/me", &token, None) {
+    match api_call("GET", "/api/dashboard/auth/me", Some(&token), None) {
         Ok(me) => Ok(Some(json!({
             "token": token,
             "user": me.get("user").cloned().unwrap_or(me),
             "key_id": session["key_id"].clone(),
         }))),
         Err(_) => {
-            // 会话过期：清本地，但保留 providers.monoize 的 key（还能直接调
-            // /v1，余额可见），下次登录再轮换。
+            // 会话过期（或网关暂不可达）：清本地，但保留 providers.monoize 的
+            // key（还能直接调 /v1，余额可见），下次登录再轮换。
             Ok(None)
         }
     }
@@ -349,28 +361,27 @@ fn current_session() -> Result<Option<Value>, String> {
 /// 注册（与 web 相同的规则：3-22 位字母数字下划线，密码 ≥8 位，PoW 验证码）。
 #[tauri::command(async)]
 pub fn monoize_register(username: String, password: String) -> Result<Value, String> {
-    register_or_login("/dashboard/auth/register", username, password)
+    register_or_login("/api/dashboard/auth/register", username, password)
 }
 
 /// 登录：会话 token + 自动轮换桌面专用 key。
 #[tauri::command(async)]
 pub fn monoize_login(username: String, password: String) -> Result<Value, String> {
-    register_or_login("/dashboard/auth/login", username, password)
+    register_or_login("/api/dashboard/auth/login", username, password)
 }
 
 fn register_or_login(path: &str, username: String, password: String) -> Result<Value, String> {
     let captcha = solve_captcha()?;
-    let agent = http();
-    let resp: Value = agent
-        .post(&format!("{BASE}{path}"))
-        .send_json(json!({
+    let resp: Value = api_call(
+        "POST",
+        path,
+        None,
+        Some(json!({
             "username": username,
             "password": password,
             "captcha_token": captcha,
-        }))
-        .map_err(extract_error_message)?
-        .into_json()
-        .map_err(|e| e.to_string())?;
+        })),
+    )?;
     let token = resp["token"]
         .as_str()
         .ok_or("gateway returned no session token")?
@@ -390,14 +401,16 @@ fn register_or_login(path: &str, username: String, password: String) -> Result<V
 #[tauri::command(async)]
 pub fn monoize_logout() -> Result<(), String> {
     let session = read_session();
-    if let (Some(token), Some(key_id)) = (
-        session["token"].as_str(),
-        session["key_id"].as_str(),
-    ) {
-        let _ = auth_call("DELETE", &format!("/dashboard/tokens/{key_id}"), token, None);
+    if let (Some(token), Some(key_id)) = (session["token"].as_str(), session["key_id"].as_str()) {
+        let _ = api_call(
+            "DELETE",
+            &format!("/api/dashboard/tokens/{key_id}"),
+            Some(token),
+            None,
+        );
     }
     clear_session();
-    crate::remove_auth_key("monoize".to_string())
+    crate::remove_provider_credential("monoize".to_string())
 }
 
 /// 当前登录态：无会话返回 `{"logged_in": false}`。
@@ -414,10 +427,9 @@ pub fn monoize_session() -> Result<Value, String> {
 /// 区分；分组列表随 `groups` 一并返回。
 #[tauri::command(async)]
 pub fn monoize_marketplace() -> Result<Value, String> {
-    let session = current_session()?
-        .ok_or("not logged in")?;
+    let session = current_session()?.ok_or("not logged in")?;
     let token = session["token"].as_str().ok_or("missing session token")?;
-    let groups: Value = auth_call("GET", "/dashboard/groups", token, None)?;
+    let groups: Value = api_call("GET", "/api/dashboard/groups", Some(token), None)?;
     let group_list: Vec<(String, String)> = groups["groups"]
         .as_array()
         .map(|rows| {
@@ -433,10 +445,10 @@ pub fn monoize_marketplace() -> Result<Value, String> {
 
     let mut by_model: std::collections::BTreeMap<String, Value> = Default::default();
     for (group_id, group_name) in &group_list {
-        let models = auth_call(
+        let models = api_call(
             "GET",
-            &format!("/dashboard/marketplace/models?group_id={group_id}"),
-            token,
+            &format!("/api/dashboard/marketplace/models?group_id={group_id}"),
+            Some(token),
             None,
         )?;
         for row in models.as_array().cloned().unwrap_or_default() {
@@ -448,12 +460,14 @@ pub fn monoize_marketplace() -> Result<Value, String> {
                 }
                 first
             });
-            if let Some(groups) = entry.get_mut("groups").and_then(|g| g.as_array_mut()) {
-                if !groups.iter().any(|g| g == &json!(group_name)) {
-                    groups.push(json!(group_name));
+            if let Some(group_names) = entry.get_mut("groups").and_then(|g| g.as_array_mut()) {
+                if !group_names.iter().any(|g| g == &json!(group_name)) {
+                    group_names.push(json!(group_name));
                 }
             }
         }
     }
-    Ok(json!(Value::Array(by_model.into_values().collect::<Vec<_>>())))
+    Ok(json!(Value::Array(
+        by_model.into_values().collect::<Vec<_>>()
+    )))
 }

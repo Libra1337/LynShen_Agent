@@ -7,17 +7,16 @@
 	import { onMount, untrack } from 'svelte';
 	import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 	import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
+	import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
 	import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
 	import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 	import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
-	import { checkEnvironment, type EnvReport } from '$lib/protocol';
-	import { dispatch } from '$lib/backends/router';
+	import { checkEnvironment, monoizeLogin, monoizeRegister, monoizeSession, type EnvReport, type MonoizeUser } from '$lib/protocol';
 	import { loadBackendSettings } from '$lib/backends/settings';
 	import type { BackendId } from '$lib/backends';
 	import type { SectionKey } from '$lib/settings/nav';
 	import type { ChatState } from '$lib/chat.svelte';
-	import { loginErrorSince } from '$lib/loginWatch';
 	import { LEGAL, type LegalDocId } from '$lib/legal';
 	import LegalDoc from '$lib/LegalDoc.svelte';
 	import { shortcutLabel } from '$lib/shortcuts';
@@ -26,6 +25,7 @@
 	import Button from '$lib/ui/Button.svelte';
 	import Segmented from '$lib/ui/Segmented.svelte';
 	import Notice from '$lib/ui/Notice.svelte';
+	import TextField from '$lib/ui/TextField.svelte';
 	import SignalRaster from './SignalRaster.svelte';
 	import AgentStep from './AgentStep.svelte';
 	import ModelStep from './ModelStep.svelte';
@@ -83,8 +83,21 @@
 	}
 	onMount(runCheck);
 
+	// ---------- Monoize 账号登录 / 注册 ----------
+	// 直连 LynShen Console 网关（与 web 控制台同一套逻辑，验证码由 Rust 侧
+	// 自动解算），不依赖本地引擎。登录成功后由 Rust 自动配置仅本客户端
+	// 使用的 API key，走 onRefreshAuth 刷新父组件的 provider 状态。
+	let monoizeUser = $state<MonoizeUser | null>(null);
+	let mzMode = $state<'login' | 'register'>('login');
+	let mzUsername = $state('');
+	let mzPassword = $state('');
+	let mzError = $state('');
+	let mzBusy = $state(false);
+	let mzTouched = $state(false);
+	let mzChecked = $state(false);
+
 	const done = $derived<Record<StepKey, boolean>>({
-		account: loggedIn || configured,
+		account: loggedIn || !!monoizeUser || configured,
 		agent: agentReady,
 		model: modelReady,
 		env: !!env?.git.present && !!env?.engine.present,
@@ -93,38 +106,49 @@
 	});
 	const doneCount = $derived(STEPS.filter((s) => done[s]).length);
 
-	// ---------- LynShen login ----------
-	let loggingIn = $state(false);
-	let loginError = $state('');
-	let loginMark = 0;
-	function login() {
-		loginError = '';
-		loginMark = chat?.messages.length ?? 0;
-		// A bare /login answers with a provider picker; name the provider.
-		dispatch(sessionId, { op: 'command', input: '/login lynshen' });
-		loggingIn = true;
-	}
-	$effect(() => {
-		if (!loggingIn) return;
-		const failed = loginErrorSince(chat, loginMark);
-		if (failed) {
-			loginError = failed;
-			loggingIn = false;
+	onMount(async () => {
+		try {
+			const s = await monoizeSession();
+			monoizeUser = s.logged_in && s.session ? s.session.user : null;
+		} catch {
+			monoizeUser = null;
 		}
+		// 已登录的老用户直接进引导，不停在登录页。
+		if (monoizeUser && !mzTouched && view === 'login') view = 'guide';
+		mzChecked = true;
 	});
-	// Poll auth.json while the OAuth round-trip is out in the browser.
-	$effect(() => {
-		if (!loggingIn || loggedIn) return;
-		const timer = setInterval(onRefreshAuth, 2000);
-		return () => clearInterval(timer);
-	});
-	$effect(() => {
-		if (loggedIn && loggingIn) {
-			loggingIn = false;
+	async function submitMonoize() {
+		if (mzBusy) return;
+		if (!mzUsername.trim() || !mzPassword) {
+			mzError = t('settings.monoize.needCredentials');
+			return;
+		}
+		mzBusy = true;
+		mzError = '';
+		try {
+			const r =
+				mzMode === 'login'
+					? await monoizeLogin(mzUsername.trim(), mzPassword)
+					: await monoizeRegister(mzUsername.trim(), mzPassword);
+			monoizeUser = r.user;
+			mzPassword = '';
+			onRefreshAuth();
 			view = 'guide';
 			step = 'agent';
+		} catch (e) {
+			mzError = String(e);
+		} finally {
+			mzBusy = false;
 		}
-	});
+	}
+	function switchMzMode(mode: string) {
+		mzMode = mode as 'login' | 'register';
+		mzError = '';
+	}
+	const mzModeOpts = $derived([
+		{ value: 'login', label: t('settings.monoize.login') },
+		{ value: 'register', label: t('settings.monoize.register') }
+	]);
 
 	let legal = $state<LegalDocId | null>(null);
 	const legalTitle = (doc: LegalDocId) => LEGAL[doc][getLocale() === 'zh' ? 'zh' : 'en'].title;
@@ -164,15 +188,18 @@
 				<p class="lede">{t('setup.welcome.login.sub')}</p>
 
 				<div class="actions">
-					<Button variant="primary" onclick={login} disabled={loggingIn}>
-						{#if loggingIn}<CircleNotchIcon size={15} class="spin" /> {t('setup.loginOauth.waiting')}{:else}<SignInIcon size={15} /> {t('setup.loginOauth.loginBtn')}{/if}
+					<Segmented value={mzMode} options={mzModeOpts} onChange={switchMzMode} />
+					<TextField bind:value={mzUsername} mono placeholder={t('settings.monoize.username')} />
+					<TextField bind:value={mzPassword} type="password" mono placeholder={t('settings.monoize.password')} />
+					<Button variant="primary" onclick={submitMonoize} disabled={mzBusy || !mzChecked}>
+						{#if mzBusy}<CircleNotchIcon size={15} class="spin" /> {t('settings.monoize.working')}{:else if mzMode === 'login'}<SignInIcon size={15} /> {t('settings.monoize.login')}{:else}<UserPlusIcon size={15} /> {t('settings.monoize.register')}{/if}
 					</Button>
+					<p class="hint">{t('settings.monoize.keyHint')}</p>
 					<Button variant="secondary" onclick={() => openSettings('providers')}><KeyIcon size={15} /> {t('setup.welcome.login.apiKey')}</Button>
 				</div>
-				{#if loggingIn}<p class="hint">{t('setup.loginOauth.browserOpened')}</p>{/if}
-				{#if loginError}<div class="err"><Notice onDismiss={() => (loginError = '')}>{loginError}</Notice></div>{/if}
+				{#if mzError}<div class="err"><Notice onDismiss={() => (mzError = '')}>{mzError}</Notice></div>{/if}
 
-				<button class="later" onclick={() => (view = 'guide')}>
+				<button class="later" onclick={() => ((mzTouched = true), (view = 'guide'))}>
 					{t('setup.welcome.login.later')} <ArrowRightIcon size={13} />
 				</button>
 			</div>
@@ -213,19 +240,27 @@
 							<p class="psub">{t(`setup.welcome.${step}.sub`)}</p>
 
 							{#if step === 'account'}
-								{#if loggedIn}
+								{#if monoizeUser}
+									<div class="okline"><span class="okico"><UserCircleIcon size={20} /></span>{t('setup.welcome.account.loggedIn')} · {monoizeUser.username}</div>
+									<div class="row"><Button size="sm" onclick={() => openSettings('providers')}>{t('setup.welcome.account.manage')}</Button></div>
+								{:else if loggedIn}
 									<div class="okline"><span class="okico"><UserCircleIcon size={20} /></span>{t('setup.welcome.account.loggedIn')}</div>
 									<div class="row"><Button size="sm" onclick={() => openSettings('account')}>{t('setup.welcome.account.manage')}</Button></div>
 								{:else}
 									{#if configured}<div class="okline"><span class="okico"><KeyIcon size={18} /></span>{t('setup.welcome.account.byok')}</div>{/if}
-									<div class="row">
-										<Button variant="primary" size="sm" onclick={login} disabled={loggingIn}>
-											{#if loggingIn}<CircleNotchIcon size={14} class="spin" /> {t('setup.loginOauth.waiting')}{:else}<SignInIcon size={14} /> {t('setup.loginOauth.loginBtn')}{/if}
-										</Button>
-										<Button variant="ghost" size="sm" onclick={() => openSettings('providers')}><KeyIcon size={14} /> {t('setup.welcome.login.apiKey')}</Button>
+									<div class="mzform">
+										<Segmented value={mzMode} options={mzModeOpts} onChange={switchMzMode} />
+										<TextField bind:value={mzUsername} mono placeholder={t('settings.monoize.username')} />
+										<TextField bind:value={mzPassword} type="password" mono placeholder={t('settings.monoize.password')} />
+										<div class="row">
+											<Button variant="primary" size="sm" onclick={submitMonoize} disabled={mzBusy || !mzChecked}>
+												{#if mzBusy}<CircleNotchIcon size={14} class="spin" /> {t('settings.monoize.working')}{:else if mzMode === 'login'}<SignInIcon size={14} /> {t('settings.monoize.login')}{:else}<UserPlusIcon size={14} /> {t('settings.monoize.register')}{/if}
+											</Button>
+											<Button variant="ghost" size="sm" onclick={() => openSettings('providers')}><KeyIcon size={14} /> {t('setup.welcome.login.apiKey')}</Button>
+										</div>
 									</div>
-									{#if loggingIn}<p class="hint">{t('setup.loginOauth.browserOpened')}</p>{/if}
-									{#if loginError}<div class="err"><Notice onDismiss={() => (loginError = '')}>{loginError}</Notice></div>{/if}
+									<p class="hint">{t('settings.monoize.loginHint')}</p>
+									{#if mzError}<div class="err"><Notice onDismiss={() => (mzError = '')}>{mzError}</Notice></div>{/if}
 								{/if}
 							{:else if step === 'agent'}
 								<AgentStep bind:selected={backend} bind:ready={agentReady} onOpenSettings={() => openSettings('acp')} />
@@ -330,6 +365,13 @@
 	}
 	.err {
 		margin-top: 12px;
+	}
+	.mzform {
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 10px;
+		max-width: 360px;
 	}
 	.later {
 		display: inline-flex;

@@ -889,44 +889,18 @@ fn fetch_deepseek_balance() -> Result<serde_json::Value, String> {
         .map_err(|e| e.to_string())
 }
 
-/// Monoize 网关（LynShen Console，https://www.lynshen.org）的账户余额，用
-/// auth.json 里 providers.monoize 的 key 请求 /user/balance。网关按 DeepSeek
-/// /user/balance 的格式作答，前端沿用同一套解析。
+/// Monoize 网关（LynShen Console）的账户余额，用 auth.json 里
+/// providers.monoize 的 key 请求 /user/balance。网关按 DeepSeek
+/// /user/balance 的格式作答，前端沿用同一套解析；域名容灾见 monoize_auth。
 #[tauri::command(async)]
 fn fetch_monoize_balance() -> Result<serde_json::Value, String> {
-    let key = read_auth()
-        .get("providers")
-        .and_then(|p| p.get("monoize"))
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string())
-        .filter(|k| !k.is_empty())
-        .ok_or_else(|| "未配置 Monoize API key".to_string())?;
-    ureq::get("https://www.lynshen.org/user/balance")
-        .timeout(std::time::Duration::from_secs(30))
-        .set("Authorization", &format!("Bearer {key}"))
-        .call()
-        .map_err(|e| e.to_string())?
-        .into_json::<serde_json::Value>()
-        .map_err(|e| e.to_string())
+    monoize_auth::gateway_key_get("/user/balance")
 }
 
 /// Monoize 网关当前可调用的模型（GET /v1/models），用于在设置里刷新模型列表。
 #[tauri::command(async)]
 fn fetch_monoize_models() -> Result<serde_json::Value, String> {
-    let key = read_auth()
-        .get("providers")
-        .and_then(|p| p.get("monoize"))
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string())
-        .filter(|k| !k.is_empty())
-        .ok_or_else(|| "未配置 Monoize API key".to_string())?;
-    ureq::get("https://www.lynshen.org/v1/models")
-        .timeout(std::time::Duration::from_secs(30))
-        .set("Authorization", &format!("Bearer {key}"))
-        .call()
-        .map_err(|e| e.to_string())?
-        .into_json::<serde_json::Value>()
-        .map_err(|e| e.to_string())
+    monoize_auth::gateway_key_get("/v1/models")
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

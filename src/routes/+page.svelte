@@ -1192,13 +1192,13 @@
 		resizing={sbResizing}
 		sidebarOpen={showSidebar}
 		onToggleSidebar={toggleSidebar}
-		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : (active?.chat.title ?? '')}
-		subtitle={showSettings || showDesk ? '' : (activeProject?.name ?? '')}
-		addOptions={showSettings || showDesk ? [] : addOptions}
+		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : showSetup ? 'LynShen' : (active?.chat.title ?? '')}
+		subtitle={showSettings || showDesk || showSetup ? '' : (activeProject?.name ?? '')}
+		addOptions={showSettings || showDesk || showSetup ? [] : addOptions}
 		onAdd={(key) => mosaicAdd(focusedLeaf, key)}
 	>
 		{#snippet actions()}
-			{#if !showSettings && !showDesk && active && active.surface !== 'tui' && canHandOffToTui(active.backendId)}
+			{#if !showSettings && !showDesk && !showSetup && active && active.surface !== 'tui' && canHandOffToTui(active.backendId)}
 				<button
 					class="tile-action"
 					disabled={!tuiReady(active.id)}
