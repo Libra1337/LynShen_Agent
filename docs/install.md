@@ -2,15 +2,16 @@
 
 LynShen Desktop 内测版还没有做代码签名。macOS 和 Windows 在第一次打开时会拦截，按下面的步骤放行即可。之后应用会自动更新，不需要重复操作。
 
-下载地址：[GitHub Releases](https://github.com/LynShen-Team/LynShen-Desktop/releases/latest)
+下载地址：[LynShen 官网](https://www.lynshen.org/download)。仅已发布的平台会显示下载按钮。
 
 | 系统 | 下载文件 |
 | --- | --- |
 | macOS（Apple 芯片） | `LynShen_<版本>_aarch64.dmg` |
+| macOS（Intel 芯片） | `LynShen_<版本>_x64.dmg` |
 | Windows x64 | `LynShen_<版本>_x64-setup.exe` |
 | Linux x64 | `LynShen_<版本>_amd64.AppImage`，或 `.deb`、`.rpm` |
 
-Intel 芯片的 Mac 暂不支持。
+发布流程覆盖 Apple Silicon 和 Intel Mac；是否已有安装包以下载页为准。
 
 ## macOS
 
@@ -73,7 +74,10 @@ sudo dnf install ./LynShen-*.x86_64.rpm     # Fedora、RHEL
 首次启动会打开设置向导：
 
 1. 检查 git 和 LynShen CLI，缺少的可以一键安装。
-2. 登录 LynShen 账号，浏览器会打开登录页，完成后自动回到应用。
+2. 点击「前往浏览器授权」，在官网登录或注册，核对软件显示的授权码并同意授权。
 3. 选择常用模型。
+
+软件不会收集账号密码。授权成功后切回软件即可继续，每台设备获得独立的 30 天凭据。
+在软件中退出登录会撤销该设备凭据；也可在官网的 API 密钥管理中撤销对应的 `LynShen Desktop` 项。
 
 Claude Code 和 Codex 是可选的。需要时在「设置 → 智能体」里安装，安装程序来自它们的官方渠道。

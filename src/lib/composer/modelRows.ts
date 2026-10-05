@@ -197,7 +197,7 @@ export function buildModelRows(input: {
 	const activeGroup = cur === 'lynshen' ? groups.lynshen : groups.byok;
 	const activeRows: ModelRow[] = models.map((m) => ({
 		id: `${cur}::${m.model}`,
-		label: m.label || m.model,
+		label: providersList.find(p => p.id === cur)?.models.find(row => row.name === m.model)?.display_name || m.label || m.model,
 		vendor: m.vendor || m.model,
 		detail:
 			cur === 'lynshen'

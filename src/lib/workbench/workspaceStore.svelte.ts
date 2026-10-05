@@ -27,6 +27,7 @@ export class WorkspaceStore {
 	/** Cleared when the on-disk file is unreadable (corrupt, or written by a
 	 *  newer app version): the session runs in memory and never clobbers it. */
 	#writable = true;
+	#loading: Promise<WorkspaceEntry> | null = null;
 	#saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 	get workspaces(): WorkspaceEntry[] {
@@ -44,7 +45,12 @@ export class WorkspaceStore {
 	 * seed a fresh default). Resolves to the active workspace. `defaultName`
 	 * labels the workspace created when none exists yet.
 	 */
-	async load(defaultName: string): Promise<WorkspaceEntry> {
+	load(defaultName: string): Promise<WorkspaceEntry> {
+		if (this.loaded && this.active) return Promise.resolve(this.active);
+		return this.#loading ??= this.#load(defaultName).finally(() => { this.#loading = null; });
+	}
+
+	async #load(defaultName: string): Promise<WorkspaceEntry> {
 		let raw: string | null = null;
 		let readable = true;
 		try {
@@ -58,8 +64,13 @@ export class WorkspaceStore {
 		if (raw != null) {
 			const parsed = parseWorkspacesFile(raw);
 			if (parsed) {
+				if (JSON.parse(raw).workspaces.filter((w: { isDefault?: boolean }) => w?.isDefault).length > 1) {
+					try { await appDataWrite('workspaces-before-default-merge.json', raw); }
+					catch (e) { this.#writable = false; console.error('workspaces: backup failed, running in-memory', e); }
+				}
 				this.file = parsed;
 				this.loaded = true;
+				this.#schedule();
 				return this.active!;
 			}
 			// Present but unreadable — never overwrite it with a fresh file.
@@ -82,6 +93,14 @@ export class WorkspaceStore {
 	}
 
 	/** Replace the active workspace's saved projects (SessionStore.serialize). */
+	canonicalDefaultId(id: string) {
+		const ws = this.workspaces.find(w => w.isDefault);
+		if (!this.file || !ws || ws.id === id) return;
+		if (this.file.active === ws.id) this.file.active = id;
+		ws.id = id;
+		this.#schedule();
+	}
+
 	updateProjects(projects: SavedProject[]) {
 		const ws = this.active;
 		if (!ws) return;
@@ -180,8 +199,12 @@ export class WorkspaceStore {
 		}, SAVE_DELAY);
 	}
 
-	async flush() {
-		if (!this.#writable || !this.file) return;
+	async flush(strict = false) {
+		if (!this.#writable) {
+			if (strict) throw new Error('Workspace storage is unavailable; save your workspace before updating.');
+			return;
+		}
+		if (!this.file) return;
 		if (this.#saveTimer != null) {
 			clearTimeout(this.#saveTimer);
 			this.#saveTimer = null;
@@ -190,6 +213,7 @@ export class WorkspaceStore {
 			await appDataWrite(WORKSPACES_FILE, serializeWorkspaces($state.snapshot(this.file) as WorkspacesFile));
 		} catch (e) {
 			console.error('workspaces: write failed', e);
+			if (strict) throw e;
 		}
 	}
 }

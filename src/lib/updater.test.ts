@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UpdaterState } from './updater.svelte';
 
-const { invoke, relaunch } = vi.hoisted(() => ({ invoke: vi.fn(), relaunch: vi.fn() }));
+const { invoke, relaunch, flush } = vi.hoisted(() => ({ invoke: vi.fn(), relaunch: vi.fn(), flush: vi.fn() }));
+vi.mock('$lib/workbench/workspaceStore.svelte', () => ({ workspaces: { flush } }));
 
 vi.mock('@tauri-apps/api/core', () => ({
 	invoke,
@@ -26,6 +27,7 @@ describe('UpdaterState', () => {
 	beforeEach(() => {
 		invoke.mockReset();
 		relaunch.mockReset();
+		flush.mockReset();
 	});
 
 	it('automatically downloads and installs a silent startup update', async () => {
@@ -71,6 +73,53 @@ describe('UpdaterState', () => {
 
 		expect(state.phase).toBe('error');
 		expect(state.error).toContain('signature mismatch');
+	});
+
+	it('resets progress when a failed download starts again on a fallback source', async () => {
+		invoke.mockImplementation(async (cmd, args) => {
+			if (cmd === 'update_check') return { version: '0.5.0', source: 'lynshen' };
+			if (cmd === 'update_policy') return '';
+			if (cmd === 'update_install') {
+				const channel = args.onEvent;
+				channel.onmessage({ event: 'Started', data: { contentLength: 100 } });
+				channel.onmessage({ event: 'Progress', data: { chunkLength: 80 } });
+				channel.onmessage({ event: 'Started', data: { contentLength: 100 } });
+				channel.onmessage({ event: 'Progress', data: { chunkLength: 10 } });
+				expect(state.progress).toBe(10);
+			}
+		});
+		const state = new UpdaterState();
+		await state.check(true, true);
+		expect(calls('update_apply')).toBe(0);
+	});
+
+	it('flushes workspace state before running the installer that may exit Windows', async () => {
+		invoke.mockResolvedValue(undefined);
+		const state = new UpdaterState();
+		state.phase = 'ready';
+		await state.restart();
+		expect(invoke).toHaveBeenCalledWith('update_apply');
+		expect(flush.mock.invocationCallOrder[0]).toBeLessThan(invoke.mock.invocationCallOrder[0]);
+		expect(invoke.mock.invocationCallOrder[0]).toBeLessThan(relaunch.mock.invocationCallOrder[0]);
+	});
+
+	it('keeps the process open when applying the update fails', async () => {
+		invoke.mockRejectedValue(new Error('installer failed'));
+		const state = new UpdaterState();
+		await state.restart();
+		expect(relaunch).not.toHaveBeenCalled();
+		expect(state.phase).toBe('error');
+		expect(state.error).toContain('installer failed');
+	});
+	it('does not install when saving the workspace fails', async () => {
+		flush.mockRejectedValue(new Error('disk full'));
+		const state = new UpdaterState();
+		state.phase = 'ready';
+		await state.restart();
+		expect(flush).toHaveBeenCalledWith(true);
+		expect(invoke).not.toHaveBeenCalled();
+		expect(relaunch).not.toHaveBeenCalled();
+		expect(state.error).toContain('disk full');
 	});
 });
 

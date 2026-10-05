@@ -165,3 +165,18 @@ describe('legacy migration', () => {
 		expect(migrateLegacy(store({}), 'ws')).toBeNull();
 	});
 });
+
+it('merges duplicate defaults while preserving saved chats, the active layout and named workspaces', () => {
+ const raw = {version: 1, active: 'b', workspaces: [
+  {id: 'a', name: 'default', isDefault: true, projects: [{id: 'p1', name: 'P', path: 'C:/Work/App', tabs: [{id: 't1', sid: 's1'}, {id: 't2', sid: 's2'}]}]},
+  {id: 'b', name: 'default', isDefault: true, layout: {root: 'active-layout'}, projects: [{id: 'p2', name: 'P', path: 'c:/work/app/', tabs: [{id: 'new-t1', sid: 's1'}, {id: 'draft'}]}]},
+  {id: 'c', name: 'my workspace', projects: [{id: 'p3', name: 'P', path: 'C:/Work/App'}]}
+ ]};
+ const result = parseWorkspacesFile(JSON.stringify(raw))!;
+ expect(result.active).toBe('b');
+ expect(result.workspaces.map(w => w.id)).toEqual(['b', 'c']);
+ expect(result.workspaces[0].projects).toHaveLength(1);
+ expect(result.workspaces[0].projects[0].tabs?.map(t => t.id)).toEqual(['new-t1', 'draft', 't2']);
+ expect(result.workspaces[0].layout).toEqual({root: 'active-layout'});
+ expect(parseWorkspacesFile(serializeWorkspaces(result))).toEqual(result);
+});

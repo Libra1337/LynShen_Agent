@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { refreshMonoizeCatalog } from '$lib/providers/monoize';
 	import { DaemonSync } from '$lib/daemonSync.svelte';
 	import { onMount, untrack } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
@@ -275,6 +276,7 @@
 	let showQuickOpen = $state(false);
 
 	function refreshAuth() {
+		loadProviders();
 		readAuthProviders()
 			.then((p) => (providers = p))
 			.catch(() => {});
@@ -283,9 +285,14 @@
 	// All configured providers (builtin + custom) with their models, so the in-chat
 	// model picker can list every provider's models — not just the active one's.
 	let providersList = $state<ProviderOption[]>([]);
+	let providerLoad = 0;
 	function loadProviders() {
+		const generation = ++providerLoad;
 		listProviders()
-			.then((bs) => {
+			.then(async (bs) => {
+				const auth = await readAuthProviders();
+				if (auth.includes('monoize')) await refreshMonoizeCatalog().catch(e => console.error('Model route refresh failed', e));
+				if (generation !== providerLoad) return;
 				let custom: ProviderOption[] = [];
 				try {
 					custom = JSON.parse(localStorage.getItem('lynshen-custom-providers') || '[]');
@@ -1374,6 +1381,14 @@
 					bind:section={settingsSection}
 					navWidth={sidebarWidth}
 					onAuthChange={refreshAuth}
+					onAccountLogout={() => {
+						showSettings = false;
+						showDesk = false;
+						showMarket = false;
+						modelSetup.open = false;
+						setupView = 'login';
+						showSetup = true;
+					}}
 					onMarket={() => {
 						closeSettings();
 						showMarket = true;
@@ -1431,7 +1446,7 @@
 	{/if}
 
 	<UpdatePrompt />
-	{#if showSetup && activeId}
+	{#if showSetup}
 		<Welcome
 			sessionId={activeId}
 			startAt={setupView}
