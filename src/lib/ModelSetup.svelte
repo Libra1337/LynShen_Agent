@@ -155,9 +155,13 @@
 			if (n > 0) overrides[m.id] = n;
 		}
 		const patch: Record<string, unknown> = { lynshen_models: chosen, context_window_overrides: overrides };
-		if (cfg.provider === 'lynshen') {
-			patch.models = chosen;
-			if (!chosen.some((m) => m.name === cfg.model)) patch.model = chosen[0].name;
+		if (cfg.provider) {
+			// The checked list becomes the active provider's model list — the
+			// composer menu reads it whatever the provider (lynshen or a keyed
+			// one like monoize); only when nothing was picked does the previous
+			// list stay.
+			if (chosen.length) patch.models = chosen;
+			if (chosen.length && !chosen.some((m) => m.name === cfg.model)) patch.model = chosen[0].name;
 		}
 		try {
 			await writeConfig(patch);
