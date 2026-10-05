@@ -3,7 +3,7 @@
 官网下载页为 `https://www.lynshen.org/download`。桌面更新优先访问
 `https://www.lynshen.org/v1/public/releases/desktop/latest.json`，连接失败时访问
 `https://api.lynshen.org/v1/public/releases/desktop/latest.json`。
-当前 GitHub 仓库为私有仓库，不能作为未登录客户端的公共更新源。
+GitHub 仓库现已公开；客户端仍以官网作为下载与更新源。
 构建和签名在 GitHub Actions 或本地完成，文件存储和下载由 Monoize 提供。
 
 ## 客户端行为
@@ -69,7 +69,7 @@ Tauri 客户端负责密码学验签；清单中的 SHA-256 供用户核验，�
 | --- | --- | --- |
 | Secret | `TAURI_SIGNING_PRIVATE_KEY` | 与内置公钥匹配的 Tauri 私钥 |
 | Secret | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 私钥密码 |
-| Secret | `LYNSHEN_CLI_TOKEN` | 只读访问私有 CLI 仓库和子模块 |
+| Secret | `LYNSHEN_CLI_TOKEN` | 可选；公开 CLI 仓库默认使用 github.token |
 | Secret | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD` | 可选 macOS 固定签名身份 |
 | Variable | `DESKTOP_PUBLIC_ORIGIN` | 默认 `https://www.lynshen.org` |
 | Variable | `DESKTOP_SSH_HOST`, `DESKTOP_SSH_USER` | 分发服务器和发布账号 |

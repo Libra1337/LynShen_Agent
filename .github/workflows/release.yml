@@ -7,8 +7,8 @@ name: Release
 # Repo secrets used:
 #   TAURI_SIGNING_PRIVATE_KEY(_PASSWORD) — updater artifact signing (required
 #     for auto-update; the matching pubkey lives in tauri.conf.json).
-#   LYNSHEN_CLI_TOKEN — a token that can clone the private LynShen-CLI repo,
-#     from which the sidecar engine is built (desktop + engine update together).
+#   LYNSHEN_CLI_TOKEN — optional clone token; the public CLI repo defaults
+#     to github.token (desktop + pinned sidecar engine update together).
 #   APPLE_CERTIFICATE(_PASSWORD) — optional; macOS keeps granted permissions
 #     across updates only while the signing identity stays the same.
 on:

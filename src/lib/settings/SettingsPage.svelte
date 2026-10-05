@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BrowserSignIn from '$lib/BrowserSignIn.svelte';
 	import ProviderSignIn from '$lib/ProviderSignIn.svelte';
+	import { refreshMonoizeCatalog } from '$lib/providers/monoize';
 	// The settings page: covers the content panel (session list + canvas stay
 	// mounted underneath) with a nav column on the left — grouped sections and
 	// a search over every row — and the selected section's page on the right.
@@ -623,6 +624,18 @@
 		onAuthChange?.();
 		onAccountLogout?.();
 	}
+	async function onMonoizeAuthorized(user: MonoizeUser) {
+		monoizeUser = user;
+		keyed = (await readAuthProviders()) ?? [];
+		loadBalances();
+		editing = null;
+		try {
+			await refreshMonoizeCatalog();
+			custom = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]');
+			if (cfg.provider === 'monoize') cfg.models = custom.find(p => p.id === 'monoize')?.models ?? [];
+		} catch (e) { monoizeModelsMsg = String(e); }
+		onAuthChange?.();
+	}
 
 	async function openMonoizeSquare() {
 		squareOpen = true;
@@ -1095,13 +1108,7 @@
 
 {#if editing === '__monoize__'}
 	<Modal title={t('settings.monoize.browserLogin')} width={440} onClose={() => (editing = null)}>
-		<BrowserSignIn autoStart onSuccess={async (user) => {
-			monoizeUser = user;
-			keyed = (await readAuthProviders()) ?? [];
-			loadBalances();
-			editing = null;
-			onAuthChange?.();
-		}} />
+		<BrowserSignIn autoStart onSuccess={onMonoizeAuthorized} />
 	</Modal>
 {/if}
 

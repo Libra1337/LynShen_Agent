@@ -92,7 +92,7 @@ export class WorkspaceStore {
 		return this.active!;
 	}
 
-	/** Replace the active workspace's saved projects (SessionStore.serialize). */
+	/** Preserve projects and selection when clients converge on a default ID. */
 	canonicalDefaultId(id: string) {
 		const ws = this.workspaces.find(w => w.isDefault);
 		if (!this.file || !ws || ws.id === id) return;
