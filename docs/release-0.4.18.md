@@ -11,16 +11,30 @@
 - 新增账户密钥专用模型目录接口，使用实际路由、定价及密钥绑定解析分组。
 - 模型广场、设置和聊天选择器显示模型及分组；请求仍使用原始模型 ID。
 - 更新安装继续使用 LynShen/Monoize 下载源、签名验证和安装前保存工作区。
-- CI 包含 macOS Apple Silicon、Intel、Windows、Linux；增加真实浏览器回归。
+- 本地准备的 CI 工作流包含 macOS Apple Silicon、Intel、Windows、Linux；增加真实浏览器回归。
 
 ## 验证
 
 Svelte 检查零错误。592 项前端单测通过。桌面 Rust 114 项单测及网关集成测试通过。
 浏览器回归通过：连续新项目、新会话、草稿不启动引擎、账户页打开授权、退出、API Key 文案及提供商 OAuth 入口。
 Monoize Linux 模型分组路由测试及 3 项设备授权测试通过。
+CLI 647 项库单测、8 项托管引擎集成及 11 项其他集成测试通过；clippy 通过。
+CLI 完整 Windows 测试仍有 11 项 daemon 集成失败，涉及 Unix 假进程脚本、命令及路径假设；不宣称完整套件通过。
 第三方账号最终授权需要用户在浏览器完成，未代替用户登录订阅账户。
 
 ## 发布
 
 此文件记录源代码改动；构建、CI 与线上部署状态以实际完成结果更新。
-GitHub 当前令牌缺少 workflow 权限，工作流推送被 GitHub 拒绝，等待补充授权。
+GitHub 当前令牌缺少 workflow 权限，新增工作流推送被 GitHub 拒绝，等待补充授权。
+已推送保留原有 CI 的代码分支，并建立草稿 PR：
+- Desktop: https://github.com/Libra1337/LynShen_Agent/pull/1
+- CLI: https://github.com/Libra1337/LynShen-CLI/pull/1
+
+Windows 安装包已在本地构建并验证文件与元数据签名：
+- 文件：`src-tauri/target/release/bundle/nsis/LynShen_0.4.18_x64-setup.exe`
+- SHA-256：`d1dc440c82c7191f942db747709532ff33341ecaedfb496969e24a3b9ac7dac2`
+- CLI 来源：`1a9baa20e314c8e809d9730e60e036a89bba071f`，从干净源码构建。
+
+macOS 新构建矩阵尚未运行，不宣称已有可下载 Mac 包。线上下载目录仍为 0.4.17，0.4.18 未发布到自动更新。
+Monoize 镜像 `desktop-0418-fe561f25` 已通过隔离检查。2026-10-05 20:07 UTC，两个公网域名的模型目录均返回 200，43 个模型中 34 个可用，可用项均带有分组。
+蓝绿切换仍保留旧实例，等待最后一条旧连接自然排空；没有强制终止连接。
