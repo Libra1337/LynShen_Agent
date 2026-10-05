@@ -9,7 +9,6 @@
 	import { t } from '$lib/i18n';
 	import { fmtBalance } from '$lib/money';
 	import Vendor from '$lib/Vendor.svelte';
-	import AccountPanel from '$lib/AccountPanel.svelte';
 	import ProviderBalance from '$lib/settings/ProviderBalance.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import TextField from '$lib/ui/TextField.svelte';
@@ -97,10 +96,10 @@
 			<span class="pcard-url">{#if provider.name}{provider.id} · {/if}{provider.base_url}</span>
 		</span>
 		<span class="pcard-right">
-			{#if provider.id === 'lynshen' && loggingIn && !authed}
-				<span class="bal wait"><span class="spin"></span> {t('settings.account.authorizing')}</span>
-			{:else if authed && provider.id === 'lynshen' && lynshenBal}
-				<span class="bal"><WalletIcon size={12} /> {fmtBalance(lynshenBal.balance)} {lynshenBal.currency ?? ''}</span>
+			{#if provider.id === 'lynshen' && monoizeUser && monoizeTotal}
+				<span class="bal"><WalletIcon size={12} /> {monoizeUser.username} · {fmtBalance(monoizeTotal.total_balance)} {monoizeTotal.currency}</span>
+			{:else if provider.id === 'lynshen' && !monoizeUser}
+				<span class="stat">{t('settings.account.notLoggedIn')}</span>
 			{:else if authed && provider.id === 'deepseek' && deepseekTotal}
 				<span class="bal"><WalletIcon size={12} /> {fmtBalance(deepseekTotal.total_balance)} {deepseekTotal.currency}</span>
 			{:else if provider.id === 'monoize' && monoizeUser && monoizeTotal}
@@ -114,7 +113,7 @@
 			{:else}
 				<span class="stat">{provider.id === 'lynshen' ? t('settings.account.notLoggedIn') : t('settings.account.notKeyed')}</span>
 			{/if}
-			{#if (provider.id === 'lynshen' || (provider.id === 'monoize' && !monoizeUser)) && !authed}
+			{#if (provider.id === 'lynshen' || (provider.id === 'monoize' && !monoizeUser)) && !authed && !monoizeUser}
 				<SignInIcon size={15} class="dimx" />
 			{:else}
 				<CaretDownIcon size={16} class="chev {open ? 'up' : ''}" />
@@ -125,13 +124,24 @@
 	{#if open}
 		<div class="pcard-body">
 			{#if provider.id === 'lynshen'}
-				<AccountPanel />
-				<div class="cardact">
-					{#if !isDefault}<Button variant="secondary" size="sm" onclick={() => onSetDefault(provider)}>{t('settings.account.setDefault')}</Button>{/if}
-					<Button size="sm" onclick={() => (modelSetup.open = true)}><ListChecksIcon size={13} /> {t('shell.modelSetup.manage')}</Button>
-					<Button variant="primary" size="sm" onclick={onLogin}><SignInIcon size={13} /> {t('settings.account.relogin')}</Button>
-					<Button variant="danger" size="sm" onclick={() => onLogout('lynshen')}><SignOutIcon size={13} /> {t('settings.account.logout')}</Button>
-				</div>
+				<!-- LynShen 账号卡：登录走 Monoize 网关（与 web 控制台同一套），
+				     旧的浏览器 OAuth 已废弃。 -->
+				{#if monoizeUser}
+					<ProviderBalance balance={monoizeBal} />
+					{#if monoizeModelsMsg}<p class="mmsg">{monoizeModelsMsg}</p>{/if}
+					<div class="cardact">
+						<Button size="sm" onclick={() => (modelSetup.open = true)}><ListChecksIcon size={13} /> {t('shell.modelSetup.manage')}</Button>
+						<Button size="sm" onclick={onOpenSquare}><ListChecksIcon size={13} /> {t('settings.monoize.square')}</Button>
+						<Button size="sm" onclick={onRefreshModels}><ArrowClockwiseIcon size={13} /> {t('settings.account.refreshModels')}</Button>
+						<Button variant="danger" size="sm" onclick={onMonoizeLogout}><SignOutIcon size={13} /> {t('settings.account.logout')}</Button>
+					</div>
+					<p class="mmsg">{t('settings.monoize.managedKey')}</p>
+				{:else}
+					<p class="mmsg">{t('settings.monoize.loginHint')}</p>
+					<div class="cardact">
+						<Button variant="primary" size="sm" onclick={onOpenMonoizeLogin}><SignInIcon size={13} /> {t('settings.monoize.loginRegister')}</Button>
+					</div>
+				{/if}
 			{:else if provider.id === 'monoize'}
 				{#if monoizeUser}
 					<ProviderBalance balance={monoizeBal} />
@@ -269,10 +279,6 @@
 		color: var(--ok);
 		font-variant-numeric: tabular-nums;
 	}
-	.bal.wait {
-		color: var(--dim);
-		font-weight: 500;
-	}
 	.defbadge {
 		display: inline-flex;
 		align-items: center;
@@ -316,14 +322,6 @@
 	.erow.end {
 		justify-content: flex-end;
 		gap: 8px;
-	}
-	.spin {
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
-		border: 2px solid var(--border);
-		border-top-color: var(--accent);
-		flex: none;
 	}
 	.ekey {
 		display: flex;

@@ -644,8 +644,10 @@
 	// (key-based) providers expand to reveal the key input. Logged-in cards expand
 	// to show details.
 	function cardClick(p: Provider, authed: boolean) {
-		if (p.id === 'lynshen' && !authed) {
-			if (!loggingIn) login();
+		// LynShen 账号卡的登录走 Monoize 网关表单（旧浏览器 OAuth 已废弃）。
+		if (p.id === 'lynshen' && !authed && !monoizeUser) {
+			monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false };
+			editing = '__monoize__';
 			return;
 		}
 		if (p.id === 'monoize' && !authed && !monoizeUser) {
@@ -878,7 +880,7 @@
 						{#each addedProviders as p (p.id)}
 							<ProviderAccountCard
 								provider={p}
-								authed={keyed.includes(p.id)}
+								authed={keyed.includes(p.id) || (p.id === 'lynshen' && !!monoizeUser)}
 								isDefault={cfg.provider === p.id}
 								open={editing === p.id}
 								{loggingIn}
