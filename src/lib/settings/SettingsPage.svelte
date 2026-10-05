@@ -227,12 +227,17 @@
 	const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 	const allProviders = $derived<Provider[]>([
-		...builtin.map((b) => ({ id: b.id, base_url: b.base_url, models: b.models, format: b.protocol, builtin: true })),
+		...builtin
+			// The builtin `lynshen` entry is the dead account gateway
+			// (api.lynshen.net); with no login there it is pure noise next
+			// to the monoize entry that serves the same models.
+			.filter((b) => b.id !== 'lynshen' || keyed.includes('lynshen'))
+			.map((b) => ({ id: b.id, base_url: b.base_url, models: b.models, format: b.protocol, builtin: true })),
 		...custom
 	]);
 	// Usable: has a key / login, or is a custom endpoint (which may need none).
 	const usable = (p: Provider) => keyed.includes(p.id) || !p.builtin;
-	// The page lists what the user has added (plus LynShen, the login entry, and
+	// The page lists what the user has added (plus the login entry and
 	// whatever is the default); the rest is offered by the add dialog.
 	const addedProviders = $derived(allProviders.filter((p) => usable(p) || p.id === 'lynshen' || p.id === cfg.provider));
 	const addable = $derived<CatalogProvider[]>([
@@ -378,6 +383,27 @@
 			custom = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]');
 		} catch {
 			custom = [];
+		}
+		// The gateway login provisions providers.monoize directly; without a
+		// stored entry the dropdowns and model groups would not offer it.
+		// Materialize it from the vendored catalog once, keyed and absent.
+		if (keyed.includes('monoize') && !custom.some((c) => c.id === 'monoize')) {
+			const entry = PROVIDER_CATALOG.providers.find((p) => p.id === 'monoize');
+			if (entry) {
+				custom = [
+					...custom,
+					{
+						id: entry.id,
+						name: entry.name,
+						base_url: entry.base_url,
+						format: entry.protocol,
+						models: entry.models.map((m) => ({ ...m })),
+						builtin: false,
+						source: 'catalog' as const
+					}
+				];
+				persistCustom();
+			}
 		}
 	});
 
