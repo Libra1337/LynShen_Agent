@@ -800,44 +800,33 @@
 					</SettingsSection>
 				{:else if current === 'account'}
 					{@render loginNotice()}
+					<!-- 账户区：登录/余额/模型广场全部走 Monoize 网关（LynShen Console），
+					     旧 LynShen 账号 OAuth 已废弃。 -->
 					<SettingsSection title={t('settings.page.lynshenAccount')}>
 						<SettingsRow
 							id="account-login"
-							title={lynshenAuthed ? t('settings.account.loggedIn') : t('settings.account.notLoggedIn')}
-							description={lynshenAuthed ? t('settings.page.lynshenLoggedInDesc') : t('settings.page.lynshenAccountDesc')}
+							title={monoizeUser ? t('settings.account.loggedIn') : t('settings.account.notLoggedIn')}
+							description={monoizeUser ? `${monoizeUser.username} · LynShen Console` : t('settings.page.lynshenAccountDesc')}
 						>
-							{#if lynshenAuthed}
-								<Button size="sm" onclick={login}><SignInIcon size={14} /> {t('settings.account.relogin')}</Button>
-								<Button variant="danger" size="sm" onclick={() => logout('lynshen')}><SignOutIcon size={14} /> {t('settings.account.logout')}</Button>
-							{:else if loggingIn}
-								<Button variant="primary" size="sm" disabled>{t('settings.account.authorizing')}</Button>
+							{#if monoizeUser}
+								<Button size="sm" onclick={() => { monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false }; editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.account.relogin')}</Button>
+								<Button variant="danger" size="sm" onclick={doMonoizeLogout}><SignOutIcon size={14} /> {t('settings.account.logout')}</Button>
 							{:else}
-								<Button variant="primary" size="sm" onclick={login}><SignInIcon size={14} /> {t('settings.page.login')}</Button>
+								<Button variant="primary" size="sm" onclick={() => { monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false }; editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.monoize.loginRegister')}</Button>
 							{/if}
 						</SettingsRow>
-						{#if lynshenAuthed}
-							<SettingsRow id="account-models" title={t('shell.modelSetup.manage')} description={t('settings.page.manageModelsDesc')}>
-								<Button size="sm" onclick={() => (modelSetup.open = true)}><ListChecksIcon size={14} /> {t('settings.page.manage')}</Button>
+						{#if monoizeUser}
+							<SettingsRow id="account-balance" title={t('settings.usage.balance')} description="https://www.lynshen.org">
+								<span>{monoizeTotal ? `${monoizeTotal.total_balance} ${monoizeTotal.currency}` : '—'}</span>
 							</SettingsRow>
-							<SettingsRow id="account-sync" title={t('settings.sync.title')} description={t('settings.sync.desc')}>
-								<span class="sync-state">
-									{cloudSync.error
-										? t('settings.sync.failed', { msg: cloudSync.error })
-										: cloudSync.lastSync
-											? t('settings.sync.at', { time: new Date(cloudSync.lastSync).toLocaleTimeString() })
-											: ''}
-								</span>
-								<Button size="sm" onclick={() => void cloudSync.sync()}>{t('settings.sync.now')}</Button>
+							<SettingsRow id="account-models" title={t('settings.monoize.square')} description={t('settings.monoize.squareHint')}>
+								<Button size="sm" onclick={openMonoizeSquare}><ListChecksIcon size={14} /> {t('settings.monoize.square')}</Button>
+							</SettingsRow>
+							<SettingsRow id="account-provider" title="Monoize" description={t('settings.monoize.managedKey')}>
+								<Button size="sm" onclick={() => (editing = 'monoize')}>{t('settings.page.manage')}</Button>
 							</SettingsRow>
 						{/if}
 					</SettingsSection>
-					{#if lynshenAuthed}
-						<SettingsSection>
-							<SettingsRow id="account-usage" stacked>
-								<AccountPanel />
-							</SettingsRow>
-						</SettingsSection>
-					{/if}
 				{:else if current === 'usage'}
 					<OverviewPanel />
 				{:else if current === 'voice'}
@@ -1543,10 +1532,5 @@
 		border-radius: var(--r-xs);
 		padding: 0 5px;
 		flex-shrink: 0;
-	}
-
-	.sync-state {
-		color: var(--dim);
-		font-size: var(--fs-xs);
 	}
 </style>

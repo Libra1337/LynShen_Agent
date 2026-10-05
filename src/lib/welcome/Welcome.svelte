@@ -248,19 +248,13 @@
 									<div class="row"><Button size="sm" onclick={() => openSettings('account')}>{t('setup.welcome.account.manage')}</Button></div>
 								{:else}
 									{#if configured}<div class="okline"><span class="okico"><KeyIcon size={18} /></span>{t('setup.welcome.account.byok')}</div>{/if}
-									<div class="mzform">
-										<Segmented value={mzMode} options={mzModeOpts} onChange={switchMzMode} />
-										<TextField bind:value={mzUsername} mono placeholder={t('settings.monoize.username')} />
-										<TextField bind:value={mzPassword} type="password" mono placeholder={t('settings.monoize.password')} />
-										<div class="row">
-											<Button variant="primary" size="sm" onclick={submitMonoize} disabled={mzBusy || !mzChecked}>
-												{#if mzBusy}<CircleNotchIcon size={14} class="spin" /> {t('settings.monoize.working')}{:else if mzMode === 'login'}<SignInIcon size={14} /> {t('settings.monoize.login')}{:else}<UserPlusIcon size={14} /> {t('settings.monoize.register')}{/if}
-											</Button>
-											<Button variant="ghost" size="sm" onclick={() => openSettings('providers')}><KeyIcon size={14} /> {t('setup.welcome.login.apiKey')}</Button>
-										</div>
-									</div>
 									<p class="hint">{t('settings.monoize.loginHint')}</p>
-									{#if mzError}<div class="err"><Notice onDismiss={() => (mzError = '')}>{mzError}</Notice></div>{/if}
+									<div class="row">
+										<Button variant="primary" size="sm" onclick={() => { mzTouched = true; view = 'login'; }}>
+											<SignInIcon size={14} /> {t('settings.monoize.loginRegister')}
+										</Button>
+										<Button variant="ghost" size="sm" onclick={() => openSettings('providers')}><KeyIcon size={14} /> {t('setup.welcome.login.apiKey')}</Button>
+									</div>
 								{/if}
 							{:else if step === 'agent'}
 								<AgentStep bind:selected={backend} bind:ready={agentReady} onOpenSettings={() => openSettings('acp')} />
@@ -365,13 +359,6 @@
 	}
 	.err {
 		margin-top: 12px;
-	}
-	.mzform {
-		display: flex;
-		flex-direction: column;
-		align-items: stretch;
-		gap: 10px;
-		max-width: 360px;
 	}
 	.later {
 		display: inline-flex;

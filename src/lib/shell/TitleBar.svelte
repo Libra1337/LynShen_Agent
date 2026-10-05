@@ -20,6 +20,7 @@
 		resizing = false,
 		sidebarOpen,
 		onToggleSidebar,
+		showToggle = true,
 		title = '',
 		subtitle = '',
 		addOptions = [],
@@ -32,6 +33,8 @@
 		resizing?: boolean;
 		sidebarOpen: boolean;
 		onToggleSidebar: () => void;
+		/** Hide the toggle on full-window surfaces (the welcome screen). */
+		showToggle?: boolean;
 		title?: string;
 		subtitle?: string;
 		/** Panels that can be opened next to the focused one. */
@@ -64,13 +67,15 @@
 
 <header class="titlebar" data-tauri-drag-region>
 	<div class="lead" class:resizing style:width="{leftWidth}px" data-tauri-drag-region>
-		<button
-			class="tb-btn"
-			title={withShortcut(t('shell.toggleSidebar'), 'sidebar')}
-			aria-label={t('shell.toggleSidebar')}
-			aria-pressed={sidebarOpen}
-			onclick={onToggleSidebar}><SidebarSimpleIcon size={18} /></button
-		>
+		{#if showToggle}
+			<button
+				class="tb-btn"
+				title={withShortcut(t('shell.toggleSidebar'), 'sidebar')}
+				aria-label={t('shell.toggleSidebar')}
+				aria-pressed={sidebarOpen}
+				onclick={onToggleSidebar}><SidebarSimpleIcon size={18} /></button
+			>
+		{/if}
 	</div>
 	<div class="title" data-tauri-drag-region>
 		{#if title}<span class="t">{title}</span>{/if}

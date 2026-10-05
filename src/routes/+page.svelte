@@ -1192,6 +1192,7 @@
 		resizing={sbResizing}
 		sidebarOpen={showSidebar}
 		onToggleSidebar={toggleSidebar}
+		showToggle={!showSetup}
 		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : showSetup ? 'LynShen' : (active?.chat.title ?? '')}
 		subtitle={showSettings || showDesk || showSetup ? '' : (activeProject?.name ?? '')}
 		addOptions={showSettings || showDesk || showSetup ? [] : addOptions}
@@ -1222,7 +1223,7 @@
 			onRename={(id, name) => workspaces.rename(id, name)}
 			onChrome={(id, chrome) => workspaces.setChrome(id, chrome)}
 			onDelete={deleteWorkspace}
-			loggedIn={providers.includes('lynshen')}
+			loggedIn={providers.includes('monoize') || providers.includes('lynshen')}
 			updateAvailable={updater.available}
 			settingsOpen={showSettings}
 			onManageAccount={() => openSettings('account')}
@@ -1435,7 +1436,7 @@
 			sessionId={activeId}
 			startAt={setupView}
 			{chat}
-			loggedIn={providers.includes('lynshen')}
+			loggedIn={providers.includes('monoize') || providers.includes('lynshen')}
 			configured={providers.length > 0}
 			onRefreshAuth={refreshAuth}
 			onOpenSettings={(section) => {

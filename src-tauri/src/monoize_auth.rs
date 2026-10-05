@@ -271,6 +271,24 @@ fn provision_desktop_key(session_token: &str) -> Result<(String, String), String
         })
         .unwrap_or_default();
 
+    // 分组歧义：同一模型出现在多个分组时，网关要求为每个歧义模型选定
+    // 分组——取第一个分组绑定。
+    let model_conflicts: Value =
+        api_call("GET", "/api/dashboard/tokens/model-conflicts", Some(&bearer), None)
+            .map_err(|e| format!("list model conflicts failed: {e}"))?;
+    let model_bindings: Vec<Value> = model_conflicts
+        .as_array()
+        .map(|rows| {
+            rows.iter()
+                .filter_map(|row| {
+                    let group = row["options"].get(0)?["group_id"].as_str()?;
+                    let model = row["model"].as_str()?;
+                    Some(json!({ "model": model, "group_id": group }))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
     // 逐分组拉模型，只为跨分组同名模型生成后缀重写规则（上限 32 条）。
     let groups: Value = api_call("GET", "/api/dashboard/groups", Some(&bearer), None)
         .map_err(|e| format!("list groups failed: {e}"))?;
@@ -322,6 +340,7 @@ fn provision_desktop_key(session_token: &str) -> Result<(String, String), String
         Some(json!({
             "name": KEY_NAME,
             "channel_bindings": channel_bindings,
+            "model_bindings": model_bindings,
             "model_redirects": model_redirects,
         })),
     )?;
