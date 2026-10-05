@@ -232,7 +232,8 @@ fn regex_escape(s: &str) -> String {
 /// 规则（网关的 replace 不支持捕获组，每把 key 上限 32 条）。
 /// 返回 (key_id, key)。
 fn provision_desktop_key(session_token: &str) -> Result<(String, String), String> {
-    let bearer = format!("Bearer {session_token}");
+    // api_call 内部统一加 "Bearer " 前缀，这里传裸 token。
+    let bearer = session_token.to_string();
 
     let listed: Value = api_call("GET", "/api/dashboard/tokens", Some(&bearer), None)
         .map_err(|e| format!("list tokens failed: {e}"))?;
@@ -470,4 +471,59 @@ pub fn monoize_marketplace() -> Result<Value, String> {
     Ok(json!(Value::Array(
         by_model.into_values().collect::<Vec<_>>()
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 对真实网关跑完整登录链路（与前端 invoke 的是同一批函数）：
+    /// PoW 验证码 → 登录 → 自动建 key（含歧义绑定）→ key 级接口 → 登出吊销。
+    /// 依赖外网与网关在线；跑完即清理，不留会话与 key。
+    #[test]
+    fn full_login_roundtrip_against_live_gateway() {
+        // 注册（若已存在则登录）一个一次性账号。
+        let username = format!("mztest{}", std::process::id() % 100000);
+        let password = "LynShenDesk-Test-2026";
+        let outcome = register_or_login(
+            "/api/dashboard/auth/register",
+            username.clone(),
+            password.to_string(),
+        )
+        .or_else(|_| {
+            register_or_login(
+                "/api/dashboard/auth/login",
+                username.clone(),
+                password.to_string(),
+            )
+        })
+        .expect("register or login");
+        assert!(outcome["user"]["username"].as_str() == Some(username.as_str()));
+
+        // 会话可查。
+        let session = current_session().expect("session read").expect("logged in");
+        assert_eq!(session["user"]["username"].as_str(), Some(username.as_str()));
+
+        // 登录流程应已把仅客户端 key 写进 auth.json 的 providers.monoize。
+        let key = crate::read_auth()["providers"]["monoize"]
+            .as_str()
+            .expect("providers.monoize stored")
+            .to_string();
+        assert!(key.starts_with("sk-"));
+
+        // key 级接口（走同一条容灾请求层）。
+        let balance = gateway_key_get("/user/balance").expect("balance via key");
+        assert!(balance["balance_infos"].is_array());
+        let models = gateway_key_get("/v1/models").expect("models via key");
+        assert!(models["data"].as_array().map(|a| !a.is_empty()).unwrap_or(false));
+
+        // 模型广场（会话级，服务端按分组过滤）。
+        let square = monoize_marketplace().expect("marketplace");
+        assert!(square.as_array().map(|a| !a.is_empty()).unwrap_or(false));
+
+        // 登出：网关侧删 key、清本地。
+        monoize_logout().expect("logout");
+        assert!(read_session().get("token").is_none());
+        assert!(crate::read_auth()["providers"]["monoize"].is_null());
+    }
 }
