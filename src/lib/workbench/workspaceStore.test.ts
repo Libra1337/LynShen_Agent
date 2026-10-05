@@ -74,3 +74,16 @@ describe('WorkspaceStore chrome', () => {
 		expect(store.workspaces[0].icon).toBeUndefined();
 	});
 });
+
+it('loads once even when startup callers overlap and backs up duplicate defaults before saving', async () => {
+ const {appDataRead, appDataWrite} = await import('$lib/protocol');
+ const raw = JSON.stringify({version: 1, active: 'b', workspaces: [{id:'a',name:'default',isDefault:true,projects:[]},{id:'b',name:'default',isDefault:true,projects:[]}]});
+ vi.mocked(appDataRead).mockResolvedValueOnce(raw);
+ const store = new WorkspaceStore();
+ const [a, b] = await Promise.all([store.load('default'), store.load('default')]);
+ expect(a.id).toBe(b.id);
+ expect(appDataRead).toHaveBeenCalledOnce();
+ expect(appDataWrite).toHaveBeenCalledWith('workspaces-before-default-merge.json', raw);
+ await store.flush();
+ expect(JSON.parse(vi.mocked(appDataWrite).mock.calls.at(-1)![1]).workspaces).toHaveLength(1);
+});

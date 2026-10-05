@@ -15,10 +15,11 @@ mod backend;
 mod browser;
 mod capture;
 mod claude_history;
-mod native_import;
 mod installer;
-mod plugins;
 mod monoize_auth;
+mod native_import;
+mod plugins;
+mod provider_auth;
 mod secrets;
 mod shell_env;
 mod tool_switch;
@@ -56,7 +57,18 @@ fn resolve_cwd() -> PathBuf {
     if let Ok(path) = std::env::var("LYNSHEN_CWD") {
         return PathBuf::from(path);
     }
-    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    #[cfg(windows)]
+    if let Ok(windows) = std::env::var("WINDIR") {
+        let key = cwd.to_string_lossy().replace('\\', "/").to_lowercase();
+        let system = windows.replace('\\', "/").to_lowercase();
+        if key == system || key.starts_with(&format!("{system}/")) {
+            if let Ok(home) = std::env::var("USERPROFILE") {
+                return PathBuf::from(home);
+            }
+        }
+    }
+    cwd
 }
 
 /// After canonicalization: is `path` inside `root`, or inside `root`'s
@@ -265,6 +277,7 @@ fn ensure_daemon(bin_override: Option<&str>, env: &[(String, String)]) -> Result
 }
 
 /// Whether this app run already checked the daemon for staleness.
+#[cfg(unix)]
 static DAEMON_CHECKED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Why the daemon listening now should be replaced, if it should: its program
@@ -319,6 +332,7 @@ fn stale_daemon() -> Option<(i32, String)> {
 }
 
 /// `ps -o etime` ("[[dd-]hh:]mm:ss") as a duration.
+#[cfg(any(unix, test))]
 fn parse_etime(text: &str) -> Option<std::time::Duration> {
     let (days, clock) = match text.trim().split_once('-') {
         Some((d, rest)) => (d.parse::<u64>().ok()?, rest),
@@ -334,12 +348,14 @@ fn parse_etime(text: &str) -> Option<std::time::Duration> {
 /// Replace a stale daemon (see `stale_daemon`) once per app run: SIGTERM lets
 /// it end its tool commands and exit; a fresh one starts from the current
 /// program. Hosted sessions reopen from their saved state.
+#[cfg(unix)]
 fn replace_stale_daemon() {
     if DAEMON_CHECKED.swap(true, std::sync::atomic::Ordering::SeqCst) {
         return;
     }
     // A release build compares versions with the daemon instead and lets it
     // restart once idle (daemon.ts); this check is for development builds.
+    #[cfg(unix)]
     if app_cli::path().is_some() {
         return;
     }
@@ -373,6 +389,7 @@ fn daemon_endpoint(
         Some(env) => backend::validate_env(env)?,
         None => Vec::new(),
     };
+    #[cfg(unix)]
     replace_stale_daemon();
     ensure_daemon(bin_override.as_deref(), &env)?;
     let path = lynshen_dir().join("daemon").join("token");
@@ -658,6 +675,9 @@ pub(crate) fn remove_provider_credential(provider: String) -> Result<(), String>
     if let Some(map) = current.get_mut("providers").and_then(|v| v.as_object_mut()) {
         map.remove(&provider);
     }
+    if let Some(map) = current.get_mut("oauth").and_then(|v| v.as_object_mut()) {
+        map.remove(&provider);
+    }
     write_auth(&mut current)
 }
 
@@ -679,7 +699,9 @@ type LynShenSession = (String, String, u64, Option<std::time::SystemTime>);
 
 fn lynshen_session_cache() -> std::sync::MutexGuard<'static, Option<LynShenSession>> {
     static CACHE: Mutex<Option<LynShenSession>> = Mutex::new(None);
-    CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    CACHE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// The LynShen gateway URL and an access token, from `lynshen token` (the
@@ -777,9 +799,8 @@ fn fetch_account_info() -> Result<serde_json::Value, String> {
 fn fetch_lynshen_models() -> Result<serde_json::Value, String> {
     match lynshen_get("/v1/models") {
         Ok(v) => Ok(v),
-        Err(cli_error) => monoize_auth::gateway_key_get("/v1/models").map_err(|key_error| {
-            format!("lynshen token: {cli_error} | monoize key: {key_error}")
-        }),
+        Err(cli_error) => monoize_auth::gateway_key_get("/api/desktop/oauth/models")
+            .map_err(|key_error| format!("lynshen token: {cli_error} | monoize key: {key_error}")),
     }
 }
 
@@ -824,7 +845,11 @@ fn fetch_cloud_settings() -> Result<serde_json::Value, String> {
 /// Saves synced settings (`settings`: key → value, null removes).
 #[tauri::command(async)]
 fn put_cloud_settings(settings: serde_json::Value) -> Result<serde_json::Value, String> {
-    lynshen_send("PUT", "/v1/oauth/settings", Some(&serde_json::json!({ "settings": settings })))
+    lynshen_send(
+        "PUT",
+        "/v1/oauth/settings",
+        Some(&serde_json::json!({ "settings": settings })),
+    )
 }
 
 /// The end of the engine's and the daemon's logs, for a bug report (the
@@ -911,7 +936,7 @@ fn fetch_monoize_balance() -> Result<serde_json::Value, String> {
 /// Monoize 网关当前可调用的模型（GET /v1/models），用于在设置里刷新模型列表。
 #[tauri::command(async)]
 fn fetch_monoize_models() -> Result<serde_json::Value, String> {
-    monoize_auth::gateway_key_get("/v1/models")
+    monoize_auth::gateway_key_get("/api/desktop/oauth/models")
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -2721,7 +2746,14 @@ fn git_checkpoint_capture(cwd: String) -> Result<String, String> {
         git_plumb(
             &dir,
             None,
-            &["commit-tree", &tree, "-p", &head, "-m", "lynshen-checkpoint"],
+            &[
+                "commit-tree",
+                &tree,
+                "-p",
+                &head,
+                "-m",
+                "lynshen-checkpoint",
+            ],
         )?
     } else {
         git_plumb(
@@ -3199,6 +3231,9 @@ pub fn run() {
             read_auth_providers,
             set_auth_key,
             remove_auth_key,
+            provider_auth::provider_oauth_start,
+            provider_auth::provider_oauth_poll,
+            provider_auth::provider_oauth_cancel,
             fetch_account_info,
             fetch_usage,
             fetch_agent_usage_summary,
@@ -3213,8 +3248,9 @@ pub fn run() {
             fetch_deepseek_balance,
             fetch_monoize_balance,
             fetch_monoize_models,
-            monoize_auth::monoize_register,
-            monoize_auth::monoize_login,
+            monoize_auth::monoize_oauth_start,
+            monoize_auth::monoize_oauth_poll,
+            monoize_auth::monoize_oauth_cancel,
             monoize_auth::monoize_logout,
             monoize_auth::monoize_session,
             monoize_auth::monoize_marketplace,
@@ -3247,6 +3283,7 @@ pub fn run() {
             app_update::update_check,
             #[cfg(desktop)]
             app_update::update_install,
+            app_update::update_apply,
             #[cfg(desktop)]
             app_update::update_policy,
             native_import::import_native_session,
@@ -3277,7 +3314,9 @@ pub fn run() {
             }
             // A restart (an update's relaunch) cannot be held; the updater saves first.
             if let tauri::RunEvent::ExitRequested { api, code, .. } = &_event {
-                if *code != Some(tauri::RESTART_EXIT_CODE) && !QUITTING.load(std::sync::atomic::Ordering::SeqCst) {
+                if *code != Some(tauri::RESTART_EXIT_CODE)
+                    && !QUITTING.load(std::sync::atomic::Ordering::SeqCst)
+                {
                     api.prevent_exit();
                     begin_quit(_app);
                 }

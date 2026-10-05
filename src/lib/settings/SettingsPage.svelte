@@ -1,4 +1,7 @@
 <script lang="ts">
+	import BrowserSignIn from '$lib/BrowserSignIn.svelte';
+	import ProviderSignIn from '$lib/ProviderSignIn.svelte';
+	import { refreshMonoizeCatalog } from '$lib/providers/monoize';
 	// The settings page: covers the content panel (session list + canvas stay
 	// mounted underneath) with a nav column on the left — grouped sections and
 	// a search over every row — and the selected section's page on the right.
@@ -37,8 +40,6 @@
 		fetchDeepseekBalance,
 		fetchMonoizeBalance,
 		fetchMonoizeModels,
-		monoizeRegister,
-		monoizeLogin,
 		monoizeLogout,
 		monoizeSession,
 		monoizeMarketplace,
@@ -94,6 +95,7 @@
 		navWidth,
 		onClose,
 		onAuthChange,
+		onAccountLogout,
 		onMarket,
 		onFeedback
 	}: {
@@ -107,6 +109,7 @@
 		navWidth: number;
 		onClose: () => void;
 		onAuthChange?: () => void;
+		onAccountLogout?: () => void;
 		/** Open the skill marketplace (closes the settings page). */
 		onMarket?: () => void;
 		/** Open 反馈问题. */
@@ -183,6 +186,7 @@
 	// ---------- engine config + providers ----------
 	interface ModelCfg {
 		name: string;
+		display_name?: string | null;
 		context_window?: number;
 		max_output_tokens?: number;
 		reasoning_efforts?: string[];
@@ -255,7 +259,7 @@
 		...PROVIDER_CATALOG.providers.filter((entry) => !allProviders.some((provider) => provider.id === entry.id))
 	]);
 	const providerOpts = $derived(allProviders.filter(usable).map((p) => ({ value: p.id, label: p.name ?? cap(p.id) })));
-	const modelOpts = $derived(models.map((m) => ({ value: m.name, label: m.name, ...m })));
+	const modelOpts = $derived(models.map((m) => ({ value: m.name, label: m.display_name || m.name, ...m })));
 	// Empty = the main model (the engine's `Config::title`).
 	const titleModelOpts = $derived([{ value: '', label: t('settings.behavior.followMainModel') }, ...modelOpts]);
 	const effortOpts = $derived(efforts.map((e) => ({ value: e, label: cap(e) })));
@@ -265,7 +269,7 @@
 		allProviders.flatMap((p) =>
 			p.models.map((m) => ({
 				value: `${p.id}::${m.name}`,
-				label: m.name,
+				label: m.display_name || m.name,
 				provider: p.id,
 				group: p.id === 'lynshen' ? t('settings.behavior.groupLynShen') : t('settings.behavior.groupByok'),
 				context_window: m.context_window,
@@ -405,6 +409,7 @@
 				persistCustom();
 			}
 		}
+		if (keyed.includes('monoize')) await refreshMonoizeModels();
 	});
 
 	function selectProvider(p: Provider) {
@@ -574,9 +579,11 @@
 				return;
 			}
 			const known = new Map(entry.models.map((m) => [m.name, m]));
-			entry.models = list.map((m) => known.get(m.id) ?? { name: m.id });
+			entry.models = list.filter(m => !m.routing_status || m.routing_status === 'ready').map((m) => ({ ...known.get(m.id), name: m.id, display_name: monoizeModelEntries({ model_id: m.id, groups: m.groups }).join(' / ') }));
 			custom = [...custom];
 			persistCustom();
+			if (cfg.provider === 'monoize') cfg.models = entry.models;
+			onAuthChange?.();
 			monoizeModelsMsg = t('settings.account.refreshed', { count: entry.models.length });
 		} catch (e) {
 			monoizeModelsMsg = String(e);
@@ -587,13 +594,7 @@
 	// 登录成功后由 Rust 侧自动创建仅客户端使用的 key（providers.monoize），
 	// 界面不展示也不可复制；退出登录时在网关侧吊销。
 	let monoizeUser = $state<MonoizeUser | null>(null);
-	let monoizeForm = $state<{ mode: 'login' | 'register'; username: string; password: string; error: string; busy: boolean }>({
-		mode: 'login',
-		username: '',
-		password: '',
-		error: '',
-		busy: false
-	});
+	let monoizeLogoutError = $state('');
 	let squareOpen = $state(false);
 	let squareModels = $state<MonoizeMarketplaceModel[] | null>(null);
 	let squareBusy = $state(false);
@@ -608,38 +609,32 @@
 		}
 	}
 
-	async function doMonoizeAuth() {
-		if (monoizeForm.busy) return;
-		if (!monoizeForm.username.trim() || !monoizeForm.password) {
-			monoizeForm.error = t('settings.monoize.needCredentials');
-			return;
-		}
-		monoizeForm.busy = true;
-		monoizeForm.error = '';
-		try {
-			const r =
-				monoizeForm.mode === 'login'
-					? await monoizeLogin(monoizeForm.username.trim(), monoizeForm.password)
-					: await monoizeRegister(monoizeForm.username.trim(), monoizeForm.password);
-			monoizeUser = r.user;
-			keyed = (await readAuthProviders()) ?? [];
-			loadBalances();
-			editing = null;
-			monoizeForm = { ...monoizeForm, password: '', busy: false };
-		} catch (e) {
-			monoizeForm = { ...monoizeForm, error: String(e), busy: false };
-		}
-	}
-
 	async function doMonoizeLogout() {
 		try {
 			await monoizeLogout();
 		} catch {
-			/* 网关不可达也要清掉本地 */
+			monoizeLogoutError = t('settings.monoize.revokeFailed');
+			return;
 		}
+		monoizeLogoutError = '';
 		monoizeUser = null;
+		squareModels = null;
 		keyed = (await readAuthProviders()) ?? [];
 		loadBalances();
+		onAuthChange?.();
+		onAccountLogout?.();
+	}
+	async function onMonoizeAuthorized(user: MonoizeUser) {
+		monoizeUser = user;
+		keyed = (await readAuthProviders()) ?? [];
+		loadBalances();
+		editing = null;
+		try {
+			await refreshMonoizeCatalog();
+			custom = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]');
+			if (cfg.provider === 'monoize') cfg.models = custom.find(p => p.id === 'monoize')?.models ?? [];
+		} catch (e) { monoizeModelsMsg = String(e); }
+		onAuthChange?.();
 	}
 
 	async function openMonoizeSquare() {
@@ -659,7 +654,7 @@
 	}
 
 	// 把模型广场的分组内模型同步为 provider 的模型列表（保留已有的窗口/efforts）。
-	// 跨分组同名模型展开为多条 `模型@分组`；网关侧重写规则会剥掉 @后缀。
+	// Display labels never change the model ID sent to the gateway.
 	async function syncSquareModels() {
 		if (!squareModels?.length) return;
 		const entry = custom.find((c) => c.id === 'monoize');
@@ -668,17 +663,13 @@
 			return;
 		}
 		const known = new Map(entry.models.map((m) => [m.name, m]));
-		entry.models = squareModels.flatMap((m) =>
-			monoizeModelEntries(m).map((name) => {
-				const existing = known.get(name) ?? known.get(m.model_id);
-				if (existing && known.has(name)) return existing;
-				return {
-					name,
-					...(m.max_input_tokens ? { context_window: m.max_input_tokens } : {}),
-					...(m.max_output_tokens ? { max_output_tokens: m.max_output_tokens } : {})
-				};
-			})
-		);
+		entry.models = squareModels.filter(m => !m.routing_status || m.routing_status === 'ready').map(m => ({
+			...known.get(m.model_id),
+			name: m.model_id,
+			display_name: monoizeModelEntries(m).join(' / '),
+			...(m.max_input_tokens ? { context_window: m.max_input_tokens } : {}),
+			...(m.max_output_tokens ? { max_output_tokens: m.max_output_tokens } : {})
+		}));
 		custom = [...custom];
 		persistCustom();
 		squareSyncMsg = t('settings.account.refreshed', { count: entry.models.length });
@@ -690,12 +681,10 @@
 	function cardClick(p: Provider, authed: boolean) {
 		// LynShen 账号卡的登录走 Monoize 网关表单（旧浏览器 OAuth 已废弃）。
 		if (p.id === 'lynshen' && !authed && !monoizeUser) {
-			monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false };
 			editing = '__monoize__';
 			return;
 		}
 		if (p.id === 'monoize' && !authed && !monoizeUser) {
-			monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false };
 			editing = '__monoize__';
 			return;
 		}
@@ -853,16 +842,17 @@
 							description={monoizeUser ? `${monoizeUser.username} · LynShen Console` : t('settings.page.lynshenAccountDesc')}
 						>
 							{#if monoizeUser}
-								<Button size="sm" onclick={() => { monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false }; editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.account.relogin')}</Button>
+								<Button size="sm" onclick={() => { editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.account.relogin')}</Button>
 								<Button variant="danger" size="sm" onclick={doMonoizeLogout}><SignOutIcon size={14} /> {t('settings.account.logout')}</Button>
 							{:else}
-								<Button variant="primary" size="sm" onclick={() => { monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false }; editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.monoize.loginRegister')}</Button>
+								<Button variant="primary" size="sm" onclick={() => { editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.monoize.loginRegister')}</Button>
 							{/if}
 						</SettingsRow>
 						{#if monoizeUser}
 							<SettingsRow id="account-balance" title={t('settings.usage.balance')} description="https://www.lynshen.org">
 								<span>{monoizeTotal ? `${monoizeTotal.total_balance} ${monoizeTotal.currency}` : '—'}</span>
 							</SettingsRow>
+							{#if monoizeLogoutError}<p role="alert" class="mferr">{monoizeLogoutError}</p>{/if}
 							<SettingsRow id="account-models" title={t('settings.monoize.square')} description={t('settings.monoize.squareHint')}>
 								<Button size="sm" onclick={openMonoizeSquare}><ListChecksIcon size={14} /> {t('settings.monoize.square')}</Button>
 							</SettingsRow>
@@ -928,13 +918,13 @@
 								{cap}
 								onCardClick={cardClick}
 								onLogin={login}
+								onAuthChange={async () => { keyed = await readAuthProviders(); onAuthChange?.(); }}
 								onLogout={logout}
 								onSaveKey={saveKey}
 								onSetDefault={selectProvider}
 								onDelete={deleteProvider}
 								onRefreshModels={refreshMonoizeModels}
 								onOpenMonoizeLogin={() => {
-									monoizeForm = { mode: 'login', username: '', password: '', error: '', busy: false };
 									editing = '__monoize__';
 								}}
 								onMonoizeLogout={doMonoizeLogout}
@@ -961,6 +951,9 @@
 											<span class="keyurl">{keyTarget.base_url}</span>
 										</span>
 									</div>
+									{#if ['openai', 'openai-codex', 'anthropic'].includes(keyTarget.id)}
+										<ProviderSignIn provider={keyTarget.id === 'openai' ? 'openai-codex' : keyTarget.id} onSuccess={async () => { keyed = await readAuthProviders(); editing = null; onAuthChange?.(); }} />
+									{/if}
 									<TextField bind:value={keyInput} type="password" mono placeholder={t('settings.account.keyPlaceholder', { id: keyTarget.id })} />
 									<div class="keyfoot">
 										<Button variant="ghost" size="sm" onclick={() => (editing = '__catalog__')}>{t('settings.page.back')}</Button>
@@ -984,31 +977,7 @@
 							{/if}
 						</Modal>
 					{/if}
-					{#if editing === '__monoize__'}
-						<Modal title={monoizeForm.mode === 'login' ? t('settings.monoize.loginTitle') : t('settings.monoize.registerTitle')} width={440} padded={false} onClose={() => (editing = null)}>
-							<div class="keystep">
-								<div class="keyhead">
-									<span class="tile"><Vendor provider="monoize" size={18} /></span>
-									<span class="keytxt">
-										<span class="keyname">{t('settings.monoize.account')}</span>
-										<span class="keyurl">https://www.lynshen.org</span>
-									</span>
-								</div>
-								<TextField bind:value={monoizeForm.username} mono placeholder={t('settings.monoize.username')} />
-								<TextField bind:value={monoizeForm.password} type="password" mono placeholder={t('settings.monoize.password')} />
-								{#if monoizeForm.error}<p class="mferr">{monoizeForm.error}</p>{/if}
-								<p class="mfhint">{t('settings.monoize.keyHint')}</p>
-								<div class="keyfoot">
-									<Button variant="ghost" size="sm" onclick={() => (monoizeForm = { ...monoizeForm, mode: monoizeForm.mode === 'login' ? 'register' : 'login', error: '' })}>
-										{monoizeForm.mode === 'login' ? t('settings.monoize.toRegister') : t('settings.monoize.toLogin')}
-									</Button>
-									<Button variant="primary" size="sm" disabled={monoizeForm.busy} onclick={doMonoizeAuth}>
-										{monoizeForm.busy ? t('settings.monoize.working') : monoizeForm.mode === 'login' ? t('settings.monoize.login') : t('settings.monoize.register')}
-									</Button>
-								</div>
-							</div>
-						</Modal>
-					{/if}
+
 					{#if squareOpen}
 						<Modal title={t('settings.monoize.squareTitle')} width={620} padded={false} onClose={() => (squareOpen = false)}>
 							<div class="square">
@@ -1136,6 +1105,12 @@
 		</div>
 	{/key}
 </div>
+
+{#if editing === '__monoize__'}
+	<Modal title={t('settings.monoize.browserLogin')} width={440} onClose={() => (editing = null)}>
+		<BrowserSignIn autoStart onSuccess={onMonoizeAuthorized} />
+	</Modal>
+{/if}
 
 <style>
 	.stat-preview {

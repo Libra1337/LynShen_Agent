@@ -136,7 +136,7 @@
 
 	let page = $state<'main' | 'models'>('main');
 	const activeRow = $derived(rows.find((r) => r.active));
-	const modelName = $derived(chat.modelLabel || chat.model || BACKEND_LABELS[chat.backendId]);
+	const modelName = $derived(rows.find(row => row.active)?.label || chat.modelLabel || chat.model || BACKEND_LABELS[chat.backendId]);
 	// On the first page the list's keys (arrows, Enter) open the list instead
 	// of picking a row nobody can see. Capture phase, ahead of the pane.
 	function onKeyCapture(e: KeyboardEvent) {

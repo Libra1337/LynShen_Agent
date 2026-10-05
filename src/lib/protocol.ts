@@ -1,3 +1,4 @@
+import { t } from '$lib/i18n';
 import { invoke } from '@tauri-apps/api/core';
 import type { McpServerEntry } from './mcp';
 import { DaemonClient, type DaemonEndpoint, type EngineSpec, type SocketLike } from './daemon';
@@ -354,7 +355,7 @@ export function fetchDeepseekBalance(): Promise<DeepseekBalance> {
 export function fetchMonoizeBalance(): Promise<DeepseekBalance> {
 	return invoke('fetch_monoize_balance');
 }
-export type MonoizeModel = { id: string; owned_by?: string };
+export type MonoizeModel = { id: string; owned_by?: string; groups?: string[]; routing_status?: string };
 export async function fetchMonoizeModels(): Promise<MonoizeModel[]> {
 	const v = await invoke<{ data?: MonoizeModel[] }>('fetch_monoize_models');
 	return Array.isArray(v.data) ? v.data : [];
@@ -369,12 +370,6 @@ export type MonoizeUser = {
 	balance_usd?: string;
 	balance_unlimited?: boolean;
 };
-export async function monoizeRegister(username: string, password: string): Promise<{ user: MonoizeUser }> {
-	return invoke('monoize_register', { username, password });
-}
-export async function monoizeLogin(username: string, password: string): Promise<{ user: MonoizeUser }> {
-	return invoke('monoize_login', { username, password });
-}
 export async function monoizeLogout(): Promise<void> {
 	return invoke('monoize_logout');
 }
@@ -392,11 +387,12 @@ export type MonoizeMarketplaceModel = {
 	max_input_tokens?: number | null;
 	max_output_tokens?: number | null;
 	groups?: string[];
+	routing_status?: string;
 };
-/** 模型在广场里的展示名：单分组用原名，多分组每个分组一条 `原名@分组`。 */
+/** Group labels are presentation only; model_id remains the request identifier. */
 export function monoizeModelEntries(m: MonoizeMarketplaceModel): string[] {
 	const groups = m.groups ?? [];
-	return groups.length > 1 ? groups.map((g) => `${m.model_id}@${g}`) : [m.model_id];
+	return groups.length ? groups.map((g) => `${m.model_id}（${g}）`) : [`${m.model_id}（${t('settings.account.groupUnresolved')}）`];
 }
 export async function monoizeMarketplace(): Promise<MonoizeMarketplaceModel[]> {
 	const v = await invoke<MonoizeMarketplaceModel[] | { data?: MonoizeMarketplaceModel[] }>('monoize_marketplace');

@@ -7,7 +7,7 @@
 		id: string;
 		base_url: string;
 		format: string;
-		models: { name: string; context_window?: number; reasoning_efforts?: string[] }[];
+		models: { name: string; display_name?: string | null; context_window?: number; reasoning_efforts?: string[] }[];
 	}
 
 	/** Imperative surface the page reaches through its pane registry: global
@@ -1186,6 +1186,7 @@
 			onModelSelect={selectRow}
 			onModelClose={() => chat.closePicker()}
 			modelRows={filteredRows}
+			modelDisplayName={providersList.find(p => p.id === chat.provider)?.models.find(m => m.name === chat.model)?.display_name || undefined}
 			modelSearch={showPickerSearch}
 			{backendLocked}
 			toolProvider={toolModel

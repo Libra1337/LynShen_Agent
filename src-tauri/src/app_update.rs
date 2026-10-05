@@ -1,21 +1,13 @@
-//! App updates from two sources: GitHub Releases first, and the LynShen server
-//! (the same signed bundles, mirrored by the backend) when GitHub cannot be
-//! reached or downloads too slowly, as is common from mainland China. The
-//! updater plugin checks signatures either way.
+//! Signed updates from LynShen/Monoize, with configured fallback endpoints.
 
 use serde::Serialize;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
-const GITHUB_MANIFEST: &str =
-    "https://github.com/LynShen-Team/LynShen-Desktop/releases/latest/download/latest.json";
 const CHECK_TIMEOUT: Duration = Duration::from_secs(10);
-/// The first bytes of the bundle must arrive at least this fast from GitHub.
-const PROBE_BYTES: u64 = 512 * 1024;
-const PROBE_TIME: Duration = Duration::from_secs(4);
 
 #[derive(Clone, Copy, PartialEq, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -26,7 +18,10 @@ pub enum Source {
 
 /// The update found by the last check, for `update_install`.
 #[derive(Default)]
-pub struct Pending(Mutex<Option<(Update, Source)>>);
+pub struct Pending {
+    found: Mutex<Option<(Update, Source, String)>>,
+    downloaded: Mutex<Option<(Update, Vec<u8>)>>,
+}
 
 #[derive(Serialize)]
 pub struct Found {
@@ -40,30 +35,60 @@ pub struct Found {
 #[serde(tag = "event", content = "data")]
 pub enum DownloadEvent {
     #[serde(rename_all = "camelCase")]
-    Started { content_length: Option<u64> },
+    Started {
+        content_length: Option<u64>,
+    },
     #[serde(rename_all = "camelCase")]
-    Progress { chunk_length: usize },
+    Progress {
+        chunk_length: usize,
+    },
     Finished,
 }
 
 /// The LynShen server's mirror of the desktop manifest, on the API the user's
 /// config names (regional domains differ).
 fn lynshen_manifest() -> String {
-    format!("{}/v1/public/releases/desktop/latest.json", api_base())
+    let config = crate::read_json(&crate::lynshen_dir().join("config.json"));
+    let base = config["desktop_update_url"]
+        .as_str()
+        .filter(|url| !url.trim().is_empty())
+        .map(|url| url.trim().trim_end_matches('/').to_owned())
+        .unwrap_or_else(api_base);
+    format!("{base}/v1/public/releases/desktop/latest.json")
 }
 
 /// The LynShen API this app talks to without a login (`lynshen_api_url` in
 /// config.json; regional domains differ).
 pub fn api_base() -> String {
-    let api = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(|home| std::path::PathBuf::from(home).join(".lynshen").join("config.json"))
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-        .and_then(|config| config["lynshen_api_url"].as_str().map(str::to_string))
+    let api = crate::read_json(&crate::lynshen_dir().join("config.json"))["lynshen_api_url"]
+        .as_str()
+        .map(str::to_string)
         .filter(|api| !api.trim().is_empty())
-        .unwrap_or_else(|| "https://api.lynshen.net".to_string());
-    api.trim_end_matches('/').to_string()
+        .unwrap_or_else(|| crate::monoize_auth::BASES[0].to_string());
+    api.trim().trim_end_matches('/').to_string()
+}
+
+fn manifests(app: &AppHandle) -> Vec<(String, Source)> {
+    let mut sources = vec![(lynshen_manifest(), Source::LynShen)];
+    if let Some(urls) = app
+        .config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|config| config["endpoints"].as_array())
+    {
+        for url in urls.iter().filter_map(|url| url.as_str()) {
+            if !sources.iter().any(|(existing, _)| existing == url) {
+                let source = if url.starts_with("https://github.com/") {
+                    Source::Github
+                } else {
+                    Source::LynShen
+                };
+                sources.push((url.to_owned(), source));
+            }
+        }
+    }
+    sources
 }
 
 async fn check_at(app: &AppHandle, manifest: &str) -> Result<Option<Update>, String> {
@@ -79,64 +104,41 @@ async fn check_at(app: &AppHandle, manifest: &str) -> Result<Option<Update>, Str
         .map_err(|e| e.to_string())
 }
 
-/// Whether the start of `url` downloads at a usable rate.
-fn downloads_fast(url: &str) -> bool {
-    let agent = ureq::AgentBuilder::new()
-        .timeout_connect(PROBE_TIME)
-        .timeout_read(PROBE_TIME)
-        .build();
-    let started = Instant::now();
-    let Ok(response) = agent
-        .get(url)
-        .set("Range", &format!("bytes=0-{}", PROBE_BYTES - 1))
-        .call()
-    else {
-        return false;
-    };
-    let mut reader = std::io::Read::take(response.into_reader(), PROBE_BYTES);
-    let read = std::io::copy(&mut reader, &mut std::io::sink()).unwrap_or(0);
-    read > 0 && started.elapsed() <= PROBE_TIME
-}
-
-/// Looks for an update: on GitHub, else (unreachable, or too slow to download
-/// from) on the LynShen server.
+/// A healthy primary is authoritative; an unavailable primary falls back.
 #[tauri::command]
-pub async fn update_check(app: AppHandle, pending: State<'_, Pending>) -> Result<Option<Found>, String> {
-    let found = match check_at(&app, GITHUB_MANIFEST).await {
-        Ok(None) => None,
-        Ok(Some(update)) => {
-            let url = update.download_url.to_string();
-            let fast = tauri::async_runtime::spawn_blocking(move || downloads_fast(&url))
-                .await
-                .unwrap_or(false);
-            if fast {
-                Some((update, Source::Github))
-            } else {
-                // Slow GitHub: the mirror when it has this version, else GitHub after all.
-                match check_at(&app, &lynshen_manifest()).await {
-                    Ok(Some(mirror)) if mirror.version == update.version => Some((mirror, Source::LynShen)),
-                    _ => Some((update, Source::Github)),
-                }
+pub async fn update_check(
+    app: AppHandle,
+    pending: State<'_, Pending>,
+) -> Result<Option<Found>, String> {
+    *pending.found.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    let mut errors = Vec::new();
+    let mut found = None;
+    for (manifest, source) in manifests(&app) {
+        match check_at(&app, &manifest).await {
+            Ok(update) => {
+                found = update.map(|update| (update, source, manifest));
+                errors.clear();
+                break;
             }
+            Err(error) => errors.push(format!("{manifest}: {error}")),
         }
-        Err(github) => match check_at(&app, &lynshen_manifest()).await {
-            Ok(update) => update.map(|update| (update, Source::LynShen)),
-            Err(lynshen) => return Err(format!("GitHub: {github}; LynShen: {lynshen}")),
-        },
-    };
-    let result = found.as_ref().map(|(update, source)| Found {
+    }
+    if !errors.is_empty() {
+        return Err(errors.join("; "));
+    }
+    let result = found.as_ref().map(|(update, source, _)| Found {
         version: update.version.clone(),
         notes: update.body.clone(),
         source: *source,
     });
-    *pending.0.lock().unwrap_or_else(|e| e.into_inner()) = found;
+    *pending.found.lock().unwrap_or_else(|e| e.into_inner()) = found;
     Ok(result)
 }
 
-async fn install(update: &Update, on_event: &Channel<DownloadEvent>) -> Result<(), String> {
+async fn download(update: &Update, on_event: &Channel<DownloadEvent>) -> Result<Vec<u8>, String> {
     let mut started = false;
     update
-        .download_and_install(
+        .download(
             |chunk_length, content_length| {
                 if !started {
                     started = true;
@@ -174,32 +176,57 @@ pub async fn update_policy() -> String {
     .unwrap_or_default()
 }
 
-/// Downloads and installs the update the last check found; a GitHub download
-/// that fails is retried once from the LynShen server.
+/// Retry failed downloads from a different source at the exact same version.
+/// Installation errors must not launch another installer.
 #[tauri::command]
 pub async fn update_install(
     app: AppHandle,
     pending: State<'_, Pending>,
     on_event: Channel<DownloadEvent>,
 ) -> Result<(), String> {
-    let (update, source) = pending
-        .0
+    let (update, _source, manifest) = pending
+        .found
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .take()
         .ok_or("no update to install")?;
-    match install(&update, &on_event).await {
-        Ok(()) => Ok(()),
-        Err(github) if source == Source::Github => {
-            match check_at(&app, &lynshen_manifest()).await {
-                Ok(Some(mirror)) if mirror.version == update.version => install(&mirror, &on_event)
-                    .await
-                    .map_err(|lynshen| format!("GitHub: {github}; LynShen: {lynshen}")),
-                _ => Err(github),
-            }
+    let mut errors = Vec::new();
+    match download(&update, &on_event).await {
+        Ok(bytes) => {
+            *pending.downloaded.lock().unwrap_or_else(|e| e.into_inner()) = Some((update, bytes));
+            return Ok(());
         }
-        Err(error) => Err(error),
+        Err(error) => errors.push(error),
     }
+    for (fallback, _) in manifests(&app) {
+        if fallback == manifest {
+            continue;
+        }
+        match check_at(&app, &fallback).await {
+            Ok(Some(other)) if other.version == update.version => {
+                match download(&other, &on_event).await {
+                    Ok(bytes) => {
+                        *pending.downloaded.lock().unwrap_or_else(|e| e.into_inner()) =
+                            Some((other, bytes));
+                        return Ok(());
+                    }
+                    Err(error) => errors.push(error),
+                }
+            }
+            Err(error) => errors.push(error),
+            _ => {}
+        }
+    }
+    Err(errors.join("; "))
+}
+
+/// Windows installation exits the running process. Only apply after the user
+/// requests a restart and the frontend has flushed its unsaved workspace state.
+#[tauri::command]
+pub async fn update_apply(pending: State<'_, Pending>) -> Result<(), String> {
+    let downloaded = pending.downloaded.lock().unwrap_or_else(|e| e.into_inner());
+    let (update, bytes) = downloaded.as_ref().ok_or("no downloaded update to apply")?;
+    update.install(bytes).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
@@ -208,11 +235,23 @@ mod tests {
 
     #[test]
     fn progress_matches_the_plugin_events() {
-        let started = serde_json::to_value(DownloadEvent::Started { content_length: Some(9) }).unwrap();
-        assert_eq!(started, serde_json::json!({ "event": "Started", "data": { "contentLength": 9 } }));
+        let started = serde_json::to_value(DownloadEvent::Started {
+            content_length: Some(9),
+        })
+        .unwrap();
+        assert_eq!(
+            started,
+            serde_json::json!({ "event": "Started", "data": { "contentLength": 9 } })
+        );
         let chunk = serde_json::to_value(DownloadEvent::Progress { chunk_length: 3 }).unwrap();
-        assert_eq!(chunk, serde_json::json!({ "event": "Progress", "data": { "chunkLength": 3 } }));
-        assert_eq!(serde_json::to_value(DownloadEvent::Finished).unwrap(), serde_json::json!({ "event": "Finished" }));
+        assert_eq!(
+            chunk,
+            serde_json::json!({ "event": "Progress", "data": { "chunkLength": 3 } })
+        );
+        assert_eq!(
+            serde_json::to_value(DownloadEvent::Finished).unwrap(),
+            serde_json::json!({ "event": "Finished" })
+        );
     }
 
     #[test]

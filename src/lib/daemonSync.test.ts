@@ -255,3 +255,17 @@ describe('DaemonSync', () => {
 		await flush();
 	});
 });
+
+it('consolidates independently seeded defaults on startup and reconnect', async () => {
+ const {sync, store, workspaces} = await setup();
+ const incoming = [{id: 'remote-default', name: '默认工作区', is_default: true, projects: [{id: 'p2', name: 'new', path: '/w/new'}]}, {id: 'another-default', name: '默认工作区', is_default: true, projects: [{id: 'p3', name: 'third', path: '/w/third'}]}];
+ sync.handle({type: 'workspaces', rev: 7, workspaces: incoming});
+ expect(workspaces.workspaces.map(w => w.id)).toEqual(['another-default']);
+ expect(workspaces.activeId).toBe('another-default');
+ expect(store.projects.map(p => p.path).sort()).toEqual(['/w/app', '/w/new', '/w/third']);
+ expect((request.mock.calls.at(-1)![0] as any).workspaces).toHaveLength(1);
+ sync.reset();
+ sync.handle({type: 'workspaces', rev: 8, workspaces: incoming});
+ expect(workspaces.workspaces).toHaveLength(1);
+ expect(store.projects).toHaveLength(3);
+});

@@ -297,6 +297,9 @@ export class SessionStore {
 		acpAgent?: { id: string; name: string }
 	) {
 		// Only the lynshen engine has a chat mode.
+		// Mutate the stored Svelte proxy, including when the caller just inserted
+		// a plain project object. Mutating that original bypasses reactivity.
+		project = this.projects.find((p) => p.id === project.id) ?? project;
 		let backendId = project.chats ? 'lynshen' : (backend ?? defaultBackendFor(project.lastBackend));
 		let agent = backendId === 'acp' ? (acpAgent ?? project.lastAcpAgent) : undefined;
 		if (backendId === 'acp' && !agent) {
@@ -695,7 +698,7 @@ export class SessionStore {
 		if (worktree) p.worktree = worktree;
 		this.projects.push(p);
 		this.addSession(p, firstMessage);
-		return p;
+		return this.projects.find((project) => project.id === p.id)!;
 	}
 
 	/** Show a long-lived agent's conversation: `sid` (a daemon session of
@@ -717,6 +720,7 @@ export class SessionStore {
 		if (!project) {
 			project = { id: this.uid(), name: base(agent.cwd), path: agent.cwd, sessions: [] };
 			this.projects.push(project);
+			project = this.projects.find((p) => p.id === project!.id)!;
 		}
 		const s = this.#newSession('lynshen');
 		if (title) s.chat.title = title;
@@ -1036,6 +1040,7 @@ export class SessionStore {
 		if (!host) {
 			host = { id: this.uid(), name: base(cwd), path: cwd, sessions: [], agents: true };
 			this.projects.push(host);
+			host = this.projects.find((p) => p.id === host!.id)!;
 		}
 		return host;
 	}

@@ -64,6 +64,11 @@ const settings = {
 			readTimeoutDesc: '等待响应数据的最长时间，0 表示使用默认值。'
 		},
 		account: {
+			keyPlaceholder: '请输入 API Key',
+			groupUnresolved: '分组未确定',
+			oauthLogin: '在浏览器中授权 {provider}',
+			oauthHint: '使用订阅账户授权。授权在浏览器中完成；API Key 也可单独配置。',
+			reopenBrowser: '重新打开授权页面',
 			groupLabel: '已添加的 Provider',
 			hint: '已添加的 Provider 可同时使用。点卡片查看详情、更新密钥或设为默认。',
 			default: '默认',
@@ -90,6 +95,12 @@ const settings = {
 			refreshNeedProvider: '请先添加该 Provider',
 		},
 		monoize: {
+            browserLogin: '在浏览器中授权 LynShen',
+            browserWaiting: '等待浏览器授权…',
+            browserCancel: '取消授权',
+            browserHint: '在官网登录并确认授权。请核对下方代码；客户端不会获取你的密码。',
+            revokeFailed: '撤销授权失败，请检查网络后重试。登录凭据已保留。',
+
 			account: 'LynShen Console 账号',
 			loginTitle: '登录 LynShen Console',
 			registerTitle: '注册 LynShen Console',
@@ -102,7 +113,7 @@ const settings = {
 			password: '密码（至少 8 位）',
 			needCredentials: '请输入用户名和密码',
 			loginHint: '登录后自动配置密钥并同步你分组内的可用模型。',
-			loginRegister: '登录 / 注册',
+			loginRegister: '在浏览器中授权',
 			keyHint: '登录后会自动生成一条仅本客户端使用的 API key，不展示、不可复制。',
 			managedKey: '密钥由登录自动管理：仅本客户端使用，界面不展示，退出登录即吊销。',
 			managedKeyOptional: '当前使用手动配置的密钥；登录后可切换为由客户端自动管理。',
@@ -530,6 +541,11 @@ const settings = {
 			readTimeoutDesc: 'Longest wait for response data; 0 uses the default.'
 		},
 		account: {
+			keyPlaceholder: 'Enter API Key',
+			groupUnresolved: 'Group unresolved',
+			oauthLogin: 'Authorize {provider} in browser',
+			oauthHint: 'Authorize your subscription account in the browser, or configure an API key separately.',
+			reopenBrowser: 'Reopen authorization page',
 			groupLabel: 'Added providers',
 			hint: 'Added providers can be used at the same time. Click a card to see details, update its key or make it the default.',
 			default: 'Default',
@@ -556,6 +572,12 @@ const settings = {
 			refreshNeedProvider: 'Add the provider first',
 		},
 		monoize: {
+            browserLogin: 'Authorize LynShen in browser',
+            browserWaiting: 'Waiting for browser approval…',
+            browserCancel: 'Cancel authorization',
+            browserHint: 'Sign in on the website and approve access. Match the code below; the app never receives your password.',
+            revokeFailed: 'Could not revoke access. Check your connection and retry. Credentials were retained.',
+
 			account: 'LynShen Console account',
 			loginTitle: 'Sign in to LynShen Console',
 			registerTitle: 'Create a LynShen Console account',
@@ -568,7 +590,7 @@ const settings = {
 			password: 'Password (at least 8 characters)',
 			needCredentials: 'Enter a username and password',
 			loginHint: 'Sign in to auto-configure the key and sync the models available to your groups.',
-			loginRegister: 'Sign in / Register',
+			loginRegister: 'Authorize in browser',
 			keyHint: 'On sign-in a client-only API key is generated automatically — never shown, never copyable.',
 			managedKey: 'The key is managed by the client: usable only here, never displayed, revoked on sign-out.',
 			managedKeyOptional: 'A manually configured key is in use; sign in to switch to client-managed.',

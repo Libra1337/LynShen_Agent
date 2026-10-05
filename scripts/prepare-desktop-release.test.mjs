@@ -1,0 +1,49 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { prepareRelease } from './prepare-desktop-release.mjs';
+
+function fixture(run) {
+  const root = mkdtempSync(path.join(tmpdir(), 'desktop-release-'));
+  const assets = path.join(root, 'assets');
+  const output = path.join(root, 'out');
+  mkdirSync(assets);
+  const platforms = {};
+  for (const [platform, name] of Object.entries({
+    'windows-x86_64': 'LynShen_1.2.3_x64-setup.exe',
+    'darwin-aarch64': 'LynShen_aarch64.app.tar.gz',
+    'darwin-x86_64': 'LynShen_x64.app.tar.gz',
+  })) {
+    writeFileSync(path.join(assets, name), 'binary');
+    writeFileSync(path.join(assets, name + '.sig'), 'signature\n');
+    platforms[platform] = { url: `https://github.com/example/releases/download/v1.2.3/${name}`, signature: 'signature' };
+  }
+  for (const arch of ['aarch64', 'x64']) writeFileSync(path.join(assets, `LynShen_1.2.3_${arch}.dmg`), 'installer');
+  const manifest = { version: '1.2.3', platforms };
+  const save = () => writeFileSync(path.join(assets, 'latest.json'), JSON.stringify(manifest));
+  save();
+  try { run({ assets, output, manifest, save }); } finally { rmSync(root, { recursive: true }); }
+}
+test('rewrites every artifact to the LynShen host and preserves signatures', () => fixture(({ assets, output }) => {
+  const catalog = prepareRelease(assets, output, 'https://www.lynshen.org');
+  assert.equal(Object.keys(catalog.platforms).length, 3);
+  const manifest = JSON.parse(readFileSync(path.join(output, 'latest.json')));
+  for (const entry of Object.values(manifest.platforms)) {
+    assert.match(entry.url, /^https:\/\/www\.lynshen\.org\/v1\/public\/releases\/desktop\/1\.2\.3\//);
+    assert.equal(entry.signature, 'signature');
+  }
+  assert.match(catalog.platforms['windows-x86_64'].sha256, /^[a-f0-9]{64}$/);
+}));
+test('rejects incomplete releases before writing manifests', () => fixture(({ assets, output, manifest, save }) => {
+  delete manifest.platforms['darwin-x86_64']; save();
+  assert.throws(() => prepareRelease(assets, output, 'https://www.lynshen.org'), /Missing signed/);
+}));
+test('rejects changed signatures and unsafe artifact paths', () => fixture(({ assets, output, manifest, save }) => {
+  manifest.platforms['windows-x86_64'].signature = 'different'; save();
+  assert.throws(() => prepareRelease(assets, output, 'https://www.lynshen.org'), /Signature mismatch/);
+  manifest.platforms['windows-x86_64'].url = 'https://example.com/a%2Fb'; save();
+  assert.throws(() => prepareRelease(assets, output, 'https://www.lynshen.org'));
+  assert.throws(() => prepareRelease(assets, output, 'http://www.lynshen.org'), /HTTPS/);
+}));

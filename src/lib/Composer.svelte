@@ -52,6 +52,7 @@
 		pickerQuery = $bindable(''),
 		pickerSelIdx = $bindable(0),
 		modelRows = [],
+		modelDisplayName,
 		modelSearch = false,
 		backendLocked = true,
 		toolProvider,
@@ -83,6 +84,7 @@
 		pickerQuery?: string;
 		pickerSelIdx?: number;
 		modelRows?: ModelRow[];
+		modelDisplayName?: string;
 		modelSearch?: boolean;
 		/** False only while the session is still virgin (no user turn) — the
 		 *  agent rail in the model popover shows then and disappears afterwards. */
@@ -870,7 +872,7 @@
 					{#key chat.model}
 						<span class="mswap">
 							{#if chat.backendId === 'lynshen' && chat.model}<Vendor model={chat.model} size={15} />{:else}<BackendIcon backend={chat.backendId} size={15} />{/if}
-							<span class="m">{chat.modelLabel || chat.model || backendLabel}</span>
+							<span class="m">{modelDisplayName || chat.modelLabel || chat.model || backendLabel}</span>
 						</span>
 					{/key}
 					{#if chat.efforts.length}{#key chat.effort}<span
@@ -881,7 +883,7 @@
 					{#if chat.ultracode}<span class="e">· Ultracode</span>{/if}
 				</button>
 			{:else if chat.model}
-				<span class="flatbtn model static"><BackendIcon backend={chat.backendId} size={15} /><span>{chat.modelLabel || chat.model}</span></span>
+				<span class="flatbtn model static"><BackendIcon backend={chat.backendId} size={15} /><span>{modelDisplayName || chat.modelLabel || chat.model}</span></span>
 			{/if}
 			{#if modelPopoverVisible}
 				<ModelMenu
