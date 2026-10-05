@@ -769,18 +769,29 @@ fn fetch_account_info() -> Result<serde_json::Value, String> {
     lynshen_get("/v1/oauth/userinfo")
 }
 
-/// Every model the LynShen account can reach, across all of its groups (the
+/// Every model the account can reach, across all of its groups (the
 /// OAuth token routes to any of them), for the "models to show" picker.
+/// Without the local engine login (no `lynshen` CLI here) this falls back to
+/// the Monoize gateway's key-scoped /v1/models — the desktop client's world.
 #[tauri::command(async)]
 fn fetch_lynshen_models() -> Result<serde_json::Value, String> {
-    lynshen_get("/v1/models")
+    match lynshen_get("/v1/models") {
+        Ok(v) => Ok(v),
+        Err(cli_error) => monoize_auth::gateway_key_get("/v1/models").map_err(|key_error| {
+            format!("lynshen token: {cli_error} | monoize key: {key_error}")
+        }),
+    }
 }
 
 /// The groups the account may route through, with rate multipliers and the
-/// models each serves.
+/// models each serves. The Monoize fallback has no per-account group API —
+/// answer an empty list instead of failing (the picker just hides groups).
 #[tauri::command(async)]
 fn fetch_lynshen_groups() -> Result<serde_json::Value, String> {
-    lynshen_get("/v1/open/groups")
+    match lynshen_get("/v1/open/groups") {
+        Ok(v) => Ok(v),
+        Err(_) => Ok(serde_json::json!({ "groups": [] })),
+    }
 }
 
 /// Plan quota usage (5h / weekly / monthly used vs cap).
