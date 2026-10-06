@@ -1,7 +1,6 @@
 // 应用自动更新状态。模块级 runes 单例：设置页的更新卡片
 // 与侧栏设置入口的小圆点共享同一份状态，启动时的静默检查也写到这里。
-// 检查和下载在 Rust 侧（src-tauri/src/app_update.rs）：先走 GitHub，
-// 不通或太慢时换 LynShen 服务器上的同一份签名安装包。
+// 检查和下载使用 LynShen / Monoize，备用源来自应用配置。
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -50,13 +49,14 @@ export class UpdaterState {
 	}
 
 	/**
-	 * Check for updates. Startup checks can pass `autoInstall` to download and
-	 * install immediately. Relaunch stays user-controlled to avoid lost work.
+	 * Startup checks can pass `autoInstall` to download and verify the update.
+	 * Installation and relaunch stay user-controlled to avoid lost work.
 	 */
 	async check(silent = false, autoInstall = false) {
 		await this.#checkRequired();
 		if (this.phase === 'checking' || this.phase === 'downloading' || this.phase === 'ready') return;
 		this.phase = 'checking';
+		this.error = '';
 		try {
 			const u = await invoke<{ version: string; notes: string | null; source: 'github' | 'lynshen' } | null>(
 				'update_check'
@@ -68,6 +68,9 @@ export class UpdaterState {
 				this.phase = 'available';
 				if (autoInstall || this.required) await this.download();
 			} else {
+				this.version = '';
+				this.source = '';
+				this.notes = '';
 				this.phase = silent ? 'idle' : 'latest';
 			}
 		} catch (e) {
@@ -81,11 +84,12 @@ export class UpdaterState {
 		}
 	}
 
-	/** 下载并安装更新，完成后进入 ready（由「重启并安装」按钮触发 relaunch）。 */
+	/** 下载并验签，完成后进入 ready，等待「重启并安装」。 */
 	async download() {
 		// The check that found it holds the update on the Rust side.
 		if (this.phase !== 'available') return;
 		this.phase = 'downloading';
+		this.error = '';
 		this.progress = 0;
 		let total = 0;
 		let received = 0;
@@ -93,6 +97,8 @@ export class UpdaterState {
 			const onEvent = new Channel<Progress>();
 			onEvent.onmessage = (ev) => {
 				if (ev.event === 'Started') {
+					received = 0;
+					this.progress = 0;
 					total = ev.data.contentLength ?? 0;
 				} else if (ev.event === 'Progress') {
 					received += ev.data.chunkLength;
@@ -123,11 +129,17 @@ export class UpdaterState {
 		this.dismissed = this.version;
 	}
 
-	/** 重启应用以应用已安装的更新。 */
+	/** 保存工作区、安装更新并重启应用。 */
 	async restart() {
 		// The relaunch does not wait for the half-second save of the workspaces.
-		await workspaces.flush();
-		await relaunch();
+		try {
+			await workspaces.flush(true);
+			await invoke('update_apply');
+			await relaunch();
+		} catch (e) {
+			this.error = String(e);
+			this.phase = 'error';
+		}
 	}
 }
 

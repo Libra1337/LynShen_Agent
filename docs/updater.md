@@ -1,124 +1,101 @@
-# 自动更新（tauri-plugin-updater）发布指南
+# LynShen / Monoize 下载与自动更新
 
-桌面端通过 [tauri-plugin-updater](https://v2.tauri.app/plugin/updater/) 实现应用内自动更新。
-`src-tauri/tauri.conf.json` 中的 `plugins.updater` 配置了：
+官网下载页为 `https://www.lynshen.org/download`。桌面更新优先访问
+`https://www.lynshen.org/v1/public/releases/desktop/latest.json`，连接失败时访问
+`https://api.lynshen.org/v1/public/releases/desktop/latest.json`。
+GitHub 仓库现已公开；客户端仍以官网作为下载与更新源。
+构建和签名在 GitHub Actions 或本地完成，文件存储和下载由 Monoize 提供。
 
-- **endpoint**：`https://github.com/LynShen-Team/LynShen-Desktop/releases/latest/download/latest.json`
-  —— 指向 GitHub Release 最新版附带的 `latest.json` 清单（由 tauri-action 自动生成并上传）。
-- **pubkey**：已配置为真实公钥（密钥对生成于 2026-07-13，私钥在维护者本机
-  `~/.tauri/lynshen-desktop.key`，**空密码**）。
+## 客户端行为
 
-## 1. 生成签名密钥（已完成）
+- 启动约 5 秒后检查，此后每 10 分钟检查；手动检查不自动下载，强制更新除外。
+- 自动下载并校验 Tauri 签名，用户选择「重启并安装」后才执行安装器。
+  Windows 安装器会退出进程，因此必须先保存工作区，不能后台自动调用。
+- 待安装的包保存在当前进程内存中；选择「稍后」后仍可在设置里安装。
+  若直接关闭应用，下次启动会重新检查和下载。
+- 下载失败时从下一来源重试同一版本；换源时进度从零重新计算。
+- 正常返回「无更新」的主源具有优先权。只有错误才切换备用源。
+- `policy` 的 `min_version` 控制最低版本；网络不可达时不锁定客户端。
+- `~/.lynshen/config.json` 的 `desktop_update_url` 可覆盖更新服务根地址；
+  未设置时使用 `lynshen_api_url`，再回退到默认官网。更新 URL 必须使用 HTTPS。
+- 配置中的 updater `endpoints` 是唯一备用源列表，Rust 不再硬编码旧仓库地址。
 
-密钥对已用下面的命令生成，公钥已写入 `tauri.conf.json`：
+0.4.16 及以前的错误更新源不能自动找到本次修复，需从官网下载一次新安装包。
+后续版本通过官网更新。
 
-```sh
-pnpm tauri signer generate -w ~/.tauri/lynshen-desktop.key --password ""
+## Monoize 接口和存储
+
+Monoize 仓库的 `spec/desktop-distribution.spec.md` 定义接口。
+默认目录为 `data/desktop-releases`，可由 `MONOIZE_DESKTOP_RELEASE_DIR` 覆盖：
+
+```text
+desktop-releases/
+  latest.json      # Tauri 更新清单，URL 为 HTTPS，保留原始签名
+  catalog.json     # 官网安装包清单，使用同源相对 URL，附 SHA-256
+  policy          # {"min_version":""}，由维护者按需修改
+  0.4.17/         # 不可变版本目录，安装包、更新包、.sig
 ```
 
-- 私钥文件 `~/.tauri/lynshen-desktop.key`（**绝不能提交进仓库**，务必异地备份）；
-- 公钥即 `plugins.updater.pubkey` 当前值。
+访问路径为 `/v1/public/releases/desktop/<文件路径>`，不需要登录，支持 HEAD 和 Range。
+缺失文件返回 404，不回退到官网 HTML。只同步发布目录，不需要重启 Monoize 或 Caddy。
+网站首次增加分发接口仍需通过已有蓝绿流程发布新 Monoize 程序。
 
-若需轮换密钥：重新生成、替换 pubkey、更新 CI secret——但注意已分发的旧客户端
-内置旧公钥，无法验证新签名，等于放弃对存量用户的推送。
+当前主机：`40.160.141.21`。运行中的容器把主机
+`/opt/migration-20260930/final/runtime/opt/monoize/data` 挂载到 `/app/data`。
+部署前重新检查挂载信息，不假定其他环境相同。
 
-## 2. CI 配置（GitHub Actions）
+## 跨平台构建
 
-在仓库 Settings → Secrets and variables → Actions 里添加（或用 gh CLI）：
+Release 和 CI 覆盖 Windows x64、macOS Apple Silicon、macOS Intel、Linux x64。
+手动运行 Release 会构建所有平台并上传 Actions artifacts，不创建 Release。
+CLI 来源固定在 `src-tauri/lynshen-cli.ref` 的提交，版本必须匹配
+`src-tauri/lynshen-cli.version`，不能直接追踪可变的 main。
 
-```sh
-gh secret set TAURI_SIGNING_PRIVATE_KEY -R LynShen-Team/LynShen-Desktop < ~/.tauri/lynshen-desktop.key
-gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R LynShen-Team/LynShen-Desktop --body ""
-```
+发布步骤：
 
-| Secret | 内容 |
-| --- | --- |
-| `TAURI_SIGNING_PRIVATE_KEY` | 私钥文件的**内容**（或私钥文件路径，CI 里用内容） |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 私钥密码（生成时没设密码则留空字符串） |
+1. 同步 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 和 Cargo.lock 的版本。
+2. 需要升级 CLI 时更新 ref 和 version。
+3. 推送版本 tag。所有平台先上传到同一个 draft Release。
+4. 完整性检查要求 Windows、Apple Silicon、Intel 的安装包和签名更新包全部存在。
+5. 生成 `desktop-distribution` artifact，再公开 Release，并同步 Monoize。
 
-`.github/workflows/release.yml` 已把这两个 secret 注入 tauri-action 的环境。
-当 `TAURI_SIGNING_PRIVATE_KEY` 存在且 `bundle.createUpdaterArtifacts: true` 时，
-tauri-action 会自动：
+`scripts/check-release-version.mjs` 检查版本一致性。
+`scripts/prepare-desktop-release.mjs` 重写 URL，核对 `.sig` 与清单一致，生成下载 SHA-256。
+Tauri 客户端负责密码学验签；清单中的 SHA-256 供用户核验，不替代签名。
 
-1. 为每个平台构建更新包（macOS `.app.tar.gz`、Windows NSIS `.exe`/`.zip`、Linux `.AppImage`）
-   并生成对应的 `.sig` 签名文件；
-2. 汇总各平台的版本号、下载地址和签名，生成 `latest.json` 并上传到该 Release。
+## GitHub Actions 配置
 
-之后已安装的客户端即可发现新版本。检查和下载在 Rust 侧（`src-tauri/src/app_update.rs`）：
+| 类型 | 名称 | 用途 |
+| --- | --- | --- |
+| Secret | `TAURI_SIGNING_PRIVATE_KEY` | 与内置公钥匹配的 Tauri 私钥 |
+| Secret | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 私钥密码 |
+| Secret | `LYNSHEN_CLI_TOKEN` | 可选；公开 CLI 仓库默认使用 github.token |
+| Secret | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD` | 可选 macOS 固定签名身份 |
+| Variable | `DESKTOP_PUBLIC_ORIGIN` | 默认 `https://www.lynshen.org` |
+| Variable | `DESKTOP_SSH_HOST`, `DESKTOP_SSH_USER` | 分发服务器和发布账号 |
+| Secret | `DESKTOP_SSH_KEY` | 发布账号专用 SSH 私钥 |
+| Secret | `DESKTOP_SSH_KNOWN_HOSTS` | 经核验的服务器 host key |
 
-- 先读 GitHub 的 `releases/latest/download/latest.json`，并试下载更新包开头 512 KB；
-- GitHub 不通，或 4 秒内下不完这 512 KB，就改用 LynShen 服务器的镜像
-  `{lynshen_api_url}/v1/public/releases/desktop/latest.json`（`lynshen_api_url` 取自
-  `~/.lynshen/config.json`，默认 `https://api.lynshen.net`）。镜像由后端每 10 分钟从
-  GitHub 同步（后台「版本发布」也可手动同步），签名与 GitHub 上的完全相同；
-- 从 GitHub 下载中途失败时，再从镜像重试一次。
+未设置 `DESKTOP_SSH_HOST` 时保留分发 artifact，跳过远程同步。
+远程发布脚本原子替换清单，保留旧版文件，拒绝版本倒退和覆盖同版本不同内容。
+同步不会修改已有 `policy`。不要提交任何密码或私钥。
 
-启动约 5 秒后检查一次，之后每 10 分钟检查一次。
-发现更新后自动下载并安装到待应用状态；为了避免中断未保存工作，应用不会自动退出，
-用户可在设置 → 概览 →「应用更新」中点击「重启并安装」完成切换。手动点击「检查更新」
-仍只检查版本，不会自动下载。
+发布专用 SSH key 必须使用 forced command 和 `restrict`，只接受
+`publish-desktop-release`。服务器安装 root 所有的 `receive-desktop-release.py`
+及 `publish-desktop-release.py`，固定目标目录，不允许 CI 指定命令或路径。
+接收器拒绝链接、路径穿越、未知文件、清单与校验和不一致，以及超过 2 GiB 的归档。
+专用账号没有通用 sudo 权限，只有固定接收器入口；SSH 转发和交互终端均禁用。
 
-## 3. 发布流程
+macOS 自签名不等于 Apple 公证；Windows 更新签名不等于 Authenticode。
+平台安装限制仍需向用户说明。GitHub 账号必须具有可用的 Actions 额度，才能运行构建。
 
-安装包内置 LynShen CLI：Release workflow 从 LynShen-CLI 的 GitHub Release 下载
-`src-tauri/lynshen-cli.version` 指定版本的二进制（`lynshen-<target>`）和
-`lynshen-third-party-notices.txt`，作为 sidecar `lynshen-cli` 打进安装包（不能叫 `lynshen`：
-macOS、Windows 文件名不区分大小写，会和应用自身的 `LynShen` 可执行文件重名）。所以先发 CLI，再发桌面端：
-
-1. LynShen-CLI：改 `Cargo.toml` 版本号，打 tag 推送，等两个 Release workflow 跑完；
-2. 把 `src-tauri/lynshen-cli.version` 改成这个 CLI 版本；
-3. 更新 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 中的版本号；
-4. 打 tag 并推送（如 `git tag v0.4.0 && git push origin v0.4.0`）；
-5. Release workflow 构建、签名并上传安装包 + 更新包 + `latest.json`；
-   10 分钟内后端镜像会同步这个版本。
-
-## 4. 本地验证签名构建（可选）
+## 手动发布
 
 ```sh
-export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/lynshen-desktop.key)"
-export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<密码，若无则空>"
-# 内置 CLI：放一个本平台的 lynshen 到 src-tauri/binaries/lynshen-cli-<target>
-cp ../LynShen-CLI/target/release/lynshen src-tauri/binaries/lynshen-cli-aarch64-apple-darwin
-pnpm tauri build --config src-tauri/tauri.bundle.conf.json
+node scripts/prepare-desktop-release.mjs release-assets distribution https://www.lynshen.org
+python3 scripts/publish-desktop-release.py distribution /path/to/desktop-releases
 ```
 
-构建产物旁会出现 `.sig` 文件；`latest.json` 只有 tauri-action（或手工拼装）才会生成。
-
-## 注意事项
-
-- **私钥丢失 = 无法再向存量用户推送更新**（公钥内置在已分发的安装包里），务必妥善备份。
-- macOS 更新包仍受 Gatekeeper 约束：未做 Apple 公证的更新在部分机器上可能被拦截，
-  与首次安装的限制一致。
-- 更新界面入口：设置 → 概览 →「应用更新」，另有启动约 5 秒后的静默后台检查，
-  发现新版本时侧栏设置入口会显示小圆点。
-
-## 强制更新
-
-后台「版本发布」页可以把某个版本设为强制更新。客户端每次检查时读取
-`{lynshen_api_url}/v1/public/releases/desktop/policy` 的 `min_version`：当前版本低于它，
-就自动下载更新，并弹出不能关闭的对话框，装好后只能重启。服务器连不上时不强制
-（不会因为网络问题把应用锁住）。
-
-## 更新提示与后台服务
-
-- 更新装好后弹窗提示「已就绪」，可以「稍后」；下次启动自动生效。会话在后台服务里，
-  重启应用不会中断任务。
-- 新版应用自带新版 CLI。连上后台服务时比较版本：不同就请它在没有任务运行时退出，
-  应用随后启动新版（`restart_when_idle`）；旧到不支持这个请求的后台服务直接结束进程
-  （macOS、Linux、Windows 都适用）。
-
-## macOS 签名（固定自签名证书）
-
-macOS 包用一张固定的自签名证书签名（未公证，首次打开仍需在「隐私与安全性」里放行）。
-签名身份固定后，系统记住的麦克风、录屏等授权在更新后仍然有效；ad-hoc 签名每次构建都不同，
-每次更新都要重新授权。
-
-- 证书：`LynShen Self-Signed`，有效期到 2036 年，公钥证书在 `src-tauri/macos-signing-cert.pem`。
-- 私钥与 p12：维护者本机 `~/.tauri/macos-signing/`（`lynshen-macos-signing.p12`、
-  `p12-password.txt`），**务必备份**。丢失后换新证书，用户需要重新授权一次。
-- CI secret：`APPLE_CERTIFICATE`（p12 的 base64）、`APPLE_CERTIFICATE_PASSWORD`。
-  Release workflow 在 macOS 上把它导入临时钥匙串并设为代码签名可信，再由 tauri-action 签名
-  （`APPLE_SIGNING_IDENTITY`）。不开 hardened runtime（不做公证就不需要，也免去麦克风等
-  entitlement 配置）。
-- 手动运行 Release workflow 只构建 macOS 包，不发布，用来检查签名：
-  `codesign -d -r- LynShen.app` 应显示 `certificate root = H"..."`，而不是 `cdhash`。
+首次只有 Windows 包可用时，可显式传入 `--windows-only`。
+官网会把两个 macOS 平台显示为「尚未发布」，不会生成失效下载链接。
+完整 CI 发布不使用这个选项；后续增加平台时使用新版本，保留已发布版本的不可变性。

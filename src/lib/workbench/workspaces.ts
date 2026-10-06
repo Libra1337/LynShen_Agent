@@ -70,6 +70,37 @@ export function serializeWorkspaces(file: WorkspacesFile): string {
 	return JSON.stringify(file, null, '\t') + '\n';
 }
 
+export const workspacePathKey = (path: string) => {
+	const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
+	return /^[a-z]:/i.test(normalized) ? normalized.toLowerCase() : normalized;
+};
+
+/** Duplicate defaults came from independently seeded clients. Keep saved chats
+ * and the active layout while consolidating their projects. Named workspaces stay separate. */
+export function consolidateDefaults(file: WorkspacesFile): WorkspacesFile {
+	const defaults = file.workspaces.filter(w => w.isDefault);
+	if (defaults.length <= 1) return file;
+	const target = defaults.find(w => w.id === file.active) ?? defaults[0];
+	const projects = new Map<string, SavedProject>();
+	for (const ws of [target, ...defaults.filter(w => w !== target)]) {
+		for (const p of ws.projects) {
+			const key = workspacePathKey(p.path);
+			const prior = projects.get(key);
+			if (!prior) { projects.set(key, { ...p, tabs: [...(p.tabs ?? [])] }); continue; }
+			const tabs = prior.tabs ?? [];
+			for (const tab of p.tabs ?? []) {
+				if (!tabs.some(t => tab.sid ? t.sid === tab.sid : t.id === tab.id)) tabs.push(tab);
+			}
+			prior.tabs = tabs;
+		}
+	}
+	return { ...file,
+		active: defaults.some(w => w.id === file.active) ? target.id : file.active,
+		workspaces: file.workspaces.filter(w => !w.isDefault || w.id === target.id)
+			.map(w => w.id === target.id ? { ...w, projects: [...projects.values()] } : w)
+	};
+}
+
 const isStr = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
 
 type SavedTab = NonNullable<SavedProject['tabs']>[number];
@@ -142,7 +173,7 @@ export function parseWorkspacesFile(text: string): WorkspacesFile | null {
 	// default so old files upgrade in place without a version bump.
 	if (!workspaces.some((w) => w.isDefault)) workspaces[0].isDefault = true;
 	const active = isStr(data.active) && workspaces.some((w) => w.id === data.active) ? data.active : workspaces[0].id;
-	return { version: WORKSPACES_VERSION, active, workspaces };
+	return consolidateDefaults({ version: WORKSPACES_VERSION, active, workspaces });
 }
 
 /** Tolerant parse of the legacy dock-tabs value: bare panel strings (oldest

@@ -10,11 +10,12 @@ Status: closed beta.
 ## Download
 
 Get the latest build from
-[Releases](https://github.com/LynShen-Team/LynShen-Desktop/releases/latest):
+[LynShen downloads](https://www.lynshen.org/download):
 
 | Platform | File |
 | --- | --- |
 | macOS, Apple Silicon | `LynShen_<version>_aarch64.dmg` |
+| macOS, Intel | `LynShen_<version>_x64.dmg` |
 | Windows x64 | `LynShen_<version>_x64-setup.exe` (or `.msi`) |
 | Linux x64 | `LynShen_<version>_amd64.AppImage`, `.deb` or `.rpm` |
 
@@ -24,10 +25,14 @@ the permissions it asks for. The app updates itself after that.
 
 The app ships its own LynShen CLI (kept in `~/.lynshen/bin`, updated with the
 app; Settings → Agents can make it a `lynshen` terminal command). On first
-launch a welcome page signs you in to LynShen, then walks through the coding
+launch a welcome page opens browser authorization for LynShen, then walks through the coding
 agent, the runtime (Git and the bundled engine) and the model. Claude Code and
 Codex are optional; it installs them from their official sources when you want
 them, and offers their upgrades later.
+
+Sign in or register on the website, compare the code shown in the app, and approve
+access. The app receives a separate 30-day device credential, not your password
+or website session. Sign out in the app or revoke its key on the website.
 
 ## What it does
 
@@ -75,8 +80,8 @@ list · `⌘,` settings (Ctrl on Windows and Linux).
   project paths), so usage adds up across your computers. Preferences such as
   language, theme and default model sync through the account; keys, MCP
   servers, skills and agents stay on the computer.
-- The app checks GitHub Releases for updates, and the LynShen server when
-  GitHub is unreachable or slow. It has no analytics.
+- The app checks the LynShen / Monoize service for signed updates, with a
+  second LynShen domain as fallback. It has no analytics.
 
 ## Architecture
 

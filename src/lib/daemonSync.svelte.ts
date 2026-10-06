@@ -22,6 +22,7 @@ import type { SavedProject, SessionStore } from '$lib/session.svelte';
 import type { Project, WorktreeMeta } from '$lib/types';
 import type { WorkspaceStore } from '$lib/workbench/workspaceStore.svelte';
 import { normalizeColor, parseTabIcon, type TabIcon } from '$lib/workbench/tabChrome';
+import { workspacePathKey } from '$lib/workbench/workspaces';
 
 interface DaemonProject {
 	id: string;
@@ -47,7 +48,7 @@ const LISTED_ENGINES = new Set(['lynshen', 'claude', 'codex']);
 /** A session created this recently may still be on its way to its tab. */
 const NEW_SESSION_GRACE_MS = 10_000;
 
-const trim = (path: string) => path.replace(/[\\/]+$/, '');
+const trim = workspacePathKey;
 
 /** Folder chrome is checked on the way in and out: the daemon keeps it as
  *  any client sent it. */
@@ -156,10 +157,27 @@ export class DaemonSync {
 			return;
 		}
 		this.#rev = Number(frame.rev) || 0;
-		const remote = (frame.workspaces as DaemonWorkspace[]).map((ws) =>
+		const incoming = (frame.workspaces as DaemonWorkspace[]).map((ws) =>
 			workspace(ws, (ws.projects ?? []).map(project))
 		);
-		this.#remoteKey = canonical(remote);
+		this.#remoteKey = canonical(incoming);
+		const localDefault = this.workspaces.workspaces.find(w => w.isDefault)?.id;
+		// Every client converges on the same identity instead of rewriting the
+		// daemon with its own seed on every reconnect.
+		const defaultId = [localDefault, ...incoming.filter(w => w.is_default).map(w => w.id)]
+			.filter((id): id is string => !!id).sort()[0];
+		if (defaultId) {
+			this.workspaces.canonicalDefaultId(defaultId);
+			this.#base = this.#base?.map(w => w.is_default ? { ...w, id: defaultId } : w) ?? null;
+		}
+		const remote: DaemonWorkspace[] = [];
+		for (const ws of incoming) {
+			const normalized = ws.is_default && defaultId ? { ...ws, id: defaultId } : ws;
+			const prior = remote.find(w => w.id === normalized.id);
+			if (prior) {
+				prior.projects = [...prior.projects, ...normalized.projects.filter(p => !prior.projects.some(q => trim(q.path) === trim(p.path)))];
+			} else remote.push(normalized);
+		}
 		const base = this.#base;
 		this.#base = remote;
 		// An empty daemon takes the desktop's list (push below). The first

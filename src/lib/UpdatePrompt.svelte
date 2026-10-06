@@ -1,6 +1,5 @@
 <script lang="ts">
-	// The update dialog. An installed update asks once to restart (later: the
-	// next launch runs it anyway). A version the server no longer accepts
+	// A downloaded update asks once to restart and install. A version the server no longer accepts
 	// (updater.required) blocks the app until the update is in: it downloads,
 	// then only offers the restart.
 	import { openUrl } from '@tauri-apps/plugin-opener';
@@ -18,7 +17,7 @@
 
 	async function openDownloads() {
 		const cfg = await readConfig().catch(() => ({}) as Record<string, unknown>);
-		const web = String(cfg.lynshen_web_url || 'https://api.lynshen.net').replace(/\/+$/, '');
+		const web = String(cfg.lynshen_web_url || 'https://www.lynshen.org').replace(/\/+$/, '');
 		await openUrl(`${web}/download`).catch(() => {});
 	}
 </script>

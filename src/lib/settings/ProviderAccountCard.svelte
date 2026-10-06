@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ProviderSignIn from '$lib/ProviderSignIn.svelte';
 	import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
 	import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
 	import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
@@ -47,6 +48,7 @@
 		cap,
 		onCardClick,
 		onLogin,
+		onAuthChange,
 		onLogout,
 		onSaveKey,
 		onSetDefault,
@@ -72,6 +74,7 @@
 		cap: (s: string) => string;
 		onCardClick: (p: Provider, authed: boolean) => void;
 		onLogin: () => void;
+		onAuthChange: () => void;
 		onLogout: (id: string) => void;
 		onSaveKey: (id: string) => void;
 		onSetDefault: (p: Provider) => void;
@@ -169,6 +172,9 @@
 			{:else}
 				{#if provider.id === 'deepseek' && authed}
 					<ProviderBalance balance={deepseekBal} />
+				{/if}
+				{#if ['openai', 'openai-codex', 'anthropic'].includes(provider.id)}
+					<ProviderSignIn provider={provider.id === 'openai' ? 'openai-codex' : provider.id} onSuccess={onAuthChange} />
 				{/if}
 				<div class="ekey">
 					<TextField bind:value={keyInput} type="password" placeholder={t('settings.account.keyPlaceholder', { id: provider.id })} mono />
