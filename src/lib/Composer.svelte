@@ -38,7 +38,7 @@
 	import ComposerTray, { type TrayItem, type TraySection } from '$lib/composer/ComposerTray.svelte';
 	import { answerStep, startFlow, togglePick, type QuestionFlow } from '$lib/composer/tray';
 	import { effortLabel } from '$lib/composer/effort';
-	import type { ModelRow } from '$lib/composer/modelRows';
+	import { stripGroupSuffix, type ModelRow } from '$lib/composer/modelRows';
 	import type { ChatState } from '$lib/chat.svelte';
 	import { buildApproveOp, type ApprovalMode, type ApproveOp } from '$lib/approval';
 	import { caps, BACKEND_LABELS, type BackendId } from '$lib/backends';
@@ -893,7 +893,7 @@
 					{#key chat.model}
 						<span class="mswap">
 							{#if chat.backendId === 'lynshen' && chat.model}<Vendor model={chat.model} size={15} />{:else}<BackendIcon backend={chat.backendId} size={15} />{/if}
-							<span class="m">{modelDisplayName || chat.modelLabel || chat.model || backendLabel}</span>
+							<span class="m">{modelDisplayName || stripGroupSuffix(chat.modelLabel || '') || chat.model || backendLabel}</span>
 						</span>
 					{/key}
 					{#if chat.efforts.length}{#key chat.effort}<span
@@ -904,7 +904,7 @@
 					{#if chat.ultracode}<span class="e">· Ultracode</span>{/if}
 				</button>
 			{:else if chat.model}
-				<span class="flatbtn model static"><BackendIcon backend={chat.backendId} size={15} /><span>{modelDisplayName || chat.modelLabel || chat.model}</span></span>
+				<span class="flatbtn model static"><BackendIcon backend={chat.backendId} size={15} /><span>{modelDisplayName || stripGroupSuffix(chat.modelLabel || '') || chat.model}</span></span>
 			{/if}
 			{#if modelPopoverVisible}
 				<ModelMenu

@@ -46,7 +46,7 @@
 		resolveFileRef,
 		type Op
 	} from '$lib/protocol';
-	import { buildModelRows, toolModels, type ToolModel } from '$lib/composer/modelRows';
+	import { buildModelRows, stripGroupSuffix, toolModels, type ToolModel } from '$lib/composer/modelRows';
 	import { confirm } from '$lib/ui/confirm.svelte';
 	import { BACKEND_LABELS, caps } from '$lib/backends';
 	import { defaultEffort } from '$lib/composer/effort';
@@ -405,15 +405,16 @@
 			selIdx = act >= 0 ? act : 0;
 			return;
 		}
-		if (chat.modelCatalog.length) {
-			chat.picker = {
-				kind: 'model',
-				models: chat.modelCatalog,
-				activeEffort: chat.modelCatalogEffort || chat.effort
-			};
-			const act = chat.modelCatalog.findIndex((m) => m.active);
-			selIdx = act >= 0 ? act : 0;
-		}
+		// Opened at once, from the last list the engine reported or (none yet:
+		// the engine is starting, stopped or unreachable) the provider's
+		// catalog; the engine's answer to /model replaces it.
+		chat.picker = {
+			kind: 'model',
+			models: chat.modelCatalog,
+			activeEffort: chat.modelCatalogEffort || chat.effort
+		};
+		const act = chat.modelCatalog.findIndex((m) => m.active);
+		selIdx = act >= 0 ? act : 0;
 		send({ op: 'command', input: '/model' });
 	}
 
@@ -526,7 +527,8 @@
 			},
 			toolMode,
 			localLabel: t('chat.providerLocal'),
-			unsetWindow: t('chat.windowUnset')
+			unsetWindow: t('chat.windowUnset'),
+			current: chat.model
 		});
 	});
 
@@ -1252,7 +1254,7 @@
 			onModelSelect={selectRow}
 			onModelClose={() => chat.closePicker()}
 			modelRows={filteredRows}
-			modelDisplayName={providersList.find(p => p.id === chat.provider)?.models.find(m => m.name === chat.model)?.display_name || undefined}
+			modelDisplayName={stripGroupSuffix(providersList.find(p => p.id === chat.provider)?.models.find(m => m.name === chat.model)?.display_name || '') || undefined}
 			modelSearch={showPickerSearch}
 			{backendLocked}
 			toolProvider={toolModel

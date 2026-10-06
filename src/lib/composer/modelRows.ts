@@ -179,6 +179,8 @@ export function buildModelRows(input: {
 	localLabel?: string;
 	/** Shown beside a LynShen model with no context window configured. */
 	unsetWindow?: string;
+	/** The session's model, marked active when the rows come from the catalog. */
+	current?: string;
 }): ModelRow[] {
 	const {
 		models,
@@ -189,7 +191,8 @@ export function buildModelRows(input: {
 		groups,
 		toolMode,
 		localLabel = '',
-		unsetWindow = ''
+		unsetWindow = '',
+		current = ''
 	} = input;
 	if (backendId === 'claude' || backendId === 'codex') {
 		const onLynShen = toolMode === 'lynshen';
@@ -223,7 +226,17 @@ export function buildModelRows(input: {
 		return detailOf(byok ? provider : null, ctx);
 	};
 	const activeCatalog = providersList.find((p) => p.id === cur)?.models ?? [];
-	const activeRows: ModelRow[] = models.map((m) => {
+	// Before the engine reports its list (a draft, or a provider just switched
+	// to) the provider's own catalog stands in, else the menu would be empty.
+	const engineModels: EngineModel[] = models.length
+		? models
+		: activeCatalog.map((m) => ({
+				model: m.name,
+				label: m.display_name ?? undefined,
+				active: m.name === current,
+				context_window: m.context_window
+			}));
+	const activeRows: ModelRow[] = engineModels.map((m) => {
 		const entry = activeCatalog.find((row) => row.name === m.model);
 		return {
 			id: `${cur}::${m.model}`,

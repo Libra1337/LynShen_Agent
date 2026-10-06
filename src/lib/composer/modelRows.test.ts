@@ -224,6 +224,32 @@ describe('gateway model rows', () => {
 		expect(rows[0].command).toBe('/model DeepSeek-V4.1-Flash');
 	});
 
+	it('lists the provider catalog before the engine has reported its models', () => {
+		// A draft after a provider switch: no engine list yet, which used to
+		// leave the reopened menu with nothing to pick.
+		const rows = buildModelRows({
+			...base,
+			groups: labels,
+			backendId: 'lynshen',
+			provider: 'monoize',
+			configured: ['monoize'],
+			current: 'claude-opus-5',
+			providersList: [
+				{
+					id: 'monoize',
+					models: [
+						{ name: 'DeepSeek-V4.1-Flash', groups: ['代理'] },
+						{ name: 'claude-opus-5', groups: ['代理'], context_window: 1_000_000 }
+					]
+				}
+			],
+			models: []
+		});
+		expect(rows.map((r) => r.label)).toEqual(['DeepSeek-V4.1-Flash', 'claude-opus-5']);
+		expect(rows.find((r) => r.active)?.id).toBe('monoize::claude-opus-5');
+		expect(rows[1].command).toBe('/model claude-opus-5');
+	});
+
 	it('strips a group suffix older configs stored in the label', () => {
 		expect(stripGroupSuffix('claude-opus-4-6（海外）')).toBe('claude-opus-4-6');
 		expect(stripGroupSuffix('gpt-5.5 (default) / gpt-5.5 (test)')).toBe('gpt-5.5');
