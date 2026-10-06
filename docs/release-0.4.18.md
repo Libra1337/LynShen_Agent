@@ -35,6 +35,16 @@ Windows 安装包已在本地构建并验证文件与元数据签名：
 - SHA-256：`d1dc440c82c7191f942db747709532ff33341ecaedfb496969e24a3b9ac7dac2`
 - CLI 来源：`1a9baa20e314c8e809d9730e60e036a89bba071f`，从干净源码构建。
 
+GitHub CI 生成的 Windows 安装包已独立下载并验证文件及元数据签名：
+- SHA-256：`e871a577464209293c0281395a2a8d80104bc173f3b9aa7e35da7a888ca155ac`
+- 大小：11,500,089 字节。
+- 与本地构建的哈希不同；线上分发使用 CI 构建产物。
+
+远程验证：
+- Desktop 四平台 CI 和浏览器回归通过：https://github.com/Libra1337/LynShen_Agent/actions/runs/37412326591
+- CLI Linux 格式、clippy、完整测试及 Windows 编译通过：https://github.com/Libra1337/LynShen-CLI/actions/runs/37411470402
+- macOS 无 Apple 证书时使用 ad-hoc 签名，自动更新产物另行使用 Tauri 更新密钥签名；尚未进行 Apple 公证。
+
 Windows、macOS Apple Silicon、macOS Intel 和 Linux 由发布工作流构建，全部成功后才发布完整目录及自动更新。发布前每个平台运行桌面 Rust 测试和 clippy。
 此记录提交时，线上下载目录仍为 0.4.17；0.4.18 构建与发布结果需以 GitHub Actions 和在线目录为准。
 Monoize 镜像 `desktop-0418-fe561f25` 已通过隔离检查。2026-10-05 20:07 UTC，两个公网域名的模型目录均返回 200，43 个模型中 34 个可用，可用项均带有分组。
