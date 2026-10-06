@@ -19,6 +19,7 @@ mod installer;
 mod monoize_auth;
 mod native_import;
 mod plugins;
+mod preview;
 mod provider_auth;
 mod secrets;
 mod shell_env;
@@ -1365,7 +1366,12 @@ pub(crate) fn which(cmd: &str) -> Option<PathBuf> {
             return Some(found);
         }
     }
-    which_in(cmd, std::env::var_os("PATH")?)
+    if let Some(found) = std::env::var_os("PATH").and_then(|path| which_in(cmd, path)) {
+        return Some(found);
+    }
+    // Tools the app installs per user (installer::user_install) land in
+    // ~/.local/bin, which a GUI app's PATH often lacks.
+    which_in(cmd, backend::home_dir().join(".local").join("bin").into_os_string())
 }
 
 /// Executable extensions to try for a bare command name on Windows, from
@@ -3312,6 +3318,7 @@ pub fn run() {
             pty_close,
             browser::browser_open,
             browser::browser_navigate,
+            preview::preview_url,
             browser::browser_back,
             browser::browser_forward,
             browser::browser_reload,

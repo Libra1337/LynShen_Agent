@@ -29,6 +29,7 @@
 	import AgentAvatar from '$lib/AgentAvatar.svelte';
 	import { agentDirectory } from '$lib/agents.svelte';
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
+	import { invoke } from '@tauri-apps/api/core';
 	import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
 	import { open } from '@tauri-apps/plugin-dialog';
@@ -968,7 +969,11 @@
 		const abs = rel.startsWith('/') ? rel : `${cwd.replace(/\/+$/, '')}/${rel.replace(/^\.?\//, '')}`;
 		const ext = abs.split('/').pop()?.split('.').pop()?.toLowerCase() ?? '';
 		if ((ext === 'html' || ext === 'htm') && prefs.htmlOpenInBrowser) {
-			browser.open(`file://${abs}`);
+			// The embedded browser loads http(s) only; a loopback URL also lets the
+			// page load its own relative scripts and styles.
+			invoke<string>('preview_url', { path: abs })
+				.then((url) => browser.open(url))
+				.catch((e) => toast.error(t('chat.fileOpenFailed', { path: ref.path, error: String(e) })));
 		} else {
 			const at = ref.line ? { line: ref.line, col: ref.col } : undefined;
 			editorStore.open(abs, cwd, at).catch((e) => toast.error(t('chat.fileOpenFailed', { path: ref.path, error: String(e) })));

@@ -5,7 +5,8 @@
 //! spawns a `Plan::Run` and pumps its output to the webview.
 //!
 //! Model per platform:
-//!   - system tools (node, ffmpeg): Windows → winget, macOS → brew, Linux → a
+//!   - system tools (node, ffmpeg, gh): Windows → winget, macOS → brew (else the
+//!     per-user `install_tool.sh`: official build, SHA-256 checked), Linux → a
 //!     copyable `sudo <pkg-manager>` command (the GUI never runs sudo itself).
 //!   - npm tools (codex, lynshen): `npm install -g <pkg>` on every platform,
 //!     gated on npm being present (else NeedsPrereq "node").
@@ -128,6 +129,32 @@ fn winget(id: &str) -> Plan {
     }
 }
 
+/// Tools `install_tool.sh` can install per user on macOS without Homebrew.
+fn user_install_tool(brew_pkg: &str) -> Option<&'static str> {
+    match brew_pkg {
+        "node" => Some("node"),
+        "ffmpeg" => Some("ffmpeg"),
+        "gh" => Some("gh"),
+        _ => None,
+    }
+}
+
+/// Embedded so the app needs no extra file on disk; `sh -c` runs it with the
+/// tool as `$1` (the official build, checksum-verified, into the user's home).
+pub const INSTALL_TOOL_SCRIPT: &str = include_str!("install_tool.sh");
+
+fn user_install(tool: &str) -> Plan {
+    Plan::Run {
+        program: "sh".to_string(),
+        args: vec![
+            "-c".to_string(),
+            INSTALL_TOOL_SCRIPT.to_string(),
+            "install-tool".to_string(),
+            tool.to_string(),
+        ],
+    }
+}
+
 fn brew(pkg: &str) -> Plan {
     Plan::Run {
         program: "brew".to_string(),
@@ -165,6 +192,8 @@ fn system_plan(
         "macos" => {
             if has("brew") {
                 brew(brew_pkg)
+            } else if let Some(tool) = user_install_tool(brew_pkg) {
+                user_install(tool)
             } else {
                 Plan::OpenUrl {
                     url: url.to_string(),
@@ -352,8 +381,11 @@ mod tests {
             plan(Dep::Node, "windows", &avail(&[])),
             Plan::OpenUrl { .. }
         ));
-        // macOS with brew → brew install node.
+        // macOS with brew → brew install node; without → the per-user installer.
         assert_eq!(plan(Dep::Node, "macos", &avail(&["brew"])), brew("node"));
+        assert_eq!(plan(Dep::Node, "macos", &avail(&[])), user_install("node"));
+        assert_eq!(plan(Dep::Ffmpeg, "macos", &avail(&[])), user_install("ffmpeg"));
+        assert_eq!(plan(Dep::Gh, "macos", &avail(&[])), user_install("gh"));
         // Linux with apt → copyable sudo command (nodejs + npm).
         assert_eq!(
             plan(Dep::Node, "linux", &avail(&["apt-get"])),
@@ -504,10 +536,7 @@ mod tests {
             plan(Dep::Gh, "windows", &avail(&["winget"])),
             winget("GitHub.cli")
         );
-        assert!(matches!(
-            plan(Dep::Gh, "macos", &avail(&[])),
-            Plan::OpenUrl { .. }
-        ));
+        assert_eq!(plan(Dep::Gh, "macos", &avail(&[])), user_install("gh"));
         assert!(matches!(
             plan(Dep::Gh, "linux", &avail(&["apt-get"])),
             Plan::OpenUrl { .. }
