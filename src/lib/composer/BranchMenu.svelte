@@ -94,7 +94,7 @@
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && !creating && onClose()} />
 
-<button class="bm-backdrop" aria-label="close menu" tabindex="-1" onclick={onClose}></button>
+<button class="bm-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={onClose}></button>
 <div class="pop bm" role="dialog" aria-label={t('chat.branchMenu.title')}>
 	{#if creating}
 		<label class="field">

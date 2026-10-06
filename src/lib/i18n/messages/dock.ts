@@ -45,7 +45,9 @@ const dock = {
 			splitHere: '拆分到这里',
 			maximizedHint: '已最大化 · Esc 还原',
 			maximize: '最大化',
-			restore: '还原'
+			restore: '还原',
+			closeTab: '关闭标签',
+			resize: '拖动调整面板大小'
 		},
 		tui: {
 			missing: '没有找到 {bin} 命令',
@@ -255,7 +257,9 @@ const dock = {
 			splitHere: 'Split here',
 			maximizedHint: 'Maximized · Esc to restore',
 			maximize: 'Maximize',
-			restore: 'Restore'
+			restore: 'Restore',
+			closeTab: 'Close tab',
+			resize: 'Drag to resize the panels'
 		},
 		tui: {
 			missing: 'Could not find the {bin} command',

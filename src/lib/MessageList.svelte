@@ -450,10 +450,10 @@
 				<DeliveryNotice {delivery} />
 			{:else}
 			<div class="row user">
-				<button class="uedit rewind" onclick={() => onRewind(m.text, userOrdinal.get(m) ?? 0)} aria-label="rewind" title={t('chat.rewindTitleN', { n: drop })}>
+				<button class="uedit rewind" onclick={() => onRewind(m.text, userOrdinal.get(m) ?? 0)} aria-label={t('chat.rewindTitleN', { n: drop })} title={t('chat.rewindTitleN', { n: drop })}>
 					<ArrowCounterClockwiseIcon size={12} />{#if drop > 1}<span class="rwn">{drop}</span>{/if}
 				</button>
-				<button class="uedit" onclick={() => onEdit(m.text)} aria-label="quote" title={t('chat.quoteTitle')}><PencilSimpleIcon size={12} /></button>
+				<button class="uedit" onclick={() => onEdit(m.text)} aria-label={t('chat.quoteTitle')} title={t('chat.quoteTitle')}><PencilSimpleIcon size={12} /></button>
 				<div class="ucol">
 					<!-- One line: the bubble is pre-wrap, so template whitespace would show. -->
 					<div class="bubble" class:pending={m.state === 'sending'}>{#if m.images?.length}<div class="uimgs">{#each m.images as p (p)}<UserImage path={p} load={loadImage} />{/each}</div>{/if}{#each userBlocks(m.text) as block, b (b)}{#if block.quote}<span class="uquote">{block.text}</span>{:else}<span class="utext">{#each userSegments(block.text) as seg, j (j)}{#if seg.image}<span class="utoken">{t('chat.imageToken', { n: seg.image })}</span>{:else}{seg.text}{/if}{/each}</span>{/if}{/each}</div>
@@ -491,7 +491,7 @@
 							<span class="mono">{fmtDur(m.elapsed)}</span>
 							{#if m.tokens}<span class="mono">{t('chat.tokens', { n: m.tokens })}</span>{/if}
 						{/if}
-						<button class="copy" onclick={() => copy(m.text, m)} aria-label="copy">
+						<button class="copy" onclick={() => copy(m.text, m)} aria-label={t('common.copy')}>
 							{#if copied === m}<CheckIcon size={13} /> {t('common.copied')}{:else}<CopyIcon size={13} /> {t('common.copy')}{/if}
 						</button>
 					</div>

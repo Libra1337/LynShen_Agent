@@ -449,7 +449,7 @@
 				<CaretDownIcon size={12} />
 			</button>
 			{#if switchMenu}
-				<button class="backdrop" aria-label="close menu" tabindex="-1" onclick={() => (switchMenu = false)}></button>
+				<button class="backdrop" aria-label={t('common.close')} tabindex="-1" onclick={() => (switchMenu = false)}></button>
 				<div class="pop switch-menu" class:left={wide} role="menu">
 					<div class="pop-head">{t('shell.remote.computers')}</div>
 					{#each conns as conn (conn)}

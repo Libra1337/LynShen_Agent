@@ -55,5 +55,5 @@
 <style>
 	.oauth { display: flex; flex-direction: column; gap: 10px; }
 	p { margin: 0; font-size: var(--fs-sm); color: var(--dim); line-height: 1.6; }
-	.error { color: var(--error); overflow-wrap: anywhere; }
+	.error { color: var(--err); overflow-wrap: anywhere; }
 </style>

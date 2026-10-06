@@ -250,6 +250,10 @@ export interface RetryState {
 /** A session's title before the daemon names it. */
 export const UNTITLED = 'New session';
 
+/** A session title as the UI shows it: the stored placeholder (or none) reads
+ *  in the interface language. */
+export const shownTitle = (title: string) => (!title || title === UNTITLED ? t('shell.newChat') : title);
+
 export class ChatState {
 	/** Set by the page: invoked when the agent's `browser_open` tool succeeds,
 	 *  so the embedded browser panel navigates to the requested URL. Static —

@@ -519,7 +519,7 @@
 		{#if stagedCount > 0}
 			<div class="commitbar">
 				{#if llm}
-					<Button size="icon" onclick={genCommit} disabled={!!genning} title={t('dock.git.aiCommit')} aria-label="generate commit message">
+					<Button size="icon" onclick={genCommit} disabled={!!genning} title={t('dock.git.aiCommit')} aria-label={t('dock.git.aiCommit')}>
 						{#if genning === 'commit'}<CircleNotchIcon size={14} class="spin" />{:else}<SparkleIcon size={14} />{/if}
 					</Button>
 				{/if}

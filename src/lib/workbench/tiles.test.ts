@@ -46,6 +46,15 @@ describe('split', () => {
 		expect((root.b as LeafNode).tabs.map((t) => t.id)).toEqual(['c']);
 	});
 
+	it('gives the new leaf the requested share on either side', () => {
+		const layout = singleLeafLayout([tab('a')]);
+		const leaf = leavesOf(layout.root)[0];
+		const right = splitLeaf(layout, leaf.id, 'right', tab('c'), 0.3).layout.root as SplitNode;
+		expect(right.ratio).toBeCloseTo(0.7);
+		const left = splitLeaf(layout, leaf.id, 'left', tab('c'), 0.3).layout.root as SplitNode;
+		expect(left.ratio).toBeCloseTo(0.3);
+	});
+
 	it('puts the new leaf before the target for left/top zones', () => {
 		const { layout, secondId } = twoLeaves('top');
 		const root = layout.root as SplitNode;

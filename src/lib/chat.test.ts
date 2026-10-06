@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ChatState, countDiffLines } from './chat.svelte';
+import { ChatState, countDiffLines, shownTitle, UNTITLED } from './chat.svelte';
 import { setLocale } from './i18n';
 
 const userTexts = (c: ChatState) =>
@@ -60,6 +60,12 @@ describe('ChatState.handle', () => {
 		c.handle({ type: 'user_message', content: 'do the thing again' });
 		c.handle({ type: 'transcript', items: [{ role: 'user', content: 'earlier' }] });
 		expect(c.title).toBe('New session');
+	});
+
+	it('shows the placeholder title in the interface language', () => {
+		expect(shownTitle(UNTITLED)).not.toBe(UNTITLED);
+		expect(shownTitle('')).toBe(shownTitle(UNTITLED));
+		expect(shownTitle('Fix the build')).toBe('Fix the build');
 	});
 
 	it('de-duplicates the optimistic echo', () => {

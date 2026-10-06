@@ -164,6 +164,7 @@ const chat = {
 		cost: '成本',
 		stopTitle: '停止',
 		sendTitle: '发送',
+		jumpToBottom: '滚动到底部',
 		// ToolCard
 		binaryFile: '二进制文件',
 		emptyDir: '空目录',
@@ -418,6 +419,7 @@ const chat = {
 		cost: 'Cost',
 		stopTitle: 'Stop',
 		sendTitle: 'Send',
+		jumpToBottom: 'Scroll to the bottom',
 		// ToolCard
 		binaryFile: 'Binary file',
 		emptyDir: 'Empty directory',

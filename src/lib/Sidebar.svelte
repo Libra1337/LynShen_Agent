@@ -21,6 +21,7 @@
 	import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
 	import Button from '$lib/ui/Button.svelte';
 	import { t } from '$lib/i18n';
+	import { shownTitle } from '$lib/chat.svelte';
 	import { withShortcut } from '$lib/shortcuts';
 	import { BACKEND_LABELS } from '$lib/backends';
 	import BackendIcon from '$lib/BackendIcon.svelte';
@@ -353,7 +354,7 @@
 					class:running={status?.kind === 'running'}
 					class:unread={status?.kind === 'unread'}
 					ondblclick={(e) => { e.stopPropagation(); startRename(s); }}
-					role="presentation">{s.chat.title}</span
+					role="presentation">{shownTitle(s.chat.title)}</span
 				>
 			{/if}
 			{#if req}<RequirementTag id={req.id} title={req.title} />{/if}
@@ -389,7 +390,7 @@
 					s.archived ? onUnarchiveSession(s.id) : onArchiveSession(s.id);
 				}}
 				onkeydown={(e) => e.key === 'Enter' && (e.stopPropagation(), s.archived ? onUnarchiveSession(s.id) : onArchiveSession(s.id))}
-				aria-label={s.archived ? 'unarchive' : 'archive'}
+				aria-label={s.archived ? t('shell.unarchive') : t('shell.archive')}
 				title={s.archived ? t('shell.unarchive') : t('shell.archive')}
 			>
 				{#if s.archived}<BoxArrowUpIcon size={16} />{:else}<ArchiveIcon size={16} />{/if}
@@ -403,7 +404,7 @@
 					onCloseSession(s.id);
 				}}
 				onkeydown={(e) => e.key === 'Enter' && (e.stopPropagation(), onCloseSession(s.id))}
-				aria-label="close"><XIcon size={16} /></span
+				aria-label={t('shell.removeSessionTitle')}><XIcon size={16} /></span
 			>
 			{/if}
 		</button>
@@ -496,7 +497,7 @@
 				<section>
 					<div class="head">
 						<span>{chats.name}</span>
-						<button class="head-act" onclick={() => onHistory(chats)} aria-label="history" title={t('shell.history')}><ClockCounterClockwiseIcon size={16} /></button>
+						<button class="head-act" onclick={() => onHistory(chats)} aria-label={t('shell.history')} title={t('shell.history')}><ClockCounterClockwiseIcon size={16} /></button>
 						<button class="head-act" onclick={onNewChat} aria-label={t('shell.newChat')} title={t('shell.newChat')}><PlusIcon size={16} /></button>
 					</div>
 					{#each showAll[chats.id] || query ? active : firstSessions(active) as s (s.id)}{@render sessRow(s, false, false, chats)}{/each}
@@ -512,7 +513,7 @@
 		<section>
 			<div class="head">
 				<span>{t('shell.projects')}</span>
-				<button class="head-act" onclick={onNewProject} aria-label="new project" title={t('shell.newProjectTitle')}><PlusIcon size={16} /></button>
+				<button class="head-act" onclick={onNewProject} aria-label={t('shell.newProjectTitle')} title={t('shell.newProjectTitle')}><PlusIcon size={16} /></button>
 			</div>
 			{#each codeProjects as p (p.id)}
 				{@const active = listedSessions(p).filter((s) => sessionMatches(p, s))}
@@ -528,14 +529,14 @@
 						{#if p.stale}
 							<span class="tag" title={p.path}>{t('shell.task.stale')}</span>
 						{:else}
-							<button class="act" onclick={() => onHistory(p)} aria-label="history" title={withShortcut(t('shell.history'), 'history')}><ClockCounterClockwiseIcon size={16} /></button>
+							<button class="act" onclick={() => onHistory(p)} aria-label={t('shell.history')} title={withShortcut(t('shell.history'), 'history')}><ClockCounterClockwiseIcon size={16} /></button>
 							{#if !p.worktree}
-								<button class="act" onclick={() => onNewTask(p)} aria-label="new parallel task" title={t('shell.newTask')}><GitForkIcon size={16} /></button>
+								<button class="act" onclick={() => onNewTask(p)} aria-label={t('shell.newTask')} title={t('shell.newTask')}><GitForkIcon size={16} /></button>
 							{/if}
-							<button class="act" onclick={() => onNewSession(p)} aria-label="new session" title={withShortcut(t('shell.newSessionInProject'), 'newSession')}><PlusIcon size={16} /></button>
+							<button class="act" onclick={() => onNewSession(p)} aria-label={t('shell.newSessionInProject')} title={withShortcut(t('shell.newSessionInProject'), 'newSession')}><PlusIcon size={16} /></button>
 						{/if}
 						{#if codeProjects.length > 1 || p.stale}
-							<button class="act" class:always={p.stale} onclick={() => onCloseProject(p)} aria-label="close project" title={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')}><XIcon size={16} /></button>
+							<button class="act" class:always={p.stale} onclick={() => onCloseProject(p)} aria-label={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')} title={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')}><XIcon size={16} /></button>
 						{/if}
 					</div>
 					{#if open}

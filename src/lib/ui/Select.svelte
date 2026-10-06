@@ -42,7 +42,7 @@
 		<span class="chev" class:up={open}><CaretDownIcon size={15} /></span>
 	</button>
 	{#if open}
-		<button class="backdrop" aria-label="close" onclick={() => (open = false)}></button>
+		<button class="backdrop" aria-label={t('common.close')} onclick={() => (open = false)}></button>
 		<div class="menu">
 			{#each options as o, i (o.value)}
 				{#if o.group && (i === 0 || options[i - 1]?.group !== o.group)}

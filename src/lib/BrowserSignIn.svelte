@@ -57,5 +57,5 @@
 	.browser-sign-in { display: flex; flex-direction: column; gap: 12px; }
 	p { margin: 0; color: var(--dim); font-size: var(--fs-sm); line-height: 1.6; }
 	.code { color: var(--text); font-family: var(--font-mono); font-size: var(--fs-lg); letter-spacing: .12em; }
-	.error { overflow-wrap: anywhere; color: var(--error); }
+	.error { overflow-wrap: anywhere; color: var(--err); }
 </style>

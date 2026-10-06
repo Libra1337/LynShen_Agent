@@ -126,7 +126,7 @@
 				label: t('shell.cmd.openPanel', { name: p.label }),
 				hint: t('shell.cmd.openPanelHint'),
 				icon: SquaresFourIcon,
-				keys: p.key === 'terminal' ? shortcutLabel('terminal') : undefined,
+				keys: p.key === 'term' ? shortcutLabel('terminal') : undefined,
 				keywords: `${t('shell.cmd.openPanelKw')} ${p.key} ${p.label}`,
 				run: wrap(() => onOpenPanel(p.key))
 			})),

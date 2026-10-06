@@ -1448,7 +1448,7 @@
 	.mferr {
 		margin: 0;
 		font-size: var(--fs-xs);
-		color: var(--danger, #e5484d);
+		color: var(--err);
 		word-break: break-all;
 	}
 	.mfhint {

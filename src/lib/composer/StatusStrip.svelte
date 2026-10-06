@@ -21,7 +21,7 @@
 			<div class="panel" transition:slide={{ duration: 140 }}>
 				<div class="phead">
 					<span class="ptitle">{t('chat.statusTitle')} · {items.length}</span>
-					<button class="pclose" onclick={() => (open = false)} aria-label="close"><XIcon size={13} /></button>
+					<button class="pclose" onclick={() => (open = false)} aria-label={t('common.close')}><XIcon size={13} /></button>
 				</div>
 				<div class="plist">
 					{#each items as it, i (i)}

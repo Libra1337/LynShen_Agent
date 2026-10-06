@@ -94,7 +94,7 @@
 {/snippet}
 
 {#if anchored}
-	<button class="pop-backdrop" aria-label="close" onclick={onClose}></button>
+	<button class="pop-backdrop" aria-label={t('common.close')} onclick={onClose}></button>
 	<div class="modal anchored" role="dialog" aria-label={title}>
 		{@render body()}
 	</div>

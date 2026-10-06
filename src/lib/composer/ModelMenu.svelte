@@ -157,7 +157,7 @@
 </script>
 
 <svelte:window onkeydowncapture={onKeyCapture} />
-<button class="mm-backdrop" aria-label="close" tabindex="-1" onclick={onClose}></button>
+<button class="mm-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={onClose}></button>
 <div class="pop mm" role="dialog" aria-label={t('chat.switchModel')} bind:this={popEl} style:left="{popLeft}px" style:top="{popTop}px">
 	{#if page === 'main'}
 		<section class="current">

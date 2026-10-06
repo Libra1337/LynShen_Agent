@@ -32,7 +32,7 @@
 		requestPermission,
 		sendNotification
 	} from '@tauri-apps/plugin-notification';
-	import { ChatState } from '$lib/chat.svelte';
+	import { ChatState, shownTitle } from '$lib/chat.svelte';
 	import { needsClaudeYoloRespawn } from '$lib/approval';
 	import {
 		readAuthProviders,
@@ -64,7 +64,6 @@
 		findLeaf,
 		leafOfTab,
 		leavesOf,
-		openTab,
 		serializeLayout,
 		type TileLayout,
 		type TileTab
@@ -74,7 +73,10 @@
 		chatSessionOf,
 		chatSessionsIn,
 		openChatTab,
-		reconcileLayout
+		openToolTab,
+		reconcileLayout,
+		TOOL_SIDE_RATIO,
+		TOOL_SPLIT_MIN_CHAT
 	} from '$lib/workbench/canvas';
 	import { tuiBackendOf, tuiTabTitle } from '$lib/workbench/tuiTab';
 	import { canHandOffToTui, isValidResumeSessionId } from '$lib/tuiHandoff';
@@ -148,7 +150,7 @@
 		}
 	}
 	const notifyDone = (title: string) =>
-		notify('LynShen', t('shell.notifyDone', { title: title || t('shell.untitled') }));
+		notify('LynShen', t('shell.notifyDone', { title: shownTitle(title) }));
 	// An agent's question, pending action or report while the window is in
 	// the background.
 	agentDirectory.onArrival = (kind, agent, text, agentId) => {
@@ -388,7 +390,7 @@
 
 	function tileLabel(tab: TileTab): string {
 		const sid = chatSessionOf(tab.panel);
-		if (sid) return sessionMap.get(sid)?.chat.title || t('shell.untitled');
+		if (sid) return shownTitle(sessionMap.get(sid)?.chat.title ?? '');
 		const tui = tuiBackendOf(tab.panel);
 		if (tui) return tuiTabTitle(tui);
 		if (tab.panel === 'audit') return t('editor.title');
@@ -455,6 +457,14 @@
 		syncActiveFromFocus();
 	}
 
+	/** Opens a tool panel from `leafId` without covering the chat there,
+	 *  unless the leaf is too narrow to give a split chat a usable width. */
+	function openTool(leafId: string | null, kind: string) {
+		const el = leafId ? document.querySelector<HTMLElement>(`[data-leaf="${leafId}"]`) : null;
+		const split = !el || el.clientWidth * (1 - TOOL_SIDE_RATIO) >= TOOL_SPLIT_MIN_CHAT;
+		applyTiles(openToolTab(tiles, leafId, { id: newTabId(), panel: kind }, split));
+	}
+
 	/** Per-leaf “+” menu (and the empty-canvas buttons). */
 	function mosaicAdd(leafId: string | null, key: string) {
 		if (key === 'chat') {
@@ -473,7 +483,7 @@
 				return;
 			}
 		}
-		applyTiles(openTab(tiles, leafId ?? focusedLeaf, { id: newTabId(), panel: key }));
+		openTool(leafId ?? focusedLeaf, key);
 	}
 
 	/** Palette / signals: re-activate an existing tab of this panel kind (a
@@ -482,7 +492,7 @@
 	function openPanelTile(kind: string) {
 		const existing = findPanelTab(kind);
 		if (existing) applyTiles(activateTab(tiles, existing.id));
-		else applyTiles(openTab(tiles, focusedLeaf, { id: newTabId(), panel: kind }));
+		else openTool(focusedLeaf, kind);
 	}
 
 	// The workbench-active session always has a chat tile: activating a session
@@ -528,7 +538,7 @@
 		if (!tilesReady) return;
 		untrack(() => {
 			const existing = findPanelTab('audit');
-			if (want && !existing) applyTiles(openTab(tiles, focusedLeaf, { id: newTabId(), panel: 'audit' }));
+			if (want && !existing) openTool(focusedLeaf, 'audit');
 			else if (want && existing) applyTiles(activateTab(tiles, existing.id));
 			else if (!want && existing) applyTiles(closeTab(tiles, existing.id));
 		});
@@ -834,7 +844,7 @@
 		if (s && !s.draft) {
 			const ok = await confirm({
 				title: t('shell.removeSessionTitle'),
-				message: t('shell.removeSessionConfirm', { title: s.chat.title || t('shell.untitled') }),
+				message: t('shell.removeSessionConfirm', { title: shownTitle(s.chat.title) }),
 				confirmLabel: t('shell.removeSessionTitle'),
 				danger: true,
 				dontAskKey: 'remove-session'
@@ -964,7 +974,7 @@
 		if (matches(e, 'sidebar')) return act(toggleSidebar);
 		if (matches(e, 'audit')) return act(toggleAudit);
 		if (matches(e, 'quickOpen')) return act(() => activeProject && (showQuickOpen = !showQuickOpen));
-		if (matches(e, 'terminal')) return act(() => openPanelTile('terminal'));
+		if (matches(e, 'terminal')) return act(() => openPanelTile('term'));
 		if (matches(e, 'history')) return act(() => activeProject && store.openHistory(activeProject));
 		if (matches(e, 'focusComposer') && pane) return act(pane.focusComposer);
 		if (matches(e, 'stop') && pane) return act(pane.stop);
@@ -1044,7 +1054,7 @@
 					if (prefs.cacheMissAlert) {
 						toast.warn(
 							t('shell.cacheMiss.message', {
-								title: s.chat.title || t('shell.untitled'),
+								title: shownTitle(s.chat.title),
 								input: fmtTokens(miss.input),
 								cached: fmtTokens(miss.cached)
 							}),
@@ -1201,7 +1211,7 @@
 		sidebarOpen={showSidebar}
 		onToggleSidebar={toggleSidebar}
 		showToggle={!showSetup}
-		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : showSetup ? 'LynShen' : (active?.chat.title ?? '')}
+		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : showSetup ? 'LynShen' : active ? shownTitle(active.chat.title) : ''}
 		subtitle={showSettings || showDesk || showSetup ? '' : (activeProject?.name ?? '')}
 		addOptions={showSettings || showDesk || showSetup ? [] : addOptions}
 		onAdd={(key) => mosaicAdd(focusedLeaf, key)}
@@ -1274,7 +1284,7 @@
 				pendingCount={agentDirectory.pending}
 				onDesk={() => openDesk(null)}
 			/>
-			<div class="resizer side" class:hidden={!showSidebar} role="separator" aria-label="resize sidebar" onpointerdown={startSidebarResize}></div>
+			<div class="resizer side" class:hidden={!showSidebar} role="separator" aria-label={t('shell.remote.resizeSidebar')} onpointerdown={startSidebarResize}></div>
 
 			<!-- THE CANVAS: workspace tabs on top, one mosaic for chats, tool panels,
 			     TUI and audit tiles below. -->

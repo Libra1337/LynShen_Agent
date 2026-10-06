@@ -241,7 +241,7 @@
 			<div
 				class="gutter {n.dir}"
 				role="separator"
-				aria-label="resize"
+				aria-label={t('dock.mosaic.resize')}
 				aria-orientation={n.dir === 'row' ? 'vertical' : 'horizontal'}
 				onpointerdown={(e) => gutterDown(e, n)}
 			></div>
@@ -287,7 +287,7 @@
 						{#if tabMark}{@render tabMark(tab)}{/if}
 						<button
 							class="lclose"
-							aria-label="close tab"
+							aria-label={t('dock.mosaic.closeTab')}
 							onpointerdown={(e) => e.stopPropagation()}
 							ondblclick={(e) => e.stopPropagation()}
 							onclick={(e) => {
@@ -306,7 +306,7 @@
 				{#if addOptions.length}
 					<button
 						class="lbtn"
-						aria-label="add panel"
+						aria-label={t('shell.addPanel')}
 						onclick={() => (addMenuFor = addMenuFor === leaf.id ? null : leaf.id)}><PlusIcon size={13} /></button
 					>
 				{/if}

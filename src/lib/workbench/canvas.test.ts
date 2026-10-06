@@ -5,8 +5,10 @@ import {
 	chatSessionsIn,
 	chatTab,
 	openChatTab,
+	openToolTab,
 	reconcileLayout,
-	CHAT_SEED_RATIO
+	CHAT_SEED_RATIO,
+	TOOL_SIDE_RATIO
 } from './canvas';
 import {
 	activateTab,
@@ -60,6 +62,57 @@ describe('openChatTab', () => {
 		const other = leavesOf(layout.root)[1];
 		const next = openChatTab(activateTab(layout, 't1'), other.id, 's1');
 		expect(chatSessionsIn(next)).toEqual(['s1']);
+	});
+});
+
+describe('openToolTab', () => {
+	it('opens a tool beside a lone chat instead of covering it', () => {
+		const layout = singleLeafLayout([chatTab('s1')]);
+		const chatLeaf = leavesOf(layout.root)[0];
+		const next = openToolTab(layout, chatLeaf.id, panelTab('t1', 'git'));
+		const root = next.root as SplitNode;
+		expect(root.dir).toBe('row');
+		expect(root.ratio).toBeCloseTo(1 - TOOL_SIDE_RATIO);
+		expect((root.a as LeafNode).tabs.map((t) => t.panel)).toEqual(['chat:s1']);
+		expect((root.b as LeafNode).tabs.map((t) => t.panel)).toEqual(['git']);
+		expect((root.b as LeafNode).active).toBe('t1');
+	});
+
+	it('stacks later tools in the existing tool leaf', () => {
+		const layout = singleLeafLayout([chatTab('s1')]);
+		const chatLeaf = leavesOf(layout.root)[0];
+		const once = openToolTab(layout, chatLeaf.id, panelTab('t1', 'git'));
+		const twice = openToolTab(once, chatLeaf.id, panelTab('t2', 'term'));
+		const leaves = leavesOf(twice.root);
+		expect(leaves).toHaveLength(2);
+		expect(leaves[1].tabs.map((t) => t.panel)).toEqual(['git', 'term']);
+		expect(leaves[1].active).toBe('t2');
+	});
+
+	it('adds the tab to a focused leaf that already shows a tool', () => {
+		const layout = dockOnlyLayout();
+		const target = leavesOf(layout.root)[1];
+		const next = openToolTab(layout, target.id, panelTab('t9', 'files'));
+		expect(leavesOf(next.root)[1].tabs.map((t) => t.panel)).toEqual(['term', 'files']);
+	});
+
+	it('stacks the tool on the chat when splitting is not allowed', () => {
+		const layout = singleLeafLayout([chatTab('s1')]);
+		const next = openToolTab(layout, null, panelTab('t1', 'git'), false);
+		const leaves = leavesOf(next.root);
+		expect(leaves).toHaveLength(1);
+		expect(leaves[0].tabs.map((t) => t.panel)).toEqual(['chat:s1', 'git']);
+	});
+
+	it('treats a native TUI tab as a conversation', () => {
+		const layout = singleLeafLayout([panelTab('tui', 'tui:codex')]);
+		const next = openToolTab(layout, null, panelTab('t1', 'git'));
+		expect(leavesOf(next.root)).toHaveLength(2);
+	});
+
+	it('creates a root leaf on an empty canvas', () => {
+		const next = openToolTab(singleLeafLayout([]), null, panelTab('t1', 'git'));
+		expect(leavesOf(next.root).map((l) => l.tabs.map((t) => t.panel))).toEqual([['git']]);
 	});
 });
 

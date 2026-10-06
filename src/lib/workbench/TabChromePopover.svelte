@@ -102,7 +102,7 @@
 
 <svelte:window onkeydown={onKey} />
 
-<button class="backdrop" aria-label="close" onclick={onClose} oncontextmenu={(e) => { e.preventDefault(); onClose(); }}></button>
+<button class="backdrop" aria-label={t('common.close')} onclick={onClose} oncontextmenu={(e) => { e.preventDefault(); onClose(); }}></button>
 <div
 	class="pop"
 	role="dialog"

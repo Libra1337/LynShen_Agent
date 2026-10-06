@@ -811,6 +811,7 @@
 			contenteditable="true"
 			role="combobox"
 			tabindex="0"
+			aria-label={t(currentQ ? 'chat.questionPlaceholder' : chat.isChatMode ? 'chat.chatPlaceholder' : 'chat.composerPlaceholder')}
 			data-placeholder={chat.suggestion && !currentQ
 				? t('chat.suggestionPlaceholder', { text: chat.suggestion })
 				: t(currentQ ? 'chat.questionPlaceholder' : chat.isChatMode ? 'chat.chatPlaceholder' : 'chat.composerPlaceholder')}
@@ -912,15 +913,15 @@
 				class:pulse={voice === 'rec'}
 				onclick={toggleVoice}
 				disabled={voice === 'busy'}
-				aria-label="voice input"
+				aria-label={t('chat.voiceTitle')}
 				title={voice === 'rec' ? t('chat.voiceStopTitle') : voice === 'busy' ? t('chat.voiceBusyTitle') : t('chat.voiceTitle')}
 			>
 				{#if voice === 'busy'}<CircleNotchIcon size={15} class="spin" />{:else if voice === 'rec'}<StopCircleIcon size={15} />{:else}<MicrophoneIcon size={17} />{/if}
 			</button>
 			{#if chat.busy && !currentQ}
-				<button class="cact stop" onclick={onStop} aria-label="stop" title={withShortcut(t('chat.stopTitle'), 'stop')}><SquareIcon size={15} /></button>
+				<button class="cact stop" onclick={onStop} aria-label={t('chat.stopTitle')} title={withShortcut(t('chat.stopTitle'), 'stop')}><SquareIcon size={15} /></button>
 			{:else}
-				<button class="cact send" onclick={submit} disabled={!input.trim() && !attachments.length && !videos.length} aria-label="send" title={t('chat.sendTitle')}><ArrowUpIcon size={17} /></button>
+				<button class="cact send" onclick={submit} disabled={!input.trim() && !attachments.length && !videos.length} aria-label={t('chat.sendTitle')} title={t('chat.sendTitle')}><ArrowUpIcon size={17} /></button>
 			{/if}
 		</div>
 	</div>

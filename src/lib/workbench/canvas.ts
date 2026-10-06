@@ -8,18 +8,27 @@ import {
 	closeTab,
 	deserializeLayout,
 	emptyLayout,
+	findLeaf,
 	leavesOf,
 	openTab,
 	singleLeafLayout,
+	splitLeaf,
 	wrapRoot,
 	type TileLayout,
 	type TileTab
 } from './tiles';
+import { TUI_PANEL_PREFIX } from './tuiTab';
 
 export const CHAT_PREFIX = 'chat:';
 
 /** A chat tile's share of the canvas when grafted beside an old dock layout. */
 export const CHAT_SEED_RATIO = 0.58;
+
+/** A tool panel's share of the canvas when it opens beside a chat. */
+export const TOOL_SIDE_RATIO = 0.42;
+
+/** Narrowest chat leaf a tool panel may split: below it, the panel stacks. */
+export const TOOL_SPLIT_MIN_CHAT = 560;
 
 /** Panel kind (and tab id) of a session's chat tile — one tile per session,
  *  so the id can be derived from the session id. */
@@ -44,6 +53,33 @@ export function chatSessionsIn(layout: TileLayout): string[] {
 		.flatMap((l) => l.tabs)
 		.map((t) => chatSessionOf(t.panel))
 		.filter((s): s is string => s !== null);
+}
+
+/** Whether a panel kind is a conversation (chat tile or native TUI). */
+const isConversation = (panel: string) => chatSessionOf(panel) !== null || panel.startsWith(TUI_PANEL_PREFIX);
+
+/**
+ * Open a tool panel (git, terminal, files, …) from the focused leaf `leafId`.
+ * A tool does not cover a conversation: when the leaf shows a chat, the panel
+ * joins the first leaf that holds no conversation, or splits the leaf to its
+ * right. A leaf that already shows a tool takes the panel as another tab, and
+ * so does a chat leaf when `split` is false (the canvas is too narrow).
+ */
+export function openToolTab(
+	layout: TileLayout,
+	leafId: string | null,
+	tab: TileTab,
+	split = true
+): TileLayout {
+	const leaves = leavesOf(layout.root);
+	const focused = (leafId && findLeaf(layout.root, leafId)) || leaves[0];
+	if (!focused) return openTab(layout, null, tab);
+	const front = focused.tabs.find((t) => t.id === focused.active);
+	if (!front || !isConversation(front.panel)) return openTab(layout, focused.id, tab);
+	const tools = leaves.find((l) => l.tabs.every((t) => !isConversation(t.panel)));
+	if (tools) return openTab(layout, tools.id, tab);
+	if (!split) return openTab(layout, focused.id, tab);
+	return splitLeaf(layout, focused.id, 'right', tab, TOOL_SIDE_RATIO).layout;
 }
 
 /** Open (or re-activate) the chat tile for `sessionId`, landing in `leafId`. */

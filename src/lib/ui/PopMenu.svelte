@@ -21,6 +21,7 @@
 	// icon · label (· gray description) with a check on the current choice.
 	// Anchored to its positioned parent; `placement` says which way it opens.
 	import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+	import { t } from '$lib/i18n';
 
 	let {
 		items,
@@ -41,7 +42,7 @@
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} />
 
-<button class="pm-backdrop" aria-label="close menu" tabindex="-1" onclick={onClose}></button>
+<button class="pm-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={onClose}></button>
 <div class="pop pm {placement}" role="menu">
 	{#if title}<div class="pop-head">{title}</div>{/if}
 	{#each items as it (it.key)}

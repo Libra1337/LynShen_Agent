@@ -1138,7 +1138,7 @@
 	{/each}
 	</div>
 	{#if !atBottom}
-		<button class="jump" style:bottom="{bottomH + 14}px" onclick={jumpToBottom} aria-label="scroll to bottom"><CaretDownIcon size={18} /></button>
+		<button class="jump" style:bottom="{bottomH + 14}px" onclick={jumpToBottom} aria-label={t('chat.jumpToBottom')}><CaretDownIcon size={18} /></button>
 	{/if}
 
 	<div class="bottom" bind:clientHeight={bottomH}>
