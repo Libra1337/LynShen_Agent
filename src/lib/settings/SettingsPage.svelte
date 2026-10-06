@@ -49,6 +49,7 @@
 		type MonoizeMarketplaceModel,
 		monoizeModelEntries
 	} from '$lib/protocol';
+	import { monoizeEntries } from '$lib/providers/monoize';
 	import { dispatch } from '$lib/backends/router';
 	import { caps } from '$lib/backends';
 	import { prefs, TURN_STAT_KEYS, vibrancySupported } from '$lib/prefs.svelte';
@@ -578,8 +579,7 @@
 				monoizeModelsMsg = t('settings.account.refreshNeedProvider');
 				return;
 			}
-			const known = new Map(entry.models.map((m) => [m.name, m]));
-			entry.models = list.filter(m => !m.routing_status || m.routing_status === 'ready').map((m) => ({ ...known.get(m.id), name: m.id, display_name: monoizeModelEntries({ model_id: m.id, groups: m.groups }).join(' / ') }));
+			entry.models = monoizeEntries(list, entry.models);
 			custom = [...custom];
 			persistCustom();
 			if (cfg.provider === 'monoize') cfg.models = entry.models;
@@ -662,14 +662,18 @@
 			squareSyncMsg = t('settings.account.refreshNeedProvider');
 			return;
 		}
-		const known = new Map(entry.models.map((m) => [m.name, m]));
-		entry.models = squareModels.filter(m => !m.routing_status || m.routing_status === 'ready').map(m => ({
-			...known.get(m.model_id),
-			name: m.model_id,
-			display_name: monoizeModelEntries(m).join(' / '),
-			...(m.max_input_tokens ? { context_window: m.max_input_tokens } : {}),
-			...(m.max_output_tokens ? { max_output_tokens: m.max_output_tokens } : {})
-		}));
+		const windows = new Map(squareModels.map((m) => [m.model_id, m]));
+		entry.models = monoizeEntries(
+			squareModels.map((m) => ({ id: m.model_id, groups: m.groups, routing_status: m.routing_status })),
+			entry.models
+		).map((m) => {
+			const square = windows.get(m.name);
+			return {
+				...m,
+				...(square?.max_input_tokens ? { context_window: square.max_input_tokens } : {}),
+				...(square?.max_output_tokens ? { max_output_tokens: square.max_output_tokens } : {})
+			};
+		});
 		custom = [...custom];
 		persistCustom();
 		squareSyncMsg = t('settings.account.refreshed', { count: entry.models.length });

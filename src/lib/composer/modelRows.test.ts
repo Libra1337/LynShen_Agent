@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildModelRows } from './modelRows';
+import { buildModelRows, stripGroupSuffix } from './modelRows';
 
 const groups = { codex: 'Codex', claude: 'Claude', lynshen: 'LynShen', byok: 'BYOK', system: 'System' };
 
@@ -194,5 +194,39 @@ describe('buildModelRows', () => {
 	it('lists only this machine when not logged in to LynShen', () => {
 		const rows = buildModelRows({ ...claude, configured: [], toolMode: 'system' });
 		expect(rows.map((r) => r.command)).toEqual(['/model opus', '/model claude-fable-5[1m]']);
+	});
+});
+
+describe('gateway model rows', () => {
+	const labels = {
+		...groups,
+		routeGroup: (group: string) => `分组 ${group}`,
+		routeChannel: (channel: string) => `渠道 ${channel}`
+	};
+
+	it('shows the model name alone and its group and channel on the second line', () => {
+		const rows = buildModelRows({
+			...base,
+			groups: labels,
+			backendId: 'lynshen',
+			provider: 'monoize',
+			configured: ['monoize'],
+			providersList: [
+				{
+					id: 'monoize',
+					models: [{ name: 'DeepSeek-V4.1-Flash', display_name: 'DeepSeek-V4.1-Flash（代理）', groups: ['代理', 'default'] }]
+				}
+			],
+			models: [{ model: 'DeepSeek-V4.1-Flash', label: 'DeepSeek-V4.1-Flash（代理）', active: true, context_window: 1_000_000 }]
+		});
+		expect(rows[0].label).toBe('DeepSeek-V4.1-Flash');
+		expect(rows[0].detail).toBe('分组 代理, default · 渠道 LynShen · 1M');
+		expect(rows[0].command).toBe('/model DeepSeek-V4.1-Flash');
+	});
+
+	it('strips a group suffix older configs stored in the label', () => {
+		expect(stripGroupSuffix('claude-opus-4-6（海外）')).toBe('claude-opus-4-6');
+		expect(stripGroupSuffix('gpt-5.5 (default) / gpt-5.5 (test)')).toBe('gpt-5.5');
+		expect(stripGroupSuffix('Claude Opus 4.8')).toBe('Claude Opus 4.8');
 	});
 });

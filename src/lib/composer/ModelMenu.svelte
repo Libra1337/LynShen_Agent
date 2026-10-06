@@ -14,7 +14,7 @@
 	import { CAPS, NATIVE_BACKEND_IDS, BACKEND_LABELS, type BackendId } from '$lib/backends';
 	import { t } from '$lib/i18n';
 	import type { ChatState } from '$lib/chat.svelte';
-	import type { ModelRow } from './modelRows';
+	import { stripGroupSuffix, type ModelRow } from './modelRows';
 	import { defaultEffort, effortLabel } from './effort';
 	import EffortSlider from './EffortSlider.svelte';
 	import GroupPicker, { type ToolProvider } from './GroupPicker.svelte';
@@ -136,7 +136,7 @@
 
 	let page = $state<'main' | 'models'>('main');
 	const activeRow = $derived(rows.find((r) => r.active));
-	const modelName = $derived(rows.find(row => row.active)?.label || chat.modelLabel || chat.model || BACKEND_LABELS[chat.backendId]);
+	const modelName = $derived(rows.find(row => row.active)?.label || stripGroupSuffix(chat.modelLabel || '') || chat.model || BACKEND_LABELS[chat.backendId]);
 	// On the first page the list's keys (arrows, Enter) open the list instead
 	// of picking a row nobody can see. Capture phase, ahead of the pane.
 	function onKeyCapture(e: KeyboardEvent) {
@@ -164,8 +164,10 @@
 			{#if canPickModel}
 				<button class="pop-row" onclick={() => (page = 'models')} title={t('chat.pickModel')}>
 					<span class="pop-ico"><Vendor model={chat.model || modelName} size={16} /></span>
-					<span class="pop-txt"><span class="pop-label">{modelName}</span></span>
-					{#if activeRow?.detail}<span class="ctx" title={activeRow.detail}>{activeRow.detail}</span>{/if}
+					<span class="pop-txt">
+						<span class="pop-label">{modelName}</span>
+						{#if activeRow?.detail}<span class="pop-desc route" title={activeRow.detail}>{activeRow.detail}</span>{/if}
+					</span>
 					<span class="pop-ico caret"><CaretRightIcon size={14} /></span>
 				</button>
 			{:else}
@@ -272,8 +274,10 @@
 						onmouseenter={() => (selIdx = i)}
 					>
 						<span class="pop-ico"><Vendor model={row.vendor ?? row.label} size={16} /></span>
-						<span class="pop-txt"><span class="pop-label">{row.label || t('shell.empty')}</span></span>
-						{#if row.detail}<span class="ctx" title={row.detail}>{row.detail}</span>{/if}
+						<span class="pop-txt">
+							<span class="pop-label">{row.label || t('shell.empty')}</span>
+							{#if row.detail}<span class="pop-desc route" title={row.detail}>{row.detail}</span>{/if}
+						</span>
 						<span class="pop-check" class:off={!row.active}><CheckIcon size={16} /></span>
 					</button>
 				{/each}
@@ -465,14 +469,11 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.ctx {
-		flex: 0 1000 auto;
-		min-width: 0;
+	/* Second line of a model row: group · channel · window. */
+	.route {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		color: var(--dim2);
-		font-size: var(--fs-xs);
 		font-variant-numeric: tabular-nums;
 	}
 	/* Keep the check's column so names and context line up on every row. */

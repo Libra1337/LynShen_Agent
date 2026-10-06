@@ -501,7 +501,9 @@
 			configured: providers,
 			groups: {
 				lynshen: t('shell.modelGroup.lynshen'),
-				byok: t('shell.modelGroup.byok')
+				byok: t('shell.modelGroup.byok'),
+				routeGroup: (group) => t('chat.routeGroup', { group }),
+				routeChannel: (channel) => t('chat.routeChannel', { channel })
 			},
 			toolMode,
 			localLabel: t('chat.providerLocal'),

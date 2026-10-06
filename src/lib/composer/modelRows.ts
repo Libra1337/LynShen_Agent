@@ -8,6 +8,7 @@ export interface ModelRow {
 	id: string;
 	label: string;
 	vendor?: string;
+	/** Second line: where the model runs (group · channel) and its window. */
 	detail: string;
 	active: boolean;
 	command: string;
@@ -27,12 +28,32 @@ export interface EngineModel {
 
 export interface CatalogProvider {
 	id: string;
-	models: { name: string; display_name?: string | null; context_window?: number }[];
+	models: { name: string; display_name?: string | null; context_window?: number; groups?: string[] }[];
 }
 
 export interface ModelGroupLabels {
 	lynshen: string;
 	byok: string;
+	/** "Group {group}" / "Channel {channel}" for the route line. */
+	routeGroup?: (group: string) => string;
+	routeChannel?: (channel: string) => string;
+}
+
+/** The provider's display name for the channel part of the route line. */
+const CHANNEL_NAMES: Record<string, string> = { monoize: 'LynShen', lynshen: 'LynShen' };
+
+/** A gateway model's route, "Group default, test · Channel LynShen". */
+function routeOf(provider: string, groups: string[] | undefined, labels: ModelGroupLabels): string {
+	const parts: string[] = [];
+	if (groups?.length && labels.routeGroup) parts.push(labels.routeGroup(groups.join(', ')));
+	const channel = CHANNEL_NAMES[provider] ?? provider;
+	if (labels.routeChannel) parts.push(labels.routeChannel(channel));
+	return parts.join(' · ');
+}
+
+/** "claude-opus（default）" → "claude-opus": older configs put the group in the label. */
+export function stripGroupSuffix(label: string): string {
+	return label.replace(/\s*[（(][^（）()]*[）)]\s*(\/.*)?$/, '').trim() || label;
 }
 
 /** Context window as shown beside a model: 272K, 1M; empty when unknown. */
@@ -195,27 +216,34 @@ export function buildModelRows(input: {
 		}));
 	}
 	const activeGroup = cur === 'lynshen' ? groups.lynshen : groups.byok;
-	const activeRows: ModelRow[] = models.map((m) => ({
-		id: `${cur}::${m.model}`,
-		label: providersList.find(p => p.id === cur)?.models.find(row => row.name === m.model)?.display_name || m.label || m.model,
-		vendor: m.vendor || m.model,
-		detail:
-			cur === 'lynshen'
-				? lynshenDetail(m.context_window, unsetWindow)
-				: detailOf(activeGroup === groups.byok ? cur : null, m.context_window),
-		active: m.active,
-		command: `/model ${m.model}`,
-		depth: undefined,
-		group: activeGroup
-	}));
+	/** A gateway model (lynshen, monoize) names its route; others their provider. */
+	const lineTwo = (provider: string, groupsOf: string[] | undefined, ctx: number | undefined, byok: boolean) => {
+		if (provider === 'lynshen' || provider === 'monoize')
+			return [routeOf(provider, groupsOf, groups), lynshenDetail(ctx, unsetWindow)].filter(Boolean).join(' · ');
+		return detailOf(byok ? provider : null, ctx);
+	};
+	const activeCatalog = providersList.find((p) => p.id === cur)?.models ?? [];
+	const activeRows: ModelRow[] = models.map((m) => {
+		const entry = activeCatalog.find((row) => row.name === m.model);
+		return {
+			id: `${cur}::${m.model}`,
+			label: stripGroupSuffix(entry?.display_name || m.label || m.model),
+			vendor: m.vendor || m.model,
+			detail: lineTwo(cur, entry?.groups, m.context_window, activeGroup === groups.byok),
+			active: m.active,
+			command: `/model ${m.model}`,
+			depth: undefined,
+			group: activeGroup
+		};
+	});
 	const otherRows: ModelRow[] = (backendId !== 'lynshen' ? [] : providersList)
 		.filter((pv) => pv.id !== cur && configured.includes(pv.id))
 		.flatMap((pv) =>
 			pv.models.map((m) => ({
 				id: `${pv.id}::${m.name}`,
-				label: m.display_name || m.name,
+				label: stripGroupSuffix(m.display_name || m.name),
 				vendor: m.name,
-				detail: pv.id === 'lynshen' ? lynshenDetail(m.context_window, unsetWindow) : detailOf(pv.id, m.context_window),
+				detail: lineTwo(pv.id, m.groups, m.context_window, true),
 				active: false,
 				command: `@switch ${pv.id} ${m.name}`,
 				depth: undefined,
