@@ -1,14 +1,14 @@
 name: Release
 
 # Build and publish a GitHub Release with installers for macOS, Linux and
-# Windows whenever a version tag (e.g. v0.4.16) is pushed. Run by hand, it
-# only builds the macOS app (no release) to check the pipeline.
+# Windows whenever a version tag is pushed. Manual runs build all platforms
+# without publishing.
 #
 # Repo secrets used:
 #   TAURI_SIGNING_PRIVATE_KEY(_PASSWORD) — updater artifact signing (required
 #     for auto-update; the matching pubkey lives in tauri.conf.json).
-#   LYNSHEN_CLI_TOKEN — a token that can clone the private LynShen-CLI repo,
-#     from which the sidecar engine is built (desktop + engine update together).
+#   LYNSHEN_CLI_TOKEN — optional clone token; the public CLI repo defaults
+#     to github.token (desktop + pinned sidecar engine update together).
 #   APPLE_CERTIFICATE(_PASSWORD) — optional; macOS keeps granted permissions
 #     across updates only while the signing identity stays the same.
 on:
@@ -26,11 +26,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS Apple Silicon, Linux x86_64, Windows x86_64; a manual run
-        # builds macOS only.
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch'
-          && '[{"os":"macos-latest","target":"aarch64-apple-darwin"}]'
-          || '[{"os":"macos-latest","target":"aarch64-apple-darwin"},{"os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu"},{"os":"windows-latest","target":"x86_64-pc-windows-msvc"}]') }}
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     env:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -51,28 +55,53 @@ jobs:
           node-version: 22
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Validate release inputs
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          test -n "$SIGNING_KEY" || { echo 'TAURI_SIGNING_PRIVATE_KEY is required'; exit 1; }
+          node scripts/check-release-version.mjs "${{ github.event_name == 'push' && github.ref_name || '' }}"
+          echo "CLI_REF=$(tr -d '\r\n' < src-tauri/lynshen-cli.ref)" >> "$GITHUB_ENV"
+      - run: pnpm check
+      - run: pnpm test
+      - run: node --test scripts/prepare-desktop-release.test.mjs
+      - run: python3 scripts/test-receive-desktop-release.py
+
+      - name: Check out the pinned CLI engine
+        uses: actions/checkout@v4
+        with:
+          repository: Libra1337/LynShen-CLI
+          ref: ${{ env.CLI_REF }}
+          token: ${{ secrets.LYNSHEN_CLI_TOKEN || github.token }}
+          path: .release-cli
+          submodules: recursive
+
       # The app ships the LynShen CLI engine as a sidecar (see
       # src-tauri/src/app_cli.rs and tauri.bundle.conf.json), so a desktop
       # update carries the matching engine: the two stay in sync.
       - name: Build the LynShen CLI sidecar
         shell: bash
-        env:
-          CLI_TOKEN: ${{ secrets.LYNSHEN_CLI_TOKEN }}
         run: |
-          git clone --depth 1 https://oauth2:${CLI_TOKEN}@github.com/Libra1337/LynShen-CLI.git /tmp/lynshen-cli
-          cd /tmp/lynshen-cli
-          git submodule update --init
-          cargo build --release
+          cd .release-cli
+          expected=$(tr -d '\r\n' < ../src-tauri/lynshen-cli.version)
+          actual=$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "lynshen-cli"))')
+          test "$actual" = "$expected"
+          cargo build --locked --release --target "${{ matrix.target }}"
           ext=""; [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ] && ext=".exe"
           cd "$GITHUB_WORKSPACE"
           mkdir -p src-tauri/binaries
-          cp "/tmp/lynshen-cli/target/release/lynshen${ext}" "src-tauri/binaries/lynshen-cli-${{ matrix.target }}${ext}"
+          cp ".release-cli/target/${{ matrix.target }}/release/lynshen${ext}" "src-tauri/binaries/lynshen-cli-${{ matrix.target }}${ext}"
+          node scripts/third-party-notices.mjs --cargo .release-cli/Cargo.toml --title 'LynShen CLI: third-party software' --out static/lynshen-cli-third-party-notices.txt
 
       # macOS builds sign with a fixed self-signed certificate (not
       # notarized) when the secret is configured; without it the build still
@@ -95,6 +124,12 @@ jobs:
           security find-identity -v -p codesigning "$keychain"
           rm "$RUNNER_TEMP/signing.p12"
 
+      - name: Verify the desktop before publication
+        run: |
+          pnpm build
+          cargo test --manifest-path src-tauri/Cargo.toml
+          cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
       # tauri-action runs beforeBuildCommand (pnpm build), bundles the app with
       # the lynshen sidecar and uploads the installers to a release named after
       # the tag. With TAURI_SIGNING_PRIVATE_KEY set it additionally signs the
@@ -110,11 +145,11 @@ jobs:
           # A manual run builds without publishing.
           tagName: ${{ github.event_name == 'push' && github.ref_name || '' }}
           releaseName: ${{ github.event_name == 'push' && github.ref_name || '' }}
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
-          args: --config src-tauri/tauri.bundle.conf.json
+          args: --target ${{ matrix.target }} --config src-tauri/tauri.bundle.conf.json
           releaseBody: |
-            Installers for macOS (Apple Silicon), Linux (x64) and Windows
+            Installers for macOS (Apple Silicon and Intel), Linux (x64) and Windows
             (x64) with the LynShen CLI engine bundled. The app updates
             itself from these releases.
 
@@ -122,5 +157,38 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: macos-app
-          path: src-tauri/target/release/bundle/macos/*.app.tar.gz
+          name: desktop-${{ matrix.target }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/
+
+  publish:
+    needs: release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate the complete release and prepare the Monoize mirror
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLIC_ORIGIN: ${{ vars.DESKTOP_PUBLIC_ORIGIN || 'https://www.lynshen.org' }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --dir release-assets
+          node scripts/prepare-desktop-release.mjs release-assets distribution "$PUBLIC_ORIGIN"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-distribution
+          path: distribution/
+      - name: Publish the complete GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+      - name: Publish downloads and updates on Monoize
+        if: vars.DESKTOP_SSH_HOST != ''
+        env:
+          DESKTOP_SSH_HOST: ${{ vars.DESKTOP_SSH_HOST }}
+          DESKTOP_SSH_USER: ${{ vars.DESKTOP_SSH_USER }}
+          DESKTOP_SSH_KEY: ${{ secrets.DESKTOP_SSH_KEY }}
+          DESKTOP_SSH_KNOWN_HOSTS: ${{ secrets.DESKTOP_SSH_KNOWN_HOSTS }}
+        run: bash scripts/publish-desktop-release.sh

@@ -25,8 +25,8 @@ CLI 完整 Windows 测试仍有 11 项 daemon 集成失败，涉及 Unix 假进�
 ## 发布
 
 此文件记录源代码改动；构建、CI 与线上部署状态以实际完成结果更新。
-GitHub 当前令牌缺少 workflow 权限，新增工作流推送被 GitHub 拒绝，等待补充授权。
-已推送保留原有 CI 的代码分支，并建立草稿 PR：
+2026-10-06 已完成 GitHub workflow 权限授权；完整工作流已可推送。
+更新通过以下 PR 审查：
 - Desktop: https://github.com/Libra1337/LynShen_Agent/pull/1
 - CLI: https://github.com/Libra1337/LynShen-CLI/pull/1
 
@@ -35,6 +35,7 @@ Windows 安装包已在本地构建并验证文件与元数据签名：
 - SHA-256：`d1dc440c82c7191f942db747709532ff33341ecaedfb496969e24a3b9ac7dac2`
 - CLI 来源：`1a9baa20e314c8e809d9730e60e036a89bba071f`，从干净源码构建。
 
-macOS 新构建矩阵尚未运行，不宣称已有可下载 Mac 包。线上下载目录仍为 0.4.17，0.4.18 未发布到自动更新。
+Windows、macOS Apple Silicon、macOS Intel 和 Linux 由发布工作流构建，全部成功后才发布完整目录及自动更新。发布前每个平台运行桌面 Rust 测试和 clippy。
+此记录提交时，线上下载目录仍为 0.4.17；0.4.18 构建与发布结果需以 GitHub Actions 和在线目录为准。
 Monoize 镜像 `desktop-0418-fe561f25` 已通过隔离检查。2026-10-05 20:07 UTC，两个公网域名的模型目录均返回 200，43 个模型中 34 个可用，可用项均带有分组。
-蓝绿切换仍保留旧实例，等待最后一条旧连接自然排空；没有强制终止连接。
+2026-10-06 11:09（UTC+8），蓝绿切换成功完成；旧连接自然结束，没有强制终止连接。
