@@ -46,6 +46,16 @@ GitHub CI 生成的 Windows 安装包已独立下载并验证文件及元数据�
 - macOS 无 Apple 证书时使用 ad-hoc 签名，自动更新产物另行使用 Tauri 更新密钥签名；尚未进行 Apple 公证。
 
 Windows、macOS Apple Silicon、macOS Intel 和 Linux 由发布工作流构建，全部成功后才发布完整目录及自动更新。发布前每个平台运行桌面 Rust 测试和 clippy。
-此记录提交时，线上下载目录仍为 0.4.17；0.4.18 构建与发布结果需以 GitHub Actions 和在线目录为准。
+2026-10-06 12:43（UTC+8），0.4.18 已正式发布并同步至两个公网域名。
+发布任务成功：https://github.com/Libra1337/LynShen_Agent/actions/runs/37412643714
+下载页：https://www.lynshen.org/download 和 https://api.lynshen.org/download
+两个域名的目录及自动更新清单均为 0.4.18，包含 Windows x64、macOS Apple Silicon 和 macOS Intel。
+三个安装包均通过公网下载 SHA-256 校验；对应更新包均通过文件和元数据签名验证；HEAD 与 byte-range 下载检查通过。
+- macOS Apple Silicon DMG SHA-256：`3fb9aa9d602502414bd03e6da838854a2f0c74fa30d19c7d353be9972a0789fd`
+- macOS Intel DMG SHA-256：`c3d529000ca61a4e4535661e2726f7414021d8269a4258123d804d315821c1b1`
+
+2026-10-06 13:05（UTC+8），两个域名的匿名浏览器检查均显示 0.4.18 和三个正确下载链接。
+修复账户检查清空公开下载目录缓存的问题；新增缓存回归及真实浏览器测试均通过。
+修复镜像 `desktop-download-0418-ef7cdfc8` 已通过隔离检查并接收新连接，旧实例仍保留 5 条连接自然排空。
 Monoize 镜像 `desktop-0418-fe561f25` 已通过隔离检查。2026-10-05 20:07 UTC，两个公网域名的模型目录均返回 200，43 个模型中 34 个可用，可用项均带有分组。
 2026-10-06 11:09（UTC+8），蓝绿切换成功完成；旧连接自然结束，没有强制终止连接。
