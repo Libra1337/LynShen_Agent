@@ -57,6 +57,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -122,6 +123,12 @@ jobs:
           sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain src-tauri/macos-signing-cert.pem
           security find-identity -v -p codesigning "$keychain"
           rm "$RUNNER_TEMP/signing.p12"
+
+      - name: Verify the desktop before publication
+        run: |
+          pnpm build
+          cargo test --manifest-path src-tauri/Cargo.toml
+          cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
       # tauri-action runs beforeBuildCommand (pnpm build), bundles the app with
       # the lynshen sidecar and uploads the installers to a release named after
