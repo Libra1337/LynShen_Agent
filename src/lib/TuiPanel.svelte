@@ -1,20 +1,20 @@
 <script lang="ts">
 	// A native TUI panel: the real interactive CLI (lynshen / codex / claude)
 	// running in a pty, rendered by xterm. Two uses: a standalone `tui:*` tab
-	// (no args, independent of any GUI session) and a session handoff, where
-	// the chat tile hands its conversation over via resume argv / a `/resume`
-	// line (`onBackToGui` present). Closing the panel kills the process. Only
-	// the backend name + allowlisted args reach Rust; argv and binary
-	// resolution are validated there.
+	// (a local pty, independent of any GUI session) and a session handoff,
+	// where the chat tile's conversation moves into its engine's TUI on a
+	// daemon terminal (`session`, `onBackToGui`). Closing the panel kills the
+	// process. Only the backend name reaches Rust; binary resolution is
+	// validated there.
 	import { onMount, onDestroy } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
 	import { Terminal } from '@xterm/xterm';
 	import { FitAddon } from '@xterm/addon-fit';
 	import '@xterm/xterm/css/xterm.css';
+	import { terminalLook, useWebgl } from './terminal';
 	import { ptyOpen, ptyWrite, ptyResize, ptyClose, daemon } from '$lib/protocol';
 	import type { BackendId } from '$lib/backends/types';
 	import { loadBackendSettings } from '$lib/backends/settings';
-	import { themeState, terminalPalette } from '$lib/theme.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import Notice from '$lib/ui/Notice.svelte';
 	import { t } from '$lib/i18n';
@@ -22,8 +22,6 @@
 	let {
 		backend,
 		cwd = '',
-		args = [],
-		resumeCommand,
 		session,
 		onBackToGui,
 		onOpenSettings
@@ -34,14 +32,8 @@
 		 *  gateway; the engine resumes when the TUI exits. */
 		session?: string;
 		cwd?: string;
-		/** Session-handoff resume argv (must match the Rust TUI allowlist,
-		 *  e.g. `['--resume', '<id>']`). Empty for standalone TUI tabs. */
-		args?: string[];
-		/** Line written into the pty once it is running — the lynshen TUI has
-		 *  no resume argv and resumes via `/resume <id>\n` instead. */
-		resumeCommand?: string;
 		/** Present only for session handoffs: hand the conversation back to
-		 *  the GUI chat (shows the "back to GUI" bar). */
+		 *  the GUI chat (the tile's title bar offers it). */
 		onBackToGui?: () => void | Promise<void>;
 		onOpenSettings?: () => void;
 	} = $props();
@@ -63,8 +55,14 @@
 		return `tui-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 	}
 
-	function palette() {
-		return terminalPalette();
+	/** Fit the grid to the panel and tell the process its new size. */
+	function refit() {
+		try {
+			fit?.fit();
+			if (term) resize(term.cols, term.rows);
+		} catch {
+			/* ignore */
+		}
 	}
 
 	// The daemon's terminal for a hosted session: its id, and the exit it
@@ -94,20 +92,27 @@
 			fit?.fit();
 			let exited: () => void = () => {};
 			daemonExit = new Promise((resolve) => (exited = resolve));
-			const reply = await daemon.request({ op: 'session_tui', session, cols: term.cols, rows: term.rows });
+			// `force`: the page asked the user before cutting a running reply
+			// or background task short.
+			const reply = await daemon.request({ op: 'session_tui', session, cols: term.cols, rows: term.rows, force: true });
 			daemonTerm = String(reply.term ?? '');
-			cleanups.push(
-				daemon.onTerm(daemonTerm, (frame) => {
-					if (frame.type === 'term_output') term?.write(unbase64(String(frame.data ?? '')));
-					else {
-						exited();
-						// The TUI ended (the user quit it): the conversation is the
-						// GUI's again, its engine already resuming.
-						if (!closing && onBackToGui) void backToGui();
-						else status = 'exited';
-					}
-				})
-			);
+			const off = daemon.onTerm(daemonTerm, (frame) => {
+				if (frame.type === 'term_output') term?.write(unbase64(String(frame.data ?? '')));
+				else {
+					exited();
+					// The TUI ended (the user quit it): the conversation is the
+					// GUI's again, its engine already resuming.
+					if (!closing && onBackToGui) void backToGui();
+					else status = 'exited';
+				}
+			});
+			cleanups.push(off);
+			// Closed while the TUI was starting: nothing could end it then.
+			if (disposed || closing) {
+				daemon.post({ op: 'term_close', term: daemonTerm }).catch(() => {});
+				if (disposed) off();
+				return;
+			}
 			status = 'running';
 		} catch (e) {
 			if (disposed || closing) return;
@@ -126,7 +131,6 @@
 			fit?.fit();
 			await ptyOpen(launchId, term.cols, term.rows, cwd || undefined, {
 				command: backend,
-				args: args.length ? args : undefined,
 				binOverride: loadBackendSettings().paths[backend]
 			});
 			// An unmount/back-to-GUI request may race an in-flight ptyOpen. Close
@@ -136,9 +140,6 @@
 				return;
 			}
 			status = 'running';
-			// Session handoff into the lynshen TUI: resume the conversation with
-			// its slash command (the pty buffers the line until the TUI reads).
-			if (resumeCommand) ptyWrite(launchId, resumeCommand).catch(() => {});
 		} catch (e) {
 			if (disposed || closing || launchId !== id) return;
 			const msg = String(e);
@@ -159,7 +160,7 @@
 	/** Establish exclusive ownership in the other direction too: the callback
 	 *  flips the session to GUI and respawns its engine, so it must not run
 	 *  until the current (or still-opening) pty has definitely been reaped. */
-	async function backToGui() {
+	export async function backToGui() {
 		if (!onBackToGui || closing) return;
 		closing = true;
 		if (session) {
@@ -196,18 +197,14 @@
 
 	onMount(() => {
 		(async () => {
-			term = new Terminal({
-				fontFamily:
-					"'MesloLGL Nerd Font Mono', 'MesloLGS NF', 'JetBrainsMono Nerd Font', 'Hack Nerd Font', 'FiraCode Nerd Font', 'Symbols Nerd Font', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace, 'Apple Color Emoji'",
-				fontSize: 12.5,
-				cursorBlink: true,
-				allowProposedApi: true,
-				theme: palette()
-			});
+			term = new Terminal({ ...terminalLook(), cursorBlink: true, allowProposedApi: true });
 			fit = new FitAddon();
 			term.loadAddon(fit);
 			if (host) term.open(host);
+			useWebgl(term);
 			fit.fit();
+			// Moved here from the chat: the keys go to the TUI at once.
+			if (session) term.focus();
 
 			const unOut = await listen<{ id: string; data: string }>('pty-output', (e) => {
 				if (e.payload.id === id) term?.write(e.payload.data);
@@ -226,14 +223,7 @@
 			launchTask = launch();
 			await launchTask;
 
-			const ro = new ResizeObserver(() => {
-				try {
-					fit?.fit();
-					if (term) resize(term.cols, term.rows);
-				} catch {
-					/* ignore */
-				}
-			});
+			const ro = new ResizeObserver(refit);
 			if (host) ro.observe(host);
 			cleanups.push(() => ro.disconnect());
 
@@ -245,8 +235,12 @@
 		};
 	});
 
+	// Theme and font changes; a new font size changes the grid.
 	$effect(() => {
-		if (term) term.options.theme = palette();
+		const look = terminalLook();
+		if (!term) return;
+		Object.assign(term.options, look);
+		refit();
 	});
 
 	onDestroy(() => {
@@ -261,12 +255,6 @@
 </script>
 
 <div class="tui-wrap">
-	{#if onBackToGui}
-		<div class="handoffbar">
-			<span class="hb-text">{t('dock.tui.handoff')}</span>
-			<Button size="sm" disabled={closing} onclick={backToGui}>{t('dock.tui.backToGui')}</Button>
-		</div>
-	{/if}
 	<div class="term-host" bind:this={host}></div>
 	{#if status === 'missing' || status === 'error'}
 		<div class="failed">
@@ -303,22 +291,6 @@
 		flex-direction: column;
 		height: 100%;
 		width: 100%;
-	}
-	.handoffbar {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 10px;
-		padding: 4px 10px;
-		font-size: var(--fs-xs);
-		color: var(--dim);
-		background: var(--surface);
-		border-bottom: 1px solid var(--hairline);
-	}
-	.hb-text {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
 	}
 	.term-host {
 		flex: 1;

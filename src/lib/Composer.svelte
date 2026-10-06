@@ -213,7 +213,7 @@
 			else if (n.nodeType === Node.ELEMENT_NODE) {
 				const e = n as HTMLElement;
 				if (e.dataset?.token) out += e.dataset.token;
-				else if (e.tagName === 'BR') out += '\n';
+				else if (e.tagName === 'BR') out += e.dataset.tail === undefined ? '\n' : '';
 				else out += serialize(e);
 			}
 		});
@@ -234,12 +234,29 @@
 		}
 		if (last < str.length) frag.appendChild(document.createTextNode(str.slice(last)));
 		el.appendChild(frag);
+		syncTail(str);
+	}
+	// pre-wrap renders no line for a trailing "\n", so a Shift+Enter at the end
+	// showed nothing until pressed twice. A trailing <br data-tail> gives the empty
+	// last line a box; serialize skips it.
+	function syncTail(str: string) {
+		if (!el) return;
+		const last = el.lastChild;
+		el.querySelectorAll('br[data-tail]').forEach((b) => b !== last && b.remove());
+		const has = last instanceof HTMLBRElement && last.dataset.tail !== undefined;
+		if (str.endsWith('\n') && !has) {
+			const br = document.createElement('br');
+			br.dataset.tail = '';
+			el.appendChild(br);
+		} else if (!str.endsWith('\n') && has) last.remove();
 	}
 	function caretToEnd() {
 		if (!el) return;
 		const r = document.createRange();
 		r.selectNodeContents(el);
 		r.collapse(false);
+		// Before the tail <br>, or typed text would land one line too low.
+		if (el.lastChild instanceof HTMLBRElement && el.lastChild.dataset.tail !== undefined) r.setStartBefore(el.lastChild);
 		const sel = window.getSelection();
 		sel?.removeAllRanges();
 		sel?.addRange(r);
@@ -252,6 +269,7 @@
 		// "\n". A real line break typed into an empty box leaves two.
 		if (s === '\n' && el.textContent === '') s = '';
 		if (s === '' && el.childNodes.length) el.textContent = '';
+		else syncTail(s);
 		lastSync = s;
 		input = s;
 		// Typing dismisses the "+" tray so Enter sends instead of picking a row.
@@ -273,12 +291,14 @@
 		nodes.forEach((n) => frag.appendChild(n));
 		const lastNode = nodes[nodes.length - 1];
 		range.insertNode(frag);
+		// Sync (adding the tail <br>) before placing the caret: WebKit moves a caret
+		// after an unrendered trailing "\n" back before it, onto the line above.
+		syncFromDom();
 		const after = document.createRange();
 		after.setStartAfter(lastNode);
 		after.collapse(true);
 		sel?.removeAllRanges();
 		sel?.addRange(after);
-		syncFromDom();
 	}
 	function insertTextAtCaret(text: string) {
 		insertNodesAtCaret([document.createTextNode(text)]);

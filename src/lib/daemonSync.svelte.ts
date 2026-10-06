@@ -32,6 +32,8 @@ interface DaemonProject {
 	worktree?: WorktreeMeta;
 	color?: string;
 	icon?: TabIcon;
+	/** Extra directories (Project.dirs). */
+	dirs?: string[];
 }
 
 interface DaemonWorkspace {
@@ -60,6 +62,7 @@ function project(p: {
 	worktree?: WorktreeMeta;
 	color?: unknown;
 	icon?: unknown;
+	dirs?: unknown;
 }): DaemonProject {
 	const color = normalizeColor(p.color);
 	const icon = parseTabIcon(p.icon);
@@ -70,7 +73,8 @@ function project(p: {
 		...(p.chats ? { chats: true } : {}),
 		...(p.worktree ? { worktree: p.worktree } : {}),
 		...(color ? { color } : {}),
-		...(icon ? { icon } : {})
+		...(icon ? { icon } : {}),
+		...(Array.isArray(p.dirs) && p.dirs.length ? { dirs: p.dirs.filter((d) => typeof d === 'string') } : {})
 	};
 }
 
@@ -235,6 +239,7 @@ export class DaemonSync {
 			}
 			if (p.name !== r.name) p.name = r.name;
 			this.store.setProjectChrome(p, { color: r.color ?? null, icon: r.icon ?? null });
+			this.store.setProjectDirs(p, r.dirs);
 		}
 		for (const r of projects) {
 			if (!this.store.userProjects.some((p) => trim(p.path) === trim(r.path))) this.store.addProjectShell(r);
@@ -291,7 +296,7 @@ export class DaemonSync {
 function merge(saved: SavedProject[], remote: DaemonProject[]): SavedProject[] {
 	return remote.map((r) => {
 		const known = saved.find((p) => trim(p.path) === trim(r.path));
-		return known ? { ...known, name: r.name, color: r.color, icon: r.icon } : { ...r, tabs: [] };
+		return known ? { ...known, name: r.name, color: r.color, icon: r.icon, dirs: r.dirs } : { ...r, tabs: [] };
 	});
 }
 

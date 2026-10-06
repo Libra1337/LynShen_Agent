@@ -5,7 +5,7 @@ vi.mock('./protocol', () => ({
 	hostSession: vi.fn(() => Promise.resolve()),
 	acpAgentsList: vi.fn(() => Promise.resolve([{ id: 'gemini', name: 'Gemini', command: 'gemini', args: ['--experimental-acp'], env: {} }])),
 	// The daemon names a new session after its desktop id.
-	daemon: { sessionOf: vi.fn((id: string) => `conv-${id}`) },
+	daemon: { sessionOf: vi.fn((id: string) => `conv-${id}`), request: vi.fn(() => Promise.resolve({})) },
 	closeSession: vi.fn(() => Promise.resolve()),
 	sendOp: vi.fn(() => Promise.resolve()),
 	sendLine: vi.fn(() => Promise.resolve()),
@@ -24,8 +24,8 @@ vi.mock('./protocol', () => ({
 
 import { SessionStore, listedSessions } from './session.svelte';
 import { UNTITLED } from './chat.svelte';
-import { dispatch } from './backends/router';
-import { hostSession, closeSession, sendLine, git, writeConfig, sessionHistory, sessionMeta } from './protocol';
+import { dispatch, startDraft } from './backends/router';
+import { daemon, hostSession, closeSession, sendLine, git, writeConfig, sessionHistory, sessionMeta } from './protocol';
 import type { EngineSpec } from './daemon';
 import { setLocale } from './i18n';
 import type { Project, WorktreeMeta } from './types';
@@ -964,7 +964,7 @@ describe('SessionStore GUI ⇄ TUI handoff', () => {
 		expect(closeSession).not.toHaveBeenCalled();
 	});
 
-	it('openInTui waits for a conversation to resume and for the turn to end', () => {
+	it('openInTui waits for a conversation to resume, not for the turn to end', () => {
 		const store = new SessionStore();
 		const p = proj();
 		store.projects.push(p);
@@ -974,8 +974,21 @@ describe('SessionStore GUI ⇄ TUI handoff', () => {
 		expect(fresh.surface).toBeUndefined();
 		const busy = readySession(store, p, 'codex');
 		busy.chat.handle({ type: 'connecting' });
+		// The page asked the user first: the daemon cuts the turn short.
 		store.openInTui(busy.id);
-		expect(busy.surface).toBeUndefined();
+		expect(busy.surface).toBe('tui');
+	});
+
+	it('addTuiSession starts a new conversation in its TUI at once', () => {
+		const store = new SessionStore();
+		const p = proj();
+		store.projects.push(p);
+		const id = store.addTuiSession(p, 'codex');
+		const s = p.sessions.find((x) => x.id === id)!;
+		expect(s.backendId).toBe('codex');
+		expect(s.surface).toBe('tui');
+		// No first message: the engine starts now, for the TUI to take over.
+		expect(s.draft).toBe(false);
 	});
 
 	it('returnToGui shows the whole conversation again, the TUI turns included', () => {
@@ -1251,5 +1264,32 @@ describe('agent sessions', () => {
 		expect(p.sessions).toHaveLength(0);
 		const host = store.projects.find((x) => x.agents)!;
 		expect([host.path, host.sessions.map((s) => s.id)]).toEqual(['/srv/ops', [id]]);
+	});
+});
+
+describe('SessionStore: a session started on a requirement', () => {
+	it('begins the requirement once the daemon names it, in the mode the work runs in', async () => {
+		const store = new SessionStore();
+		const p = proj('rq');
+		store.projects.push(p);
+		const id = store.addSession(store.projects[0]);
+		const s = store.allSessions.find((x) => x.id === id)!;
+		s.chat.approvalMode = 'plan';
+		s.requirement = 'R-7';
+		s.requirementStart = { plan: true, text: 'only the API' };
+		startDraft(id);
+		await flush();
+		expect(vi.mocked(daemon.request)).toHaveBeenCalledWith(
+			expect.objectContaining({
+				op: 'requirement_begin',
+				requirement: 'R-7',
+				session: `conv-${id}`,
+				plan: true,
+				mode: 'edits',
+				text: 'only the API'
+			})
+		);
+		expect(s.requirement).toBeUndefined();
+		expect(s.requirementStart).toBeUndefined();
 	});
 });

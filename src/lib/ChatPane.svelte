@@ -43,6 +43,7 @@
 		git,
 		gitCheckpointCapture,
 		gitCheckpointRestore,
+		resolveFileRef,
 		type Op
 	} from '$lib/protocol';
 	import { buildModelRows, toolModels, type ToolModel } from '$lib/composer/modelRows';
@@ -65,7 +66,6 @@
 	import Button from '$lib/ui/Button.svelte';
 	import TaskStrip from '$lib/TaskStrip.svelte';
 	import { parseFileHref } from '$lib/fileRefs';
-	import Notice from '$lib/ui/Notice.svelte';
 	import type { Msg } from '$lib/chat.svelte';
 	import type { SessionSwitch } from '$lib/composer/SessionSwitches.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
@@ -80,7 +80,8 @@
 	import { loadComposerText, saveComposerText } from '$lib/composerText';
 	import RequirementTag from '$lib/requirements/RequirementTag.svelte';
 	import { statusLabel } from '$lib/requirements/labels';
-	import { useRequirements } from '$lib/requirements.svelte';
+	import { gateNext, gateOf, useRequirements } from '$lib/requirements.svelte';
+	import RequirementStart, { beginRequirement } from '$lib/requirements/RequirementStart.svelte';
 	import { telemetry } from '$lib/telemetry.svelte';
 
 	// One full conversation (transcript + composer + approvals + pickers) for a
@@ -128,12 +129,30 @@
 	const reqs = useRequirements();
 	const linked = $derived(chat.sessionId ? reqs.bySession.get(chat.sessionId) : undefined);
 	const willLink = $derived(!linked && session.requirement ? reqs.get(session.requirement) : undefined);
+	/** A draft made for a requirement shows its start card until started. */
+	const starting = $derived(session.draft && session.requirementStart ? willLink : undefined);
+	/** The start's confirmation, once this session's turn has ended. */
+	const gate = $derived(linked?.status === 'confirm' && !chat.busy ? gateOf(linked, chat.sessionId) : undefined);
+	let confirming = $state(false);
+	/** Confirms the gate's stage, with the composer's words. */
+	async function confirmGate() {
+		if (!linked || confirming) return;
+		confirming = true;
+		try {
+			await reqs.confirm(linked.id, input.trim());
+			input = '';
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : String(e));
+		} finally {
+			confirming = false;
+		}
+	}
 	/** A passage of a reply, noted as a requirement about this session's project. */
 	async function noteRequirement(text: string) {
 		try {
 			const r = await reqs.create({
 				text,
-				...(chat.sessionId ? { session: chat.sessionId } : project ? { projects: [project.path] } : {})
+				...(chat.sessionId ? { session: chat.sessionId } : project ? { project: project.id } : {})
 			});
 			telemetry.track('requirement_create');
 			toast.success(t('shell.requirement.noted', { id: r.id }), {
@@ -670,6 +689,12 @@
 	function submit() {
 		const text = input.trim();
 		if (!text && attachments.length === 0 && videos.length === 0) return;
+		// A draft made for a requirement starts from it; the words go with it.
+		if (starting && !text.startsWith('/')) {
+			beginRequirement(session, text);
+			input = '';
+			return;
+		}
 		if (text.startsWith('/')) {
 			const btw = caps(chat).sideQuestions ? text.match(/^\/btw\s+([\s\S]+)/) : null;
 			if (btw) chat.sideAnswers.push({ question: btw[1].trim(), answer: '', error: '', pending: true });
@@ -871,8 +896,28 @@
 		pickerKey(e);
 	}
 
+	// The position this pane last pinned to the end, and the last one seen.
+	let pinnedTop = -1;
+	let lastTop = 0;
 	function onScroll() {
-		if (scroller) atBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 60;
+		if (!scroller) return;
+		const top = scroller.scrollTop;
+		// The scroll event of our own pin says nothing about the reader.
+		// Otherwise follow again once they scroll down near the end, never
+		// while they scroll up.
+		if (top !== pinnedTop) atBottom = top >= lastTop && scroller.scrollHeight - top - scroller.clientHeight < 60;
+		lastTop = top;
+	}
+	/** Wheel up leaves the end. Caught at the input: WebKit applies the
+	 *  scroll a frame later, and while a reply streams the next pin would
+	 *  undo it before any scroll event shows it. */
+	function onWheel(e: WheelEvent) {
+		if (e.deltaY < 0) atBottom = false;
+	}
+	function pin() {
+		if (!scroller) return;
+		scroller.scrollTop = scroller.scrollHeight;
+		pinnedTop = scroller.scrollTop;
 	}
 	// Stick to the bottom as content grows (streaming text, tool output, new cards).
 	// The smoothed reveal changes height every frame, which a scroll-event listener
@@ -881,7 +926,7 @@
 	$effect(() => {
 		if (!contentEl || !scroller) return;
 		const ro = new ResizeObserver(() => {
-			if (atBottom && scroller) scroller.scrollTop = scroller.scrollHeight;
+			if (atBottom) pin();
 		});
 		ro.observe(contentEl);
 		return () => ro.disconnect();
@@ -889,7 +934,7 @@
 	async function scrollToEnd(force = false) {
 		await tick();
 		if (scroller && (atBottom || force)) {
-			scroller.scrollTop = scroller.scrollHeight;
+			pin();
 			atBottom = true;
 		}
 	}
@@ -961,14 +1006,15 @@
 	// Open a workspace file referenced by a chat link. HTML opens in the built-in
 	// browser (rendered) or the editor (source) per preference; everything else
 	// opens in the editor. Paths resolve relative to this session's project root.
-	function openChatFile(href: string) {
+	async function openChatFile(href: string) {
 		const cwd = project?.path;
 		if (!cwd) return;
 		// A file a reply names, maybe at a line (`src/a.ts#L12:4`).
 		const ref = parseFileHref(href);
 		const rel = ref.path;
 		if (!rel) return;
-		const abs = rel.startsWith('/') ? rel : `${cwd.replace(/\/+$/, '')}/${rel.replace(/^\.?\//, '')}`;
+		const joined = `${cwd.replace(/\/+$/, '')}/${rel.replace(/^\.?\//, '')}`;
+		const abs = rel.startsWith('/') ? rel : ((await resolveFileRef(cwd, rel).catch(() => null)) ?? joined);
 		const ext = abs.split('/').pop()?.split('.').pop()?.toLowerCase() ?? '';
 		if ((ext === 'html' || ext === 'htm') && prefs.htmlOpenInBrowser) {
 			// The embedded browser loads http(s) only; a loopback URL also lets the
@@ -1068,7 +1114,7 @@
 			<RequirementTag id={willLink.id} />
 			<span class="owner-name">{t('shell.requirement.willLink', { id: willLink.id })}</span>
 			<span class="owner-role">{willLink.title}</span>
-			<button class="owner-link" onclick={() => (session.requirement = undefined)}>{t('shell.requirement.unlink')}</button>
+			<button class="owner-link" onclick={() => ((session.requirement = undefined), (session.requirementStart = undefined))}>{t('shell.requirement.unlink')}</button>
 		</div>
 	{/if}
 	{#if Object.keys(chat.subagents).length}
@@ -1104,7 +1150,7 @@
 	{/if}
 
 	<div class="mainwrap" class:resizing={dragW !== null} bind:clientWidth={wrapW}>
-	<main bind:this={scroller} onscroll={onScroll}>
+	<main bind:this={scroller} onscroll={onScroll} onwheel={onWheel}>
 		<div bind:this={contentEl}>
 			<MessageList bind:this={messageList} bind:mark messages={chat.messages} {streamingMsg} {streamingReasoning} phase={chat.phase} call={chat.call} compactionTokens={chat.compactionTokens} retry={chat.retry} autoRetry={chat.autoRetry} onAutoRetryNow={() => autoRetry.now(chat)} onAutoRetryCancel={() => autoRetry.cancel(chat)} {findActive} {scroller} onEdit={editMessage} onCite={citeText} onNote={noteRequirement} onRewind={rewindToMessage} onFile={openChatFile} onDismiss={(m) => (chat.messages = chat.messages.filter((x) => x !== m))} backend={chat.backendId} onErrorAction={fixError} traceOf={traceable ? traceOf : undefined} />
 		</div>
@@ -1112,6 +1158,10 @@
 			<div class="welcome spawning">
 				<span class="spawn-spin"><CircleNotchIcon size={26} class="spin" /></span>
 				<p class="welcome-tip">{t('shell.spawning')}</p>
+			</div>
+		{:else if starting && chat.messages.length === 0}
+			<div class="welcome">
+				<RequirementStart requirement={starting} {session} />
 			</div>
 		{:else if chat.messages.length === 0 && !chat.busy}
 			<div class="welcome">
@@ -1168,13 +1218,22 @@
 		{/if}
 
 		{#if chat.inTerminal}
-			<div class="interm"><Notice tone="info">{t('chat.inTerminal')}</Notice></div>
+			<p class="interm">{t('chat.inTerminal')}</p>
 		{/if}
 		{#if chat.rateLimit}
 			<RateLimitBanner rateLimit={chat.rateLimit} onDismiss={() => (chat.rateLimit = null)} />
 		{/if}
 
 		<StatusStrip items={chat.statusLog} />
+
+		{#if gate && !chat.pendingApproval}
+			<div class="approval-wrap">
+				<div class="gate">
+					<span class="gate-hint">{t('shell.requirement.confirmHint')}</span>
+					<Button size="sm" variant="primary" disabled={confirming} onclick={confirmGate}>{t(`shell.requirement.${gateNext(gate)}`)}</Button>
+				</div>
+			</div>
+		{/if}
 
 		<Composer
 			{chat}
@@ -1371,6 +1430,16 @@
 		margin: 0 auto;
 		padding: 0 var(--chat-pad) 10px;
 	}
+	.gate {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 12px;
+	}
+	.gate-hint {
+		font-size: var(--fs-xs);
+		color: var(--dim2);
+	}
 	.enginedown {
 		display: flex;
 		align-items: center;
@@ -1404,7 +1473,10 @@
 		min-width: 0;
 	}
 	.interm {
-		margin-bottom: 8px;
+		margin: 0 0 8px;
+		font-size: var(--fs-xs);
+		color: var(--dim);
+		text-align: center;
 	}
 	button.agent {
 		border: none;

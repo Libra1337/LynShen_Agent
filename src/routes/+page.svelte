@@ -6,6 +6,7 @@
 	import { invoke } from '@tauri-apps/api/core';
 	import { getCurrentWebview } from '@tauri-apps/api/webview';
 	import TerminalWindowIcon from 'phosphor-svelte/lib/TerminalWindowIcon';
+	import ChatCircleTextIcon from 'phosphor-svelte/lib/ChatCircleTextIcon';
 	import SessionMark from '$lib/SessionMark.svelte';
 	import { sessionStatus } from '$lib/sessionStatus';
 	import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
@@ -99,12 +100,15 @@
 	import TaskDialog from '$lib/TaskDialog.svelte';
 	import AgentDialog from '$lib/AgentDialog.svelte';
 	import DeskPage from '$lib/DeskPage.svelte';
+	import ProjectPage from '$lib/ProjectPage.svelte';
 	import FeedbackDialog from '$lib/FeedbackDialog.svelte';
 	import { telemetry } from '$lib/telemetry.svelte';
 	import { sendTelemetry } from '$lib/protocol';
 	import { Requirements, provideRequirements, type Requirement } from '$lib/requirements.svelte';
 	import type { StartHow } from '$lib/requirements/StartButton.svelte';
-	import { normalizeBackendId } from '$lib/backends';
+	import { normalizeBackendId, BACKEND_LABELS, type BackendId } from '$lib/backends';
+	import Modal from '$lib/ui/Modal.svelte';
+	import BackendIcon from '$lib/BackendIcon.svelte';
 	import { agentDirectory, agentsOfWorkspace } from '$lib/agents.svelte';
 	import { CHATS_ENABLED, type Project, type WorktreeMeta } from '$lib/types';
 	import PlanPanel from '$lib/PlanPanel.svelte';
@@ -137,6 +141,15 @@
 	// The requirements on this computer (the daemon's list).
 	const requirements = new Requirements(daemon);
 	provideRequirements(requirements);
+	// A session at a requirement's start gate is held read-only by the daemon:
+	// it shows the engine's mode, and this client's mode is neither pushed
+	// over it nor saved from it (also when it was started elsewhere).
+	$effect(() => {
+		for (const s of allSessions) {
+			const sid = s.chat.sessionId;
+			if (sid && requirements.bySession.get(sid)?.gate?.session === sid) s.chat.followEngineMode = true;
+		}
+	});
 
 	let providers = $state<string[]>([]);
 
@@ -167,6 +180,7 @@
 	function openSettings(section: SectionKey = 'general') {
 		settingsSection = section;
 		showDesk = false;
+		projectPageId = null;
 		showSettings = true;
 	}
 	function closeSettings() {
@@ -195,7 +209,27 @@
 		deskAgent = agent;
 		deskSession = null;
 		showSettings = false;
+		projectPageId = null;
 		showDesk = true;
+	}
+	// A project's page over the canvas (the sidebar stays); any session
+	// shown there closes it.
+	let projectPageId = $state<string | null>(null);
+	const pageProject = $derived(projectPageId ? store.userProjects.find((p) => p.id === projectPageId) : undefined);
+	function openProjectPage(p: Project) {
+		showDesk = false;
+		showSettings = false;
+		projectPageId = p.id;
+	}
+	$effect(() => {
+		void store.activeId;
+		projectPageId = null;
+	});
+	/** The project a new agent is created in ('' for none). */
+	let agentDialogProject = $state('');
+	function newAgent(project = '') {
+		agentDialogProject = project;
+		showAgentDialog = true;
 	}
 	/** The workbench's requirements page: one requirement, or the list. */
 	function openRequirements(id: string | null = null) {
@@ -204,28 +238,21 @@
 		deskRequirement = id;
 	}
 
-	/** Starts a session on requirement `r`: a new session in its project,
-	 *  its first message (the requirement and its progress) filled in for the
-	 *  user to edit and send, its screenshots attached; it is linked once it
-	 *  starts. Or a parallel task (worktree) with that message, or Dispatch
-	 *  across its projects. */
-	let taskRequirement = $state<{ id: string; name: string; description: string } | null>(null);
+	/** Starts a session on requirement `r`: a new draft in its project (or
+	 *  a parallel task's) that shows the start card; once the user starts
+	 *  it, the daemon has the agent explain its understanding first and wait
+	 *  for confirmation (see Requirements.begin). */
+	let taskRequirement = $state<{ id: string; name: string } | null>(null);
 	async function startRequirement(r: Requirement, how: StartHow) {
 		try {
-			const text = await requirements.prompt(r.id);
-			telemetry.track(how.mode === 'dispatch' ? 'dispatch_send' : 'requirement_start');
-			if (how.mode === 'dispatch') {
-				await daemon.request({ op: 'dispatch_send', text, plan: false, approval_mode: 'auto', requirement: r.id });
-				toast.success(t('shell.requirement.dispatched'));
-				return;
-			}
-			const path = how.project ?? r.projects[0];
+			telemetry.track('requirement_start');
+			const path = how.project ?? workspaceProjects.find((p) => p.id === r.project)?.path;
 			const project = path ? await openProjectPath(path, false) : null;
 			if (!project) return toast.warn(t('shell.requirement.pickProject'));
-			if (!r.projects.length) await requirements.update(r.id, { projects: [project.path] });
+			if (!r.project) await requirements.update(r.id, { project: project.id });
 			if (how.mode === 'worktree') {
 				// The id keeps the branch name readable whatever the title's script.
-				taskRequirement = { id: r.id, name: `${r.id} ${r.title}`, description: text };
+				taskRequirement = { id: r.id, name: `${r.id} ${r.title}` };
 				newTask(project);
 				return;
 			}
@@ -240,10 +267,10 @@
 			const session = store.allSessions.find((s) => s.id === id);
 			if (session) {
 				session.requirement = r.id;
-				session.chat.pendingFill = text;
-				session.chat.pendingAttach = [...r.images];
+				session.requirementStart = { plan: session.chat.approvalMode === 'plan' };
 			}
 			showDesk = false;
+			projectPageId = null;
 		} catch (e) {
 			toast.error(e instanceof Error ? e.message : String(e));
 		}
@@ -255,7 +282,7 @@
 		return chat?.plan.find((p) => p.status === 'in_progress')?.step;
 	}
 	const workspaceProjects = $derived(
-		projects.filter((p) => !p.worktree && !p.chats).map((p) => ({ path: p.path, name: p.name }))
+		projects.filter((p) => !p.worktree && !p.chats).map((p) => ({ id: p.id, path: p.path, name: p.name }))
 	);
 
 	/** Show a daemon session: an agent's on the workbench, a plain hosted one
@@ -274,13 +301,24 @@
 		const cwd = listed?.cwd ?? '';
 		store.openAgentSession({ id: '', name: base(cwd), cwd }, session, listed?.title);
 		showDesk = false;
+		projectPageId = null;
 	}
 	let showQuickOpen = $state(false);
 
 	function refreshAuth() {
 		loadProviders();
 		readAuthProviders()
-			.then((p) => (providers = p))
+			.then(async (p) => {
+				if (p.includes('lynshen') && !providers.includes('lynshen')) {
+					try {
+						await refreshLynShenModels();
+						loadProviders();
+					} catch (e) {
+						toast.error(t('settings.page.saveFailed', { msg: String(e) }));
+					}
+				}
+				providers = p;
+			})
 			.catch(() => {});
 	}
 
@@ -401,9 +439,50 @@
 		return !!session &&
 			isValidResumeSessionId(session.chat.sessionId) &&
 			(session.chat.resumable || !!session.restored) &&
-			!session.chat.switching &&
-			!session.chat.busy;
+			!session.chat.switching;
 	}
+	/** A new conversation: in the chat, or (the TUI by default) in the TUI of
+	 *  the backend the user picks. */
+	let tuiPick = $state<Project | null>(null);
+	function newSession(p: Project) {
+		if (prefs.defaultSurface === 'tui' && !p.chats) tuiPick = p;
+		else store.addSession(p);
+	}
+	function pickTuiBackend(backend: BackendId) {
+		const p = tuiPick;
+		tuiPick = null;
+		if (p) store.addTuiSession(p, backend);
+	}
+	// The TUI panel of each conversation in its TUI, for the title bar's way back.
+	const tuiPanels: Record<string, TuiPanel | undefined> = $state({});
+	/** Into the TUI. A running reply or background task ends with the engine,
+	 *  so the user confirms that first. */
+	async function continueInTui(sid: string) {
+		const chat = sessionMap.get(sid)?.chat;
+		if (!chat) return;
+		if (chat.busy || chat.bgTasks.length) {
+			const ok = await confirm({
+				title: t('chat.tuiInterruptTitle'),
+				message: t('chat.tuiInterruptMessage'),
+				confirmLabel: t('chat.tuiContinue'),
+				danger: true
+			});
+			if (!ok) return;
+		}
+		store.openInTui(sid);
+	}
+	// "Open in the TUI" by default: an existing conversation moves there once,
+	// when it first can; back in the chat, it stays.
+	const openedInTui = new Set<string>();
+	$effect(() => {
+		if (prefs.defaultSurface !== 'tui') return;
+		for (const [sid, session] of sessionMap) {
+			if (openedInTui.has(sid) || !session.restored || !canHandOffToTui(session.backendId)) continue;
+			if (!tuiReady(sid) || !daemon.sessionOf(sid)) continue;
+			openedInTui.add(sid);
+			if (!session.chat.busy && !session.chat.bgTasks.length) store.openInTui(sid);
+		}
+	});
 
 	// A tool tab is an *instance* of a panel kind (two terminals are two tabs);
 	// chat tabs derive their id from the session instead.
@@ -471,7 +550,7 @@
 			const p = activeProject ?? store.shownProjects[0];
 			if (!p) return;
 			if (leafId) focusedLeaf = leafId;
-			store.addSession(p); // the activeId effect opens its tile in the focused leaf
+			newSession(p); // the activeId effect opens its tile in the focused leaf
 			return;
 		}
 		// The embedded browser is a singleton native webview — a second tab
@@ -865,9 +944,14 @@
 			store.activeId = existing.sessions[0]?.id ?? store.addSession(existing);
 			return;
 		}
-		const project = store.createProject(path, meta, description || undefined);
-		// Started on a requirement: its session is linked once the daemon names it.
-		if (requirement && project.sessions[0]) project.sessions[0].requirement = requirement;
+		// Started on a requirement: the description goes with its start (the
+		// start card), not as a first message.
+		const project = store.createProject(path, meta, (!requirement && description) || undefined);
+		const first = project.sessions[0];
+		if (requirement && first) {
+			first.requirement = requirement;
+			first.requirementStart = { plan: first.chat.approvalMode === 'plan', ...(description ? { text: description } : {}) };
+		}
 		if (requirement) showDesk = false;
 	}
 	/** 任务清理完成（worktree 已删除）后，把对应项目从侧边栏移除。 */
@@ -969,7 +1053,7 @@
 				captureSignal += 1;
 			});
 		if (matches(e, 'find') && chat) return act(() => pane?.toggleFind());
-		if (matches(e, 'newSession')) return act(() => activeProject && store.addSession(activeProject));
+		if (matches(e, 'newSession')) return act(() => activeProject && newSession(activeProject));
 		if (matches(e, 'settings')) return act(() => !showSettings && openSettings());
 		if (matches(e, 'sidebar')) return act(toggleSidebar);
 		if (matches(e, 'audit')) return act(toggleAudit);
@@ -1121,7 +1205,7 @@
 			// 托盘菜单「新建会话」：在当前项目（或第一个项目）里开新会话。
 			const untray = await listen('tray-new-session', () => {
 				const p = store.activeProject ?? store.shownProjects[0];
-				if (p) store.addSession(p);
+				if (p) newSession(p);
 			});
 			// Quitting (tray menu, Cmd+Q): save the workspaces first; the app
 			// waits for this (see begin_quit in src-tauri).
@@ -1164,20 +1248,17 @@
 			cleanups.push(() => clearTimeout(updateTimer), () => clearInterval(updateEvery));
 			loadProviders();
 			readAuthProviders()
-				.then((p) => {
-					providers = p;
-					// Display names and windows the gateway changed since the models
-					// were picked (the engines read them from config.json).
-					if (p.includes('lynshen'))
-						refreshLynShenModels()
-							.then((changed) => changed && loadProviders())
-							.catch(() => {});
-					// First run: show the setup wizard only when nothing is configured yet
-					// (a genuinely fresh machine). Pre-configured users skip it silently.
-					if (!localStorage.getItem('lynshen-setup-done')) {
-						if (p.length > 0) localStorage.setItem('lynshen-setup-done', '1');
-						else showSetup = true;
+				.then(async (p) => {
+					if (p.includes('lynshen')) {
+						try {
+							if (await refreshLynShenModels()) loadProviders();
+						} catch (e) {
+							toast.error(t('settings.page.saveFailed', { msg: String(e) }));
+						}
 					}
+					providers = p;
+					// A configured provider is not proof that onboarding was completed.
+					if (!localStorage.getItem('lynshen-setup-done')) showSetup = true;
 				})
 				.catch(() => {});
 		})();
@@ -1211,19 +1292,23 @@
 		sidebarOpen={showSidebar}
 		onToggleSidebar={toggleSidebar}
 		showToggle={!showSetup}
-		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : showSetup ? 'LynShen' : active ? shownTitle(active.chat.title) : ''}
+		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : showSetup ? 'LynShen' : pageProject ? pageProject.name : active ? shownTitle(active.chat.title) : ''}
 		subtitle={showSettings || showDesk || showSetup ? '' : (activeProject?.name ?? '')}
 		addOptions={showSettings || showDesk || showSetup ? [] : addOptions}
 		onAdd={(key) => mosaicAdd(focusedLeaf, key)}
 	>
 		{#snippet actions()}
-			{#if !showSettings && !showDesk && !showSetup && active && active.surface !== 'tui' && canHandOffToTui(active.backendId)}
+			{#if !showSettings && !showDesk && !showSetup && active && active.surface === 'tui'}
+				<button class="tile-action" title={t('dock.tui.backToGui')} aria-label={t('dock.tui.backToGui')} onclick={() => active && tuiPanels[active.id]?.backToGui()}>
+					<ChatCircleTextIcon size={16} />
+				</button>
+			{:else if !showSettings && !showDesk && !showSetup && active && canHandOffToTui(active.backendId)}
 				<button
 					class="tile-action"
 					disabled={!tuiReady(active.id)}
 					title={tuiReady(active.id) ? t('chat.tuiContinueTitle') : t('chat.tuiContinueUnavailable')}
 					aria-label={t('chat.tuiContinue')}
-					onclick={() => active && store.openInTui(active.id)}
+					onclick={() => active && continueInTui(active.id)}
 				>
 					<TerminalWindowIcon size={16} />
 				</button>
@@ -1260,10 +1345,12 @@
 				{activeId}
 				width={showSidebar ? sidebarWidth : 0}
 				resizing={sbResizing}
-				onSelect={(id) => (store.activeId = id)}
+				onSelect={(id) => ((store.activeId = id), (projectPageId = null))}
+				onOpenProject={openProjectPage}
+				openProject={projectPageId}
 				onNewProject={addProject}
 				onNewTask={newTask}
-				onNewSession={(p) => store.addSession(p)}
+				onNewSession={(p) => newSession(p)}
 				onNewChat={() => store.newChat()}
 				onCloseSession={removeSession}
 				onCloseProject={removeProject}
@@ -1278,7 +1365,7 @@
 				agents={agentsOfWorkspace(agentDirectory.agents, workspaces.workspaces, workspaces.activeId)}
 				agentsStatus={agentDirectory.status}
 				onOpenAgent={(a) => openDesk(a.id)}
-				onNewAgent={() => (showAgentDialog = true)}
+				onNewAgent={() => newAgent()}
 				onAgentSession={(a) => store.openAgentSession(a, agentDirectory.latestSession(a.id)?.session)}
 				agentPending={(id) => agentDirectory.pendingFor(id)}
 				pendingCount={agentDirectory.pending}
@@ -1289,6 +1376,21 @@
 			<!-- THE CANVAS: workspace tabs on top, one mosaic for chats, tool panels,
 			     TUI and audit tiles below. -->
 			<div class="canvas">
+				{#if pageProject}
+					{#key pageProject.id}
+						<ProjectPage
+							project={pageProject}
+							projects={workspaceProjects}
+							{currentStep}
+							onClose={() => (projectPageId = null)}
+							onDirs={(dirs) => store.setProjectDirs(pageProject, dirs)}
+							onStartRequirement={startRequirement}
+							onOpenSession={(s) => openDaemonSession(s)}
+							onOpenAgent={(id) => openDesk(id)}
+							onNewAgent={() => newAgent(pageProject.id)}
+						/>
+					{/key}
+				{/if}
 
 				<div class="stage">
 					{#if store.loaded && store.shownProjects.length === 0}
@@ -1320,13 +1422,17 @@
 								{#snippet actions(tab)}
 									{@const sid = chatSessionOf(tab.panel)}
 									{@const session = sid ? sessionMap.get(sid) : undefined}
-									{#if sid && session && session.surface !== 'tui' && canHandOffToTui(session.backendId)}
+									{#if sid && session?.surface === 'tui'}
+										<button class="tile-action" title={t('dock.tui.backToGui')} aria-label={t('dock.tui.backToGui')} onclick={() => tuiPanels[sid]?.backToGui()}>
+											<ChatCircleTextIcon size={13} />
+										</button>
+									{:else if sid && session && canHandOffToTui(session.backendId)}
 										<button
 											class="tile-action"
 											disabled={!tuiReady(sid)}
 											title={tuiReady(sid) ? t('chat.tuiContinueTitle') : t('chat.tuiContinueUnavailable')}
 											aria-label={t('chat.tuiContinue')}
-											onclick={() => store.openInTui(sid)}
+											onclick={() => continueInTui(sid)}
 										>
 											<TerminalWindowIcon size={13} />
 										</button>
@@ -1340,14 +1446,18 @@
 									{#if sess}
 										{#if sess.surface === 'tui'}
 											<!-- Session handoff: the same chat tile renders the native TUI
-											     resuming this conversation by id (never a standalone tui:* tab). -->
+											     resuming this conversation by id (never a standalone tui:* tab),
+											     once the engine has its daemon session (a new one is starting). -->
+											{#if sess.chat.sessionId && daemon.sessionOf(sid)}
 											<TuiPanel
+												bind:this={tuiPanels[sid]}
 												backend={sess.backendId}
 												cwd={store.projectPathOf(sid) ?? ''}
 												session={daemon.sessionOf(sid)}
 												onBackToGui={() => store.returnToGui(sid)}
 												onOpenSettings={() => openSettings('agents')}
 											/>
+											{/if}
 										{:else}
 											<ChatPane
 												session={sess}
@@ -1414,6 +1524,7 @@
 					bind:page={deskPage}
 					bind:requirementId={deskRequirement}
 					projects={workspaceProjects}
+					currentProject={activeProject?.id}
 					{captureSignal}
 					{currentStep}
 					onStartRequirement={startRequirement}
@@ -1421,7 +1532,7 @@
 					navWidth={sidebarWidth}
 					onClose={() => (showDesk = false)}
 					onOpenSession={openDaemonSession}
-					onNewAgent={() => (showAgentDialog = true)}
+					onNewAgent={() => newAgent()}
 					onNewSession={(agent) => {
 						deskSession = store.openAgentSession(agent);
 						deskAgent = agent.id;
@@ -1460,18 +1571,28 @@
 		<Welcome
 			sessionId={activeId}
 			startAt={setupView}
+			hidden={showSettings}
 			{chat}
 			loggedIn={providers.includes('monoize') || providers.includes('lynshen')}
 			configured={providers.length > 0}
 			onRefreshAuth={refreshAuth}
-			onOpenSettings={(section) => {
+			onOpenSettings={openSettings}
+			onClose={async (choice) => {
+				// Apply the explicit model choice to the initial draft, not just its menus.
+				if (activeId) {
+					await store.switchBackend(activeId, choice.backend);
+					if (choice.backend === 'claude' || choice.backend === 'codex') {
+						await store.applyToolProfile(activeId, choice.gateway ? 'lynshen' : 'system', choice.model);
+					} else if (active?.draft) {
+						active.chat.model = choice.model;
+						active.chat.effort = choice.effort;
+						active.draftPick = { model: choice.model, effort: choice.effort };
+					} else {
+						dispatch(activeId, { op: 'command', input: `/model ${choice.model}${choice.effort ? ` ${choice.effort}` : ''}` });
+					}
+				}
+				localStorage.setItem('lynshen-setup-done', '1');
 				showSetup = false;
-				openSettings(section);
-			}}
-			onClose={() => {
-				showSetup = false;
-				// The session opened on first run starts with the agent picked there.
-				if (activeId) store.switchBackend(activeId, loadBackendSettings().default);
 			}}
 		/>
 	{/if}
@@ -1505,7 +1626,6 @@
 		<TaskDialog
 			project={taskDialogFor}
 			name={taskRequirement?.name}
-			description={taskRequirement?.description}
 			onClose={() => ((taskDialogFor = null), (taskRequirement = null))}
 			onCreated={openTaskProject}
 		/>
@@ -1514,6 +1634,8 @@
 	{#if showAgentDialog}
 		<AgentDialog
 			defaultDir={store.activeProject?.path ?? ''}
+			projects={workspaceProjects}
+			defaultProject={agentDialogProject}
 			onClose={() => (showAgentDialog = false)}
 			onCreated={(agent) => {
 				showAgentDialog = false;
@@ -1555,6 +1677,20 @@
 		</TabChromePopover>
 	{/if}
 
+	{#if tuiPick}
+		<Modal title={t('chat.tuiNewTitle')} width={380} onClose={() => (tuiPick = null)}>
+			<p class="tui-pick-hint">{t('chat.tuiNewHint')}</p>
+			<div class="tui-pick">
+				{#each ['claude', 'codex', 'lynshen'] as const as backend (backend)}
+					<button class="tui-pick-item" onclick={() => pickTuiBackend(backend)}>
+						<BackendIcon {backend} size={18} />
+						<span>{BACKEND_LABELS[backend]}</span>
+					</button>
+				{/each}
+			</div>
+		</Modal>
+	{/if}
+
 	{#if showPalette}
 		<CommandPalette
 			{chat}
@@ -1563,7 +1699,7 @@
 			panelOptions={panelKeys.map((k) => ({ key: k, label: t(`dock.tabs.${k}`) }))}
 			onClose={() => (showPalette = false)}
 			onRun={runCommand}
-			onNewSession={() => activeProject && store.addSession(activeProject)}
+			onNewSession={() => activeProject && newSession(activeProject)}
 			onNewProject={addProject}
 			onNewTask={() => newTask(activeProject)}
 			onSettings={() => openSettings()}
@@ -1579,7 +1715,7 @@
 			onShortcuts={() => (showShortcuts = true)}
 			onFeedback={() => (showFeedback = true)}
 			canOpenTui={!!active && active.surface !== 'tui' && canHandOffToTui(active.backendId) && tuiReady(active.id)}
-			onOpenTui={() => active && store.openInTui(active.id)}
+			onOpenTui={() => active && continueInTui(active.id)}
 		/>
 	{/if}
 	{#if showShortcuts}
@@ -1723,5 +1859,33 @@
 	}
 	.resizer.hidden {
 		display: none;
+	}
+	.tui-pick-hint {
+		margin: 0 0 12px;
+		font-size: var(--fs-sm);
+		color: var(--dim);
+	}
+	.tui-pick {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.tui-pick-item {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 12px;
+		border: 1px solid var(--border);
+		border-radius: var(--r-md);
+		background: var(--surface);
+		color: var(--text);
+		font-size: var(--fs-sm);
+		text-align: left;
+		cursor: pointer;
+		transition: border-color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+	}
+	.tui-pick-item:hover {
+		border-color: var(--accent);
+		background: var(--surface2);
 	}
 </style>

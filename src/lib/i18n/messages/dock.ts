@@ -57,7 +57,6 @@ const dock = {
 			failed: '启动失败',
 			exited: '进程已退出',
 			restart: '重新启动',
-			handoff: '会话已移交给原生 TUI',
 			backToGui: '回到 GUI'
 		},
 		turns: {
@@ -269,7 +268,6 @@ const dock = {
 			failed: 'Failed to start',
 			exited: 'Process exited',
 			restart: 'Restart',
-			handoff: 'Session handed to the native TUI',
 			backToGui: 'Back to GUI'
 		},
 		turns: {

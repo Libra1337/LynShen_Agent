@@ -787,6 +787,26 @@
 								<Switch checked={prefs.sidebarVibrancy} label={t('settings.behavior.vibrancy')} onChange={(on) => prefs.setSidebarVibrancy(on)} />
 							</SettingsRow>
 						{/if}
+						<SettingsRow id="default-surface" title={t('settings.behavior.defaultSurface')} description={t('settings.behavior.defaultSurfaceHint')}>
+							<Segmented
+								value={prefs.defaultSurface}
+								options={[
+									{ value: 'gui', label: 'GUI' },
+									{ value: 'tui', label: 'TUI' }
+								]}
+								onChange={(v) => prefs.setDefaultSurface(v === 'tui' ? 'tui' : 'gui')}
+							/>
+						</SettingsRow>
+						<SettingsRow id="terminal-font" title={t('settings.behavior.terminalFont')} description={t('settings.behavior.terminalFontHint')}>
+							<TextField mono placeholder="MesloLGS NF" bind:value={() => prefs.terminalFont, (v) => prefs.setTerminalFont(String(v ?? ''))} />
+						</SettingsRow>
+						<SettingsRow id="terminal-font-size" title={t('settings.behavior.terminalFontSize')}>
+							<Select
+								value={String(prefs.terminalFontSize)}
+								options={[10, 11, 12, 12.5, 13, 14, 15, 16, 18, 20].map((n) => ({ value: String(n) }))}
+								onChange={(v) => prefs.setTerminalFontSize(Number(v))}
+							/>
+						</SettingsRow>
 					</SettingsSection>
 					<SettingsSection title={t('settings.page.conversation')}>
 						<SettingsRow id="turn-stats" title={t('settings.behavior.turnStats')} description={t('settings.behavior.turnStatsHint')} stacked>
