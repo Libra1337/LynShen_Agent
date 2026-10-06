@@ -1374,20 +1374,12 @@ pub(crate) fn which(cmd: &str) -> Option<PathBuf> {
     // Installers update the registry's PATH, not this running GUI's environment
     // (nor its terminal snapshot). Probe their standard locations immediately.
     #[cfg(windows)]
-    {
-        let dirs = windows_install_dirs(cmd, &|key| std::env::var_os(key));
-        return which_in(cmd, std::env::join_paths(dirs).ok()?);
-    }
+    let dirs = windows_install_dirs(cmd, &|key| std::env::var_os(key));
     // Tools the app installs per user (installer::user_install) land in
     // ~/.local/bin, which a GUI app's PATH often lacks.
     #[cfg(not(windows))]
-    which_in(
-        cmd,
-        backend::home_dir()
-            .join(".local")
-            .join("bin")
-            .into_os_string(),
-    )
+    let dirs = [backend::home_dir().join(".local").join("bin")];
+    which_in(cmd, std::env::join_paths(dirs).ok()?)
 }
 
 #[cfg(any(windows, test))]
