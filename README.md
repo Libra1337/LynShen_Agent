@@ -72,7 +72,7 @@ list · `⌘,` settings (Ctrl on Windows and Linux).
 - Prompts and code go to the model provider of the session: the LynShen gateway,
   the provider of your own key, or the tool's own service.
 - With remote access turned on in settings, the daemon keeps a connection to
-  `wss://app.lynshen.net/relay/v1`. Conversation content is
+  `wss://app.lynshen.org/relay/v1`. Conversation content is
   end-to-end encrypted; the relay sees connection metadata only.
 - Voice input sends the recording to the configured speech-to-text service.
 - Signed in to LynShen, the daemon reports each coding-agent turn's token

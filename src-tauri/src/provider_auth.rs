@@ -25,8 +25,10 @@ fn pending() -> &'static Mutex<Option<Attempt>> {
     PENDING.get_or_init(|| Mutex::new(None))
 }
 
+/// Browser logins whose credentials the engine can use. Claude subscription
+/// tokens are left out until requests send them as OAuth bearers.
 fn allowed(provider: &str) -> bool {
-    matches!(provider, "openai-codex" | "anthropic")
+    provider == "openai-codex"
 }
 
 #[tauri::command(async)]
@@ -115,7 +117,7 @@ mod tests {
     #[test]
     fn api_key_providers_and_shell_arguments_are_rejected() {
         assert!(super::allowed("openai-codex"));
-        assert!(super::allowed("anthropic"));
+        assert!(!super::allowed("anthropic"));
         assert!(!super::allowed("openai"));
         assert!(!super::allowed("--help"));
     }

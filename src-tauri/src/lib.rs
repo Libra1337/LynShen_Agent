@@ -434,12 +434,31 @@ fn read_json_strict(path: &std::path::Path) -> Result<serde_json::Value, String>
     }
 }
 
+/// Writes JSON through a temp file and a rename, so the CLI (which shares
+/// these files) never reads a half-written one.
 pub(crate) fn write_json(path: &std::path::Path, value: &serde_json::Value) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
     let text = serde_json::to_string_pretty(value).map_err(|error| error.to_string())?;
-    std::fs::write(path, format!("{text}\n")).map_err(|error| error.to_string())
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("data");
+    let temp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    // Credentials go through here: owner-only from the first byte.
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    options
+        .open(&temp)
+        .and_then(|mut file| std::io::Write::write_all(&mut file, format!("{text}\n").as_bytes()))
+        .and_then(|()| std::fs::rename(&temp, path))
+        .map_err(|error| {
+            let _ = std::fs::remove_file(&temp);
+            error.to_string()
+        })
 }
 
 /// Whether new writes to auth.json encrypt credentials at rest.

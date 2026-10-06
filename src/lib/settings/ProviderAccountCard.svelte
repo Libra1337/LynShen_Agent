@@ -173,7 +173,7 @@
 				{#if provider.id === 'deepseek' && authed}
 					<ProviderBalance balance={deepseekBal} />
 				{/if}
-				{#if ['openai', 'openai-codex', 'anthropic'].includes(provider.id)}
+				{#if ['openai', 'openai-codex'].includes(provider.id)}
 					<ProviderSignIn provider={provider.id === 'openai' ? 'openai-codex' : provider.id} onSuccess={onAuthChange} />
 				{/if}
 				<div class="ekey">

@@ -38,7 +38,7 @@ export class RelayError extends Error {
 }
 
 export interface RelayOptions {
-	/** Relay base, e.g. `wss://app.lynshen.net/relay/v1`. */
+	/** Relay base, e.g. `wss://app.lynshen.org/relay/v1`. */
 	relay: string;
 	hostId: string;
 	hostStatic: Uint8Array;

@@ -41,7 +41,7 @@ describe('relay pairing', () => {
 		const link = (origin: string) => parsePairLink(`${origin}/remote#pair=${HOST}.${PUB}.ABCD1234`)?.host.relay;
 		expect(link('https://relay.example.com')).toBe('wss://relay.example.com/relay/v1');
 		expect(link('http://192.168.1.5:8080')).toBe('ws://192.168.1.5:8080/relay/v1');
-		expect(link('https://app.lynshen.net')).toBe(RELAY_URL);
+		expect(link('https://app.lynshen.org')).toBe(RELAY_URL);
 	});
 
 	it('adds computers to a list and keeps one device key for all of them', () => {

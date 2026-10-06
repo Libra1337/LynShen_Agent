@@ -5,7 +5,7 @@
 
 import { fromBase64Url, generateKeyPair, toBase64Url, type KeyPair } from './noise';
 
-export const RELAY_URL = 'wss://app.lynshen.net/relay/v1';
+export const RELAY_URL = 'wss://app.lynshen.org/relay/v1';
 const HOSTS_KEY = 'lynshen-relay-hosts';
 /** The single computer kept before there was a list; moved into it once. */
 const LEGACY_HOST_KEY = 'lynshen-relay-host';

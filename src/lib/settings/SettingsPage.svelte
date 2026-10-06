@@ -233,7 +233,7 @@
 	const allProviders = $derived<Provider[]>([
 		...builtin
 			// The builtin `lynshen` entry is the dead account gateway
-			// (api.lynshen.net); with no login there it is pure noise next
+			// (api.lynshen.org); with no login there it is pure noise next
 			// to the monoize entry that serves the same models.
 			.filter((b) => b.id !== 'lynshen' || keyed.includes('lynshen'))
 			.map((b) => ({ id: b.id, base_url: b.base_url, models: b.models, format: b.protocol, builtin: true })),
@@ -290,7 +290,7 @@
 		const name = key.slice(i + 2);
 		// Picking a model of a provider with no credentials (the builtin
 		// openai group, or the dead lynshen account gateway
-		// api.lynshen.net) would strand the engine on that provider.
+		// api.lynshen.org) would strand the engine on that provider.
 		// When the keyed monoize entry serves the same model, route there.
 		if (p.builtin && !keyed.includes(p.id)) {
 			const mz = allProviders.find((x) => x.id === 'monoize');
@@ -951,7 +951,7 @@
 											<span class="keyurl">{keyTarget.base_url}</span>
 										</span>
 									</div>
-									{#if ['openai', 'openai-codex', 'anthropic'].includes(keyTarget.id)}
+									{#if ['openai', 'openai-codex'].includes(keyTarget.id)}
 										<ProviderSignIn provider={keyTarget.id === 'openai' ? 'openai-codex' : keyTarget.id} onSuccess={async () => { keyed = await readAuthProviders(); editing = null; onAuthChange?.(); }} />
 									{/if}
 									<TextField bind:value={keyInput} type="password" mono placeholder={t('settings.account.keyPlaceholder', { id: keyTarget.id })} />
