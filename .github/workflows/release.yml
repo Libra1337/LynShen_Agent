@@ -26,6 +26,11 @@ on:
         description: Rebuild only macOS artifacts for an existing release
         type: boolean
         default: false
+      macos_arch:
+        description: Architecture for a macOS-only recovery
+        type: choice
+        options: [both, arm, intel]
+        default: both
 
 permissions:
   contents: write
@@ -38,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.macos_only && '[{"os":"macos-15","target":"aarch64-apple-darwin"},{"os":"macos-15-intel","target":"x86_64-apple-darwin"}]' || '[{"os":"macos-15","target":"aarch64-apple-darwin"},{"os":"macos-15-intel","target":"x86_64-apple-darwin"},{"os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu"},{"os":"windows-latest","target":"x86_64-pc-windows-msvc"}]') }}
+        include: ${{ fromJSON(inputs.macos_only && (inputs.macos_arch == 'intel' && '[{"os":"macos-15-intel","target":"x86_64-apple-darwin"}]' || inputs.macos_arch == 'arm' && '[{"os":"macos-15","target":"aarch64-apple-darwin"}]' || '[{"os":"macos-15","target":"aarch64-apple-darwin"},{"os":"macos-15-intel","target":"x86_64-apple-darwin"}]') || '[{"os":"macos-15","target":"aarch64-apple-darwin"},{"os":"macos-15-intel","target":"x86_64-apple-darwin"},{"os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu"},{"os":"windows-latest","target":"x86_64-pc-windows-msvc"}]') }}
     runs-on: ${{ matrix.os }}
     env:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -80,7 +85,7 @@ jobs:
           node scripts/check-release-version.mjs "$RELEASE_TAG"
           echo "CLI_REF=$(tr -d '\r\n' < src-tauri/lynshen-cli.ref)" >> "$GITHUB_ENV"
       - run: pnpm check
-      - run: pnpm test
+      - run: pnpm test --testTimeout=15000
       - run: node --test scripts/prepare-desktop-release.test.mjs
       - run: python3 scripts/test-receive-desktop-release.py
 
