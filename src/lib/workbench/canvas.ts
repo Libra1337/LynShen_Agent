@@ -5,10 +5,12 @@
 // naming plus the reconcile/migration step run when a workspace loads.
 
 import {
+	activateTab,
 	closeTab,
 	deserializeLayout,
 	emptyLayout,
 	findLeaf,
+	leafOfTab,
 	leavesOf,
 	openTab,
 	singleLeafLayout,
@@ -82,13 +84,24 @@ export function openToolTab(
 	return splitLeaf(layout, focused.id, 'right', tab, TOOL_SIDE_RATIO).layout;
 }
 
-/** Open (or re-activate) the chat tile for `sessionId`, landing in `leafId`. */
+/**
+ * Open (or re-activate) the chat tile for `sessionId`, landing in `leafId`.
+ * A leaf shows one conversation at a time (switching is the sidebar's, as in
+ * ChatGPT or Claude, not a row of tabs): opening one in a leaf that already
+ * shows a chat replaces that chat in place. Tool tabs beside it stay.
+ */
 export function openChatTab(
 	layout: TileLayout,
 	leafId: string | null,
 	sessionId: string
 ): TileLayout {
-	return openTab(layout, leafId, chatTab(sessionId));
+	const tab = chatTab(sessionId);
+	if (leafOfTab(layout.root, tab.id)) return activateTab(layout, tab.id);
+	const target = (leafId && findLeaf(layout.root, leafId)) || leavesOf(layout.root)[0];
+	const shown = target?.tabs.find((t) => chatSessionOf(t.panel) !== null);
+	if (!target || !shown) return openTab(layout, leafId, tab);
+	// Add the new chat, then drop the one it replaces (both in this leaf).
+	return closeTab(openTab(layout, target.id, tab), shown.id);
 }
 
 /**

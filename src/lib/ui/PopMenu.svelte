@@ -13,6 +13,9 @@
 		disabled?: boolean;
 		/** Risky choice (e.g. full access): label, icon and check in the warning colour. */
 		tone?: 'warn';
+		/** Section heading: shown above the first item of each group, with a
+		 *  divider between groups (as ChatGPT / Claude menus separate them). */
+		group?: string;
 	};
 </script>
 
@@ -45,7 +48,11 @@
 <button class="pm-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={onClose}></button>
 <div class="pop pm {placement}" role="menu">
 	{#if title}<div class="pop-head">{title}</div>{/if}
-	{#each items as it (it.key)}
+	{#each items as it, i (it.key)}
+		{#if it.group && it.group !== items[i - 1]?.group}
+			{#if i > 0}<div class="pm-sep" role="separator"></div>{/if}
+			<div class="pm-group">{it.group}</div>
+		{/if}
 		<button class="pop-row" class:warn={it.tone === 'warn'} class:two={!!it.desc} role={it.checked === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={it.checked} disabled={it.disabled} onmousedown={(e) => e.preventDefault()} onclick={() => onSelect(it.key)}>
 			{#if it.icon}<span class="pop-ico"><it.icon size={18} /></span>{:else if hasIcons}<span class="pop-ico"></span>{/if}
 			<span class="pop-txt">
@@ -59,6 +66,17 @@
 </div>
 
 <style>
+	.pm-sep {
+		height: 1px;
+		margin: 4px 8px;
+		background: var(--hairline);
+	}
+	.pm-group {
+		padding: 6px 12px 2px;
+		color: var(--dim2);
+		font-size: var(--fs-2xs);
+		font-weight: 500;
+	}
 	.pm-backdrop {
 		position: fixed;
 		inset: 0;

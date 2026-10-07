@@ -13,6 +13,7 @@ import {
 import {
 	activateTab,
 	leavesOf,
+	openTab,
 	serializeLayout,
 	singleLeafLayout,
 	splitLeaf,
@@ -55,6 +56,18 @@ describe('openChatTab', () => {
 		const leaf = leavesOf(next.root)[1];
 		expect(leaf.tabs.map((t) => t.panel)).toEqual(['term', 'chat:s1']);
 		expect(leaf.active).toBe('chat:s1');
+	});
+
+	it('replaces the chat a leaf shows instead of adding a tab', () => {
+		const one = openChatTab(singleLeafLayout([]), null, 's1');
+		const leaf = leavesOf(one.root)[0];
+		const two = openChatTab(one, leaf.id, 's2');
+		expect(leavesOf(two.root)[0].tabs.map((t) => t.panel)).toEqual(['chat:s2']);
+		expect(leavesOf(two.root)[0].active).toBe('chat:s2');
+		// A tool beside the chat stays.
+		const withTool = openTab(two, leaf.id, { id: 't1', panel: 'term' });
+		const three = openChatTab(withTool, leaf.id, 's3');
+		expect(leavesOf(three.root)[0].tabs.map((t) => t.panel).sort()).toEqual(['chat:s3', 'term']);
 	});
 
 	it('re-activates an existing tile instead of duplicating it', () => {

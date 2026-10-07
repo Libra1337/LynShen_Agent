@@ -56,7 +56,7 @@
 		label: (tab: TileTab) => string;
 		/** Panel kinds offered by each leaf's + menu. On the empty canvas a
 		 *  `primary` option leads as the main action; the rest form a grid. */
-		addOptions?: { key: string; label: string; icon?: typeof PlusIcon; primary?: boolean }[];
+		addOptions?: { key: string; label: string; icon?: typeof PlusIcon; primary?: boolean; group?: string }[];
 		onAdd?: (leafId: string | null, key: string) => void;
 		emptyText?: string;
 		emptyHint?: string;
@@ -321,7 +321,7 @@
 			</div>
 			{#if addMenuFor === leaf.id}
 				<PopMenu
-					items={addOptions.map((o) => ({ key: o.key, label: o.label }))}
+					items={addOptions.map((o) => ({ key: o.key, label: o.label, icon: o.icon, group: o.group }))}
 					onSelect={(key) => {
 						addMenuFor = null;
 						onAdd?.(leaf.id, key);

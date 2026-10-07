@@ -69,6 +69,7 @@ const shell = {
 			stop: '停止生成',
 			captureRequirement: '记下想法'
 		},
+		panelGroup: { session: '本次对话', code: '代码', tools: '工具' },
 		updatePrompt: {
 			label: '应用更新',
 			foundTitle: '发现新版本 LynShen {version}',
@@ -941,6 +942,7 @@ const shell = {
 			stop: 'Stop generating',
 			captureRequirement: 'Note an idea'
 		},
+		panelGroup: { session: 'This conversation', code: 'Code', tools: 'Tools' },
 		updatePrompt: {
 			label: 'App update',
 			foundTitle: 'LynShen {version} is available',

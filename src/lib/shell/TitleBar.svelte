@@ -38,7 +38,7 @@
 		title?: string;
 		subtitle?: string;
 		/** Panels that can be opened next to the focused one. */
-		addOptions?: { key: string; label: string }[];
+		addOptions?: { key: string; label: string; icon?: typeof PlusIcon; group?: string }[];
 		onAdd?: (key: string) => void;
 		/** Extra actions for the session in front (e.g. continue in the TUI). */
 		actions?: Snippet;
@@ -89,7 +89,7 @@
 			>
 			{#if menuOpen}
 				<PopMenu
-					items={addOptions.map((o) => ({ key: o.key, label: o.label }))}
+					items={addOptions.map((o) => ({ key: o.key, label: o.label, icon: o.icon, group: o.group }))}
 					onSelect={(key) => {
 						menuOpen = false;
 						onAdd?.(key);

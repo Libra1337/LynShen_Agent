@@ -421,9 +421,20 @@
 		plan: ListChecksIcon, goal: TargetIcon, agents: TreeStructureIcon, changes: GitDiffIcon, turns: ClockCounterClockwiseIcon,
 		files: FilesIcon, git: GitBranchIcon, term: TerminalWindowIcon, browser: GlobeIcon, diag: PulseIcon
 	};
+	/** The + menu's sections: the conversation's own views, the code, then tools. */
+	const PANEL_GROUP: Record<(typeof ALL_PANELS)[number], 'session' | 'code' | 'tools'> = {
+		plan: 'session', goal: 'session', agents: 'session', turns: 'session',
+		changes: 'code', files: 'code', git: 'code',
+		term: 'tools', browser: 'tools', diag: 'tools'
+	};
+	const GROUP_ORDER = ['session', 'code', 'tools'] as const;
 	const addOptions = $derived([
 		{ key: 'chat', label: t('shell.agentSession'), icon: PlusIcon, primary: true },
-		...panelKeys.map((k) => ({ key: k, label: t(`dock.tabs.${k}`), icon: PANEL_ICONS[k] }))
+		...GROUP_ORDER.flatMap((group) =>
+			panelKeys
+				.filter((k) => PANEL_GROUP[k] === group)
+				.map((k) => ({ key: k, label: t(`dock.tabs.${k}`), icon: PANEL_ICONS[k], group: t(`shell.panelGroup.${group}`) }))
+		)
 	]);
 
 	function tileLabel(tab: TileTab): string {
