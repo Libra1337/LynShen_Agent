@@ -621,6 +621,62 @@ fn app_data_write(app: AppHandle, file: String, content: String) -> Result<(), S
     std::fs::rename(&tmp, &path).map_err(|e| format!("写入 {} 失败：{e}", path.display()))
 }
 
+/// Image types the canvas background accepts (lowercase extensions).
+const BACKGROUND_EXTS: [&str; 7] = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
+/// Largest background image copied in.
+const BACKGROUND_MAX_BYTES: u64 = 40 * 1024 * 1024;
+
+/// The stored background's extension, from the picked file's name.
+fn background_ext(path: &Path) -> Option<String> {
+    let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+    BACKGROUND_EXTS.contains(&ext.as_str()).then_some(ext)
+}
+
+/// Removes every stored `background.<ext>` (a new pick may change the type).
+fn remove_background_files(app: &AppHandle) -> Result<(), String> {
+    for ext in BACKGROUND_EXTS {
+        let path = app_data_path(app, &format!("background.{ext}"))?;
+        if let Err(e) = std::fs::remove_file(&path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                return Err(format!("删除 {} 失败：{e}", path.display()));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Copies the picked image into the app data dir as `background.<ext>` (the
+/// canvas background) and returns the stored path, which the webview loads
+/// through the asset protocol. The original may move or vanish later.
+#[tauri::command(async)]
+fn set_background_image(app: AppHandle, path: String) -> Result<String, String> {
+    let source = PathBuf::from(&path);
+    let ext = background_ext(&source).ok_or_else(|| "unsupported image type".to_string())?;
+    let meta = std::fs::metadata(&source).map_err(|e| format!("读取 {path} 失败：{e}"))?;
+    if !meta.is_file() {
+        return Err(format!("{path} is not a file"));
+    }
+    if meta.len() > BACKGROUND_MAX_BYTES {
+        return Err("image too large (max 40 MB)".to_string());
+    }
+    let target = app_data_path(&app, &format!("background.{ext}"))?;
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let mut tmp = target.clone();
+    tmp.set_file_name(format!("background.{ext}.tmp"));
+    std::fs::copy(&source, &tmp).map_err(|e| format!("复制 {path} 失败：{e}"))?;
+    remove_background_files(&app)?;
+    std::fs::rename(&tmp, &target).map_err(|e| format!("写入 {} 失败：{e}", target.display()))?;
+    Ok(target.to_string_lossy().into_owned())
+}
+
+/// Deletes the stored background image.
+#[tauri::command(async)]
+fn clear_background_image(app: AppHandle) -> Result<(), String> {
+    remove_background_files(&app)
+}
+
 /// Returns the provider names the user is authenticated with. LynShen is now
 /// an OAuth login (tokens live in the top-level `lynshen` block, not the
 /// `providers` map), so it's reported as "lynshen" whenever a refresh token
@@ -3351,6 +3407,8 @@ pub fn run() {
             write_config,
             app_data_read,
             app_data_write,
+            set_background_image,
+            clear_background_image,
             read_auth_providers,
             set_auth_key,
             remove_auth_key,
@@ -3451,7 +3509,8 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{read_json_strict, resolve_file_ref, valid_app_data_name};
+    use super::{background_ext, read_json_strict, resolve_file_ref, valid_app_data_name};
+    use std::path::Path;
 
     #[test]
     fn resolve_file_ref_finds_a_unique_nested_match() {
@@ -3540,6 +3599,17 @@ mod tests {
         ));
         assert!(!super::is_protected_in(&home, &home.join("project/.env")));
         let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn background_ext_accepts_images_only() {
+        assert_eq!(
+            background_ext(Path::new("/a/b/Photo.JPG")).as_deref(),
+            Some("jpg")
+        );
+        assert_eq!(background_ext(Path::new("x.webp")).as_deref(), Some("webp"));
+        assert_eq!(background_ext(Path::new("x.svg")), None);
+        assert_eq!(background_ext(Path::new("noext")), None);
     }
 
     #[test]

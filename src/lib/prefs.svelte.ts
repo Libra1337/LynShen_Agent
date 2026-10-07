@@ -1,6 +1,6 @@
 // Lightweight user preferences (localStorage-backed, reactive). Kept separate
 // from engine/backend settings — these are pure UI choices.
-import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 
 const KEY = 'lynshen-prefs';
 
@@ -33,7 +33,18 @@ type PrefsShape = {
 	defaultSurface: 'gui' | 'tui';
 	/** The currency a USD balance is shown in (the website's CNY/USD switch). */
 	balanceCurrency: 'CNY' | 'USD';
+	/** Custom image behind the chat canvas: the copy in the app data dir
+	 *  (set_background_image), or empty for none. */
+	backgroundImage: string;
+	/** How strongly the image shows through the theme's background. */
+	backgroundStrength: BackgroundStrength;
+	/** Bumped on each pick: the stored file keeps its name, so the image URL
+	 *  needs a new query to reload. */
+	backgroundStamp: number;
 };
+
+export const BACKGROUND_STRENGTHS = ['faint', 'medium', 'strong'] as const;
+export type BackgroundStrength = (typeof BACKGROUND_STRENGTHS)[number];
 
 export const TURN_STAT_KEYS = ['elapsed', 'ttft', 'tokens', 'files', 'tools', 'cost', 'model'] as const;
 export type TurnStatKey = (typeof TURN_STAT_KEYS)[number];
@@ -48,7 +59,10 @@ const DEFAULTS: PrefsShape = {
 	terminalFont: '',
 	terminalFontSize: 12.5,
 	defaultSurface: 'gui',
-	balanceCurrency: 'CNY'
+	balanceCurrency: 'CNY',
+	backgroundImage: '',
+	backgroundStrength: 'medium',
+	backgroundStamp: 0
 };
 
 /** A terminal font size within 8–32 px; anything else is the default. */
@@ -102,6 +116,9 @@ class PrefsStore {
 	terminalFontSize = $state(DEFAULTS.terminalFontSize);
 	defaultSurface = $state(DEFAULTS.defaultSurface);
 	balanceCurrency = $state(DEFAULTS.balanceCurrency);
+	backgroundImage = $state(DEFAULTS.backgroundImage);
+	backgroundStrength = $state<BackgroundStrength>(DEFAULTS.backgroundStrength);
+	backgroundStamp = $state(DEFAULTS.backgroundStamp);
 
 	init() {
 		const p = load();
@@ -117,7 +134,11 @@ class PrefsStore {
 		this.terminalFontSize = fontSize(p.terminalFontSize);
 		this.defaultSurface = p.defaultSurface === 'tui' ? 'tui' : 'gui';
 		this.balanceCurrency = p.balanceCurrency === 'USD' ? 'USD' : 'CNY';
+		this.backgroundImage = typeof p.backgroundImage === 'string' ? p.backgroundImage : '';
+		this.backgroundStrength = BACKGROUND_STRENGTHS.includes(p.backgroundStrength) ? p.backgroundStrength : DEFAULTS.backgroundStrength;
+		this.backgroundStamp = Number.isFinite(p.backgroundStamp) ? p.backgroundStamp : 0;
 		this.#applyVibrancy();
+		this.#applyBackground();
 		if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
 			invoke<string | null>('window_effect')
 				.then((effect) => {
@@ -142,7 +163,10 @@ class PrefsStore {
 					terminalFont: this.terminalFont,
 					terminalFontSize: this.terminalFontSize,
 					defaultSurface: this.defaultSurface,
-					balanceCurrency: this.balanceCurrency
+					balanceCurrency: this.balanceCurrency,
+					backgroundImage: this.backgroundImage,
+					backgroundStrength: this.backgroundStrength,
+					backgroundStamp: this.backgroundStamp
 				})
 			);
 		} catch {
@@ -158,6 +182,37 @@ class PrefsStore {
 		} else {
 			document.documentElement.removeAttribute('data-vibrancy');
 		}
+	}
+
+	/** Reflect the custom background onto the root: the image URL as
+	 *  `--canvas-image` and the strength as `data-canvas-bg` (app.css paints
+	 *  the canvas from them). */
+	#applyBackground() {
+		if (typeof document === 'undefined') return;
+		const root = document.documentElement;
+		const tauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+		if (this.backgroundImage && tauri) {
+			const src = `${convertFileSrc(this.backgroundImage)}?v=${this.backgroundStamp}`;
+			root.style.setProperty('--canvas-image', `url(${JSON.stringify(src)})`);
+			root.dataset.canvasBg = this.backgroundStrength;
+		} else {
+			root.style.removeProperty('--canvas-image');
+			delete root.dataset.canvasBg;
+		}
+	}
+
+	/** `path`: the stored copy (set_background_image), or '' for none. */
+	setBackgroundImage(path: string) {
+		this.backgroundImage = path;
+		this.backgroundStamp = path ? Date.now() : 0;
+		this.#applyBackground();
+		this.#save();
+	}
+
+	setBackgroundStrength(v: BackgroundStrength) {
+		this.backgroundStrength = v;
+		this.#applyBackground();
+		this.#save();
 	}
 
 	setChatWidth(v: number) {

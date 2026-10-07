@@ -422,8 +422,18 @@ export async function fetchAgentUsageRecent(limit = 10): Promise<AgentTurnRow[]>
 }
 /** This computer's usage, from the daemon, with the project of each turn. */
 export async function fetchLocalUsage(days: number): Promise<UsageSummary> {
+	await daemon.connect();
 	const reply = await daemon.request({ op: 'usage_local', days, tz_offset: new Date().getTimezoneOffset() });
 	return reply as unknown as UsageSummary;
+}
+/** Copies the picked image to the app data dir (the canvas background) and
+ *  returns the stored copy's path. */
+export function setBackgroundImage(path: string): Promise<string> {
+	return invoke('set_background_image', { path });
+}
+/** Deletes the stored background image. */
+export function clearBackgroundImage(): Promise<void> {
+	return invoke('clear_background_image');
 }
 export type CloudSettings = Record<string, { value: unknown; updated_at: number }>;
 export async function fetchCloudSettings(): Promise<CloudSettings> {
