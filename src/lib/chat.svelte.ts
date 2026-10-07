@@ -17,6 +17,7 @@ import {
 import { t } from './i18n';
 import { costUsd } from './pricing';
 import { CacheWatch } from './cacheMiss';
+import { breakdownTotal, parseBreakdown, type ContextBreakdown } from './composer/contextUsage';
 import { parseMcpServersEvent, type McpServerView } from './mcp';
 
 /** Where a sent message is before its reply starts: accepted locally, the
@@ -327,6 +328,14 @@ export class ChatState {
 	// the engine only rewinds the conversation, not files).
 	fileCheckpoints = $state<Record<number, string>>({});
 	contextTokens = $state(0);
+	/** The engine's next request by part (lynshen `context_usage.breakdown`);
+	 *  null when the engine reports the conversation only. */
+	contextBreakdown = $state<ContextBreakdown | null>(null);
+	/** Tokens the next request holds: the whole request when the engine
+	 *  breaks it down, else the conversation (`tokens`). */
+	get contextUsed() {
+		return this.contextBreakdown ? breakdownTotal(this.contextBreakdown) : this.contextTokens;
+	}
 	contextWindow = $state(0);
 	contextLimit = $state(0);
 	cost = $state(0);
@@ -403,6 +412,14 @@ export class ChatState {
 	commands = $state<CommandItem[]>([]);
 	totalIn = $state(0);
 	totalOut = $state(0);
+	/** Prompt tokens of the requests that reported cache figures, and the
+	 *  part of them read from the provider's prompt cache (session sums). */
+	cacheInput = $state(0);
+	cacheRead = $state(0);
+	/** Average prompt-cache hit rate (0–1); null until a request reports cache figures. */
+	get cacheHitRate(): number | null {
+		return this.cacheInput > 0 ? Math.min(1, this.cacheRead / this.cacheInput) : null;
+	}
 	unseen = $state(false);
 	/** The last turn ended in an error (its message); cleared by the next one. */
 	lastError = $state<string | null>(null);
@@ -1155,6 +1172,7 @@ export class ChatState {
 			}
 			case 'context_usage':
 				this.contextTokens = num(ev.tokens);
+				this.contextBreakdown = parseBreakdown(ev.breakdown);
 				if (typeof ev.cost === 'number') {
 					this.cost = ev.cost;
 					this.#engineCost = true;
@@ -1330,6 +1348,8 @@ export class ChatState {
 				if (typeof ev.cached_input_tokens === 'number') {
 					const cached = ev.cached_input_tokens;
 					if (this.#cacheWatch.check(inn, cached) && this.busy) this.cacheMiss = { input: inn, cached };
+					this.cacheInput += inn;
+					this.cacheRead += Math.min(cached, inn);
 				}
 				this.totalIn += inn;
 				this.totalOut += out;

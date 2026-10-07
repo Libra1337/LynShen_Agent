@@ -18,7 +18,6 @@
 	import { defaultEffort, effortLabel } from './effort';
 	import EffortSlider from './EffortSlider.svelte';
 	import GroupPicker, { type ToolProvider } from './GroupPicker.svelte';
-	import PlanQuota from './PlanQuota.svelte';
 	import { modelColor, isTopEffort } from '$lib/modelColor';
 	import { modelSetup } from '$lib/modelSetupState.svelte';
 
@@ -27,6 +26,7 @@
 	// the current model (a row that opens the model list), the thinking effort,
 	// the provider (gateway group or this machine) and, while the session can still switch, the coding
 	// agent. The second page is the model list, searchable when it is long.
+	// (The plan quota is in the context ring's card.)
 	let {
 		chat,
 		canPickModel = false,
@@ -205,8 +205,6 @@
 		{:else if toolProvider}
 			{#key toolProvider.model}<GroupPicker model={toolProvider.model} tool={toolProvider} />{/key}
 		{/if}
-
-		{#if chat.planUsage}<PlanQuota usage={chat.planUsage} />{/if}
 
 		{#if !backendLocked}
 			<section class="agents" role="group" aria-label={t('chat.switchBackend')}>

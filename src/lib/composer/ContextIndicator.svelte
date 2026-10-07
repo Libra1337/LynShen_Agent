@@ -1,158 +1,271 @@
 <script lang="ts">
 	import ContextRing from '$lib/ContextRing.svelte';
-	import { t } from '$lib/i18n';
-	import { fmtDur } from '$lib/turnStats';
+	import { getLocale, t } from '$lib/i18n';
+	import { BREAKDOWN_KEYS, fmtCtxTokens, fmtPct, type BreakdownKey, type ContextBreakdown } from './contextUsage';
+	import { fmtResetAt, remainingPct, type QuotaSource } from './quota';
 
+	// The composer's context ring and the card it shows on hover or keyboard
+	// focus: how full the next request is (by part, when the engine breaks it
+	// down), the session's average prompt-cache hit rate, and the plan quota
+	// left when the session draws on one.
 	let {
+		used,
+		window: ctxWindow,
+		limit,
 		pct,
 		atThreshold = false,
-		contextTokens,
-		contextLimit,
-		totalIn,
-		totalOut,
-		cost,
-		runMs = 0
+		breakdown = null,
+		cacheHitRate = null,
+		quota = null
 	}: {
+		/** Tokens the next request holds. */
+		used: number;
+		/** The model's context window ('0' when unknown: the limit stands in). */
+		window: number;
+		/** The gauge's full mark: the auto-compaction point, else the window. */
+		limit: number;
+		/** Ring fill, 0–100, against `limit`. */
 		pct: number;
-		// True only when contextLimit is the engine's real auto-compaction threshold
-		// (lynshen). Otherwise we're gauging against the raw window → "context used".
+		/** `limit` is the engine's real compaction threshold (lynshen). */
 		atThreshold?: boolean;
-		contextTokens: number;
-		contextLimit: number;
-		totalIn: number;
-		totalOut: number;
-		cost: number;
-		/** The session's total running time (sum of its turns), ms. */
-		runMs?: number;
+		breakdown?: ContextBreakdown | null;
+		/** 0–1; null hides the row. */
+		cacheHitRate?: number | null;
+		/** null hides the remaining-quota part. */
+		quota?: QuotaSource | null;
 	} = $props();
 
-	const fmtTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
+	const uid = $props.id();
+	const locale = $derived(getLocale());
+	const fmt = (n: number) => fmtCtxTokens(n, locale);
+	const total = $derived(ctxWindow || limit);
+	const usedPct = $derived(total > 0 ? (used / total) * 100 : 0);
+
+	// Shades of the info blue, strongest first, one per request part.
+	const SHADES: Record<BreakdownKey, number> = { system_tools: 100, skills: 80, system_prompt: 62, messages: 46, mcp_tools: 32 };
+	const shade = (k: BreakdownKey) => `color-mix(in oklab, var(--info) ${SHADES[k]}%, var(--panel))`;
+	const parts = $derived(
+		breakdown
+			? BREAKDOWN_KEYS.filter((k) => (breakdown[k] ?? 0) > 0).map((k) => ({
+					key: k,
+					tokens: breakdown[k] ?? 0,
+					color: shade(k)
+				}))
+			: []
+	);
+	// Where the engine compacts, on the bar (only when that is short of the window).
+	const markPct = $derived(atThreshold && total > limit && limit > 0 ? (limit / total) * 100 : null);
+	const quotaTone = (left: number) => (left <= 0 ? 'full' : left <= 20 ? 'warn' : '');
 </script>
 
-<!-- Laid out like the plan-quota panel in the model menu: dim labels, plain
-     tabular figures, a thin track. -->
 <div class="ctxwrap">
-	<ContextRing {pct} />
-	<span class="ctx-text">{fmtTokens(contextTokens)} / {fmtTokens(contextLimit)}</span>
-	<div class="ctx-pop">
-		<div class="ctx-head">
-			<span class="ctx-label">{t('chat.context')}</span>
-			<span class="ctx-num">{fmtTokens(contextTokens)} / {fmtTokens(contextLimit)}</span>
+	<button type="button" class="ring-btn" aria-label="{t('chat.context')} {fmt(used)}/{fmt(total)}" aria-describedby="{uid}-card">
+		<ContextRing {pct} size={16} />
+	</button>
+	<div class="ctx-card" id="{uid}-card" role="tooltip">
+		<div class="row head">
+			<span class="label">{t('chat.context')}</span>
+			<span class="num">{fmt(used)}/{fmt(total)} ({fmtPct(usedPct)})</span>
 		</div>
-		<div class="ctx-track"><span class="ctx-fill" class:warn={pct >= 75} class:full={pct >= 90} style:width="{Math.min(100, pct)}%"></span></div>
-		<div class="ctx-sub">{atThreshold ? t('chat.toCompaction', { pct }) : t('chat.contextUsed', { pct })}</div>
-		{#if totalIn || totalOut || cost > 0 || runMs > 0}
-			<div class="ctx-stats">
-				{#if totalIn || totalOut}
-					<div class="ctx-cap">{t('chat.sessionUsage')}</div>
-					<div class="ctx-row"><span>{t('chat.sessionIn')}</span><span class="ctx-num">{fmtTokens(totalIn)}</span></div>
-					<div class="ctx-row"><span>{t('chat.sessionOut')}</span><span class="ctx-num">{fmtTokens(totalOut)}</span></div>
-				{/if}
-				{#if cost > 0}<div class="ctx-row"><span>{t('chat.cost')}</span><span class="ctx-num">${cost.toFixed(3)}</span></div>{/if}
-				{#if runMs > 0}<div class="ctx-row"><span>{t('chat.sessionRun')}</span><span class="ctx-num">{fmtDur(runMs)}</span></div>{/if}
+		<div class="bar" class:warn={pct >= 75} class:full={pct >= 90}>
+			{#if parts.length}
+				{#each parts as p (p.key)}
+					<span class="seg" style:width="{Math.min(100, (p.tokens / total) * 100)}%" style:background={p.color}></span>
+				{/each}
+			{:else}
+				<span class="seg plain" style:width="{Math.min(100, usedPct)}%"></span>
+			{/if}
+			{#if markPct !== null}<span class="mark" style:left="{markPct}%"></span>{/if}
+		</div>
+		{#if markPct !== null}<div class="caption">{t('chat.compactAt', { n: fmt(limit) })}</div>{/if}
+		{#if parts.length}
+			<ul class="parts">
+				{#each parts as p (p.key)}
+					<li class="row">
+						<span class="dot" style:background={p.color}></span>
+						<span class="name">{t(`chat.ctxPart.${p.key}`)}</span>
+						<span class="num dim">{fmtPct((p.tokens / Math.max(1, used)) * 100)}</span>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+		{#if cacheHitRate !== null}
+			<div class="sep"></div>
+			<div class="row">
+				<span class="name">{t('chat.cacheHit')}</span>
+				<span class="num">{fmtPct(cacheHitRate * 100)}</span>
 			</div>
+		{/if}
+		{#if quota?.windows.length}
+			<div class="sep"></div>
+			<div class="row sub">
+				<span class="label">{t('chat.quota.remaining')}</span>
+				{#if quota.plan}<span class="dim">{quota.plan}</span>{/if}
+			</div>
+			{#each quota.windows as w, i (i)}
+				{@const left = remainingPct(w)}
+				<div class="qwin">
+					<div class="row">
+						<span class="name">{w.label}</span>
+						<span class="num">{Math.round(left)}%{#if w.resetsAt}<span class="dim">{` · ${fmtResetAt(w.resetsAt, locale)}`}</span>{/if}</span>
+					</div>
+					<div class="bar thin {quotaTone(left)}"><span class="seg plain" style:width="{left}%"></span></div>
+				</div>
+			{/each}
 		{/if}
 	</div>
 </div>
 
 <style>
-	/* The ring and the count together are the hover target. */
 	.ctxwrap {
 		position: relative;
 		display: inline-flex;
+	}
+	/* The ring is the hover target; the card also shows on keyboard focus. */
+	.ring-btn {
+		display: inline-flex;
 		align-items: center;
-		gap: 6px;
-		padding: 2px 4px;
-		border-radius: var(--r-xs);
+		justify-content: center;
+		width: 30px;
+		height: 30px;
+		padding: 0;
+		border: none;
+		border-radius: var(--r-sm);
+		background: none;
 		cursor: default;
+		transition: background var(--t-fast) var(--ease-out);
 	}
-	.ctx-text {
-		color: var(--dim);
-		font-size: var(--fs-2xs);
-		font-variant-numeric: tabular-nums;
+	.ring-btn:hover {
+		background: var(--surface2);
 	}
-	.ctx-pop {
+	.ctx-card {
 		position: absolute;
-		bottom: calc(100% + 10px);
-		right: 0;
+		bottom: calc(100% + 8px);
+		right: -4px;
 		z-index: 21;
 		display: flex;
 		flex-direction: column;
-		width: 220px;
-		padding: 10px 12px 12px;
+		gap: 8px;
+		width: 272px;
+		padding: 12px 14px 14px;
 		background: var(--panel);
 		border-radius: var(--r-lg);
 		box-shadow: var(--shadow-pop);
 		opacity: 0;
+		visibility: hidden;
 		transform: translateY(4px) scale(0.97);
 		transform-origin: bottom right;
 		pointer-events: none;
-		transition: opacity var(--t-med) var(--ease-out), transform var(--t-med) var(--ease-spring);
+		transition:
+			opacity var(--t-med) var(--ease-out),
+			transform var(--t-med) var(--ease-spring),
+			visibility 0s linear var(--t-med);
 	}
-	.ctxwrap:hover .ctx-pop {
+	.ring-btn:hover + .ctx-card,
+	.ring-btn:focus-visible + .ctx-card {
 		opacity: 1;
+		visibility: visible;
 		transform: none;
+		transition-delay: 0s;
 	}
-	.ctx-head {
+	.row {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 8px;
+		min-width: 0;
+		font-size: var(--fs-xs);
+		color: var(--dim);
+	}
+	.row.head {
 		font-size: var(--fs-sm);
 	}
-	.ctx-label {
+	.label {
 		flex: 1;
-		color: var(--dim2);
-	}
-	.ctx-num {
 		color: var(--text);
-		font-variant-numeric: tabular-nums;
+		font-weight: 500;
 	}
-	.ctx-head .ctx-num {
+	.row.sub .label {
 		font-size: var(--fs-xs);
 	}
-	.ctx-track {
-		height: 4px;
-		margin: 8px 0 6px;
+	.name {
+		flex: 1;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.num {
+		flex-shrink: 0;
+		color: var(--text);
+		font-family: var(--font-mono);
+		font-size: var(--fs-xs);
+		font-variant-numeric: tabular-nums;
+	}
+	.dim,
+	.num.dim {
+		color: var(--dim);
+	}
+	.bar {
+		position: relative;
+		display: flex;
+		height: 6px;
 		border-radius: var(--r-full);
 		background: var(--surface2);
 		overflow: hidden;
 	}
-	.ctx-fill {
-		display: block;
-		height: 100%;
-		border-radius: inherit;
-		background: var(--accent);
-		transition: width var(--t-slow) var(--ease-out), background var(--t-med) var(--ease-out);
+	.bar.thin {
+		height: 4px;
+		margin-top: 5px;
 	}
-	.ctx-fill.warn {
+	.seg {
+		height: 100%;
+		flex-shrink: 0;
+		transition: width var(--t-slow) var(--ease-out);
+	}
+	.seg + .seg {
+		box-shadow: inset 1px 0 0 var(--panel);
+	}
+	.seg.plain {
+		background: var(--info);
+		border-radius: inherit;
+	}
+	.bar.warn .seg.plain {
 		background: var(--warn);
 	}
-	.ctx-fill.full {
+	.bar.full .seg.plain {
 		background: var(--err);
 	}
-	.ctx-sub {
+	/* The compaction point. */
+	.mark {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 2px;
+		margin-left: -1px;
+		background: var(--dim2);
+	}
+	.caption {
+		margin-top: -2px;
 		color: var(--dim2);
 		font-size: var(--fs-2xs);
-		font-variant-numeric: tabular-nums;
 	}
-	.ctx-stats {
+	.parts {
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
-		margin-top: 10px;
-		padding-top: 10px;
-		border-top: 1px solid var(--hairline);
+		gap: 6px;
+		margin: 2px 0 0;
+		padding: 0;
+		list-style: none;
 	}
-	.ctx-cap {
-		color: var(--dim2);
-		font-size: var(--fs-2xs);
+	.dot {
+		width: 8px;
+		height: 8px;
+		flex-shrink: 0;
+		border-radius: var(--r-full);
 	}
-	.ctx-row {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 10px;
-		color: var(--dim);
-		font-size: var(--fs-xs);
+	.sep {
+		height: 1px;
+		margin: 2px 0;
+		background: var(--hairline);
 	}
 </style>

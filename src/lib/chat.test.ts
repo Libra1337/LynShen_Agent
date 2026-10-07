@@ -360,6 +360,33 @@ describe('ChatState.handle', () => {
 		c.handle({ type: 'status', message: 'ready' });
 		expect(c.busy).toBe(false);
 	});
+
+	it('counts the whole request when context_usage breaks it down', () => {
+		const c = new ChatState();
+		c.handle({ type: 'context_usage', tokens: 9200 });
+		expect(c.contextBreakdown).toBeNull();
+		expect(c.contextUsed).toBe(9200);
+		c.handle({
+			type: 'context_usage',
+			tokens: 9200,
+			breakdown: { system_prompt: 4100, skills: 2600, system_tools: 11800, mcp_tools: 1300, messages: 9200 }
+		});
+		expect(c.contextTokens).toBe(9200);
+		expect(c.contextUsed).toBe(29_000);
+		// An engine that stops sending it falls back to the conversation.
+		c.handle({ type: 'context_usage', tokens: 500 });
+		expect(c.contextBreakdown).toBeNull();
+		expect(c.contextUsed).toBe(500);
+	});
+
+	it('averages the prompt-cache hit rate over requests with cache figures', () => {
+		const c = new ChatState();
+		c.handle({ type: 'usage', input_tokens: 1000, output_tokens: 10 });
+		expect(c.cacheHitRate).toBeNull();
+		c.handle({ type: 'usage', input_tokens: 1000, cached_input_tokens: 0, output_tokens: 10 });
+		c.handle({ type: 'usage', input_tokens: 3000, cached_input_tokens: 2800, output_tokens: 10 });
+		expect(c.cacheHitRate).toBeCloseTo(0.7);
+	});
 });
 
 describe('approval flow (engine-enforced)', () => {
