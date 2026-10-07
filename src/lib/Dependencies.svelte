@@ -1,7 +1,8 @@
 <script lang="ts">
 	// Runtime tools with detection and one-click install. `ids` limits the list
 	// (settings shows only the non-engine tools; the engine rows carry their
-	// own install button).
+	// own install button). `flat` drops the card and the re-check button, for a
+	// host (the settings page) that draws its own heading and dividers.
 	import { onMount } from 'svelte';
 	import ArrowsClockwiseIcon from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
@@ -12,7 +13,7 @@
 	import Button from '$lib/ui/Button.svelte';
 	import { t } from '$lib/i18n';
 
-	let { ids, heading = true }: { ids?: string[]; heading?: boolean } = $props();
+	let { ids, heading = true, flat = false }: { ids?: string[]; heading?: boolean; flat?: boolean } = $props();
 
 	// Brand marks (Simple Icons, CC0) for the tools that are not engines.
 	const MARKS: Record<string, string> = {
@@ -28,19 +29,21 @@
 	onMount(recheckDeps);
 </script>
 
-<div class="deps">
-	<div class="head">
-		{#if heading}
-			<div class="htext">
-				<h3>{t('setup.deps.title')}</h3>
-				<p class="sub">{t('setup.deps.sub')}</p>
-			</div>
-		{/if}
-		<Button variant="ghost" size="sm" onclick={recheckDeps} disabled={deps.loading}>
-			{#if deps.loading}<CircleNotchIcon size={14} class="spin" />{:else}<ArrowsClockwiseIcon size={14} />{/if}
-			{t('setup.deps.recheck')}
-		</Button>
-	</div>
+<div class="deps" class:flat>
+	{#if !flat}
+		<div class="head">
+			{#if heading}
+				<div class="htext">
+					<h3>{t('setup.deps.title')}</h3>
+					<p class="sub">{t('setup.deps.sub')}</p>
+				</div>
+			{/if}
+			<Button variant="ghost" size="sm" onclick={recheckDeps} disabled={deps.loading}>
+				{#if deps.loading}<CircleNotchIcon size={14} class="spin" />{:else}<ArrowsClockwiseIcon size={14} />{/if}
+				{t('setup.deps.recheck')}
+			</Button>
+		</div>
+	{/if}
 
 	{#if shown.length}
 		<div class="list">
@@ -115,6 +118,15 @@
 	}
 	.item + .item {
 		border-top: 1px solid var(--hairline);
+	}
+	.flat .list,
+	:global([data-theme='light']) .flat .list {
+		background: none;
+		border: none;
+		border-radius: 0;
+	}
+	.flat .item {
+		padding: 12px 0;
 	}
 	.dep {
 		display: flex;

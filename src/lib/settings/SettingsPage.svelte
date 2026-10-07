@@ -1,13 +1,15 @@
 <script lang="ts">
+	// The settings page: covers the content panel (session list + canvas stay
+	// mounted underneath) with a nav column on the left — a flat list of
+	// sections and a search over every row — and the selected section's page
+	// on the right. Config fields apply as they change (debounced writeConfig);
+	// keys, logins and new providers keep their explicit buttons.
+	import { onDestroy, onMount, tick } from 'svelte';
+	import { open as openDialog } from '@tauri-apps/plugin-dialog';
+	import { convertFileSrc } from '@tauri-apps/api/core';
 	import BrowserSignIn from '$lib/BrowserSignIn.svelte';
 	import ProviderSignIn from '$lib/ProviderSignIn.svelte';
 	import { refreshMonoizeCatalog } from '$lib/providers/monoize';
-	// The settings page: covers the content panel (session list + canvas stay
-	// mounted underneath) with a nav column on the left — grouped sections and
-	// a search over every row — and the selected section's page on the right.
-	// Config fields apply as they change (debounced writeConfig); keys, logins
-	// and new providers keep their explicit buttons.
-	import { onDestroy, onMount, tick } from 'svelte';
 	import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
 	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 	import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
@@ -22,13 +24,16 @@
 	import RobotIcon from 'phosphor-svelte/lib/RobotIcon';
 	import PlugsConnectedIcon from 'phosphor-svelte/lib/PlugsConnectedIcon';
 	import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
-	import DesktopTowerIcon from 'phosphor-svelte/lib/DesktopTowerIcon';
+	import DeviceMobileIcon from 'phosphor-svelte/lib/DeviceMobileIcon';
 	import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
 	import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
 	import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 	import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
 	import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
 	import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
+	import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
+	import ArrowsClockwiseIcon from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
+	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
 	import {
 		readConfig,
 		writeConfig,
@@ -43,6 +48,8 @@
 		monoizeLogout,
 		monoizeSession,
 		monoizeMarketplace,
+		setBackgroundImage,
+		clearBackgroundImage,
 		type AccountInfo,
 		type DeepseekBalance,
 		type MonoizeUser,
@@ -52,7 +59,7 @@
 	import { monoizeEntries } from '$lib/providers/monoize';
 	import { dispatch } from '$lib/backends/router';
 	import { caps } from '$lib/backends';
-	import { prefs, TURN_STAT_KEYS, vibrancySupported } from '$lib/prefs.svelte';
+	import { prefs, TURN_STAT_KEYS, BACKGROUND_STRENGTHS, vibrancySupported } from '$lib/prefs.svelte';
 	import { turnParts } from '$lib/turnStats';
 	import { themeState, setTheme, type ThemePref } from '$lib/theme.svelte';
 	import type { ChatState, TurnStats } from '$lib/chat.svelte';
@@ -62,10 +69,10 @@
 	import { ASR_PROVIDERS, asrProvider, resolveAsrSettings, type AsrSettings } from '$lib/audio';
 	import { PROVIDER_CATALOG, providerFormPrefill, type CatalogProvider } from '$lib/providers/catalog';
 	import Vendor from '$lib/Vendor.svelte';
-	import AccountPanel from '$lib/AccountPanel.svelte';
 	import OverviewPanel from '$lib/OverviewPanel.svelte';
 	import { cloudSync } from '$lib/cloudSync.svelte';
 	import Dependencies from '$lib/Dependencies.svelte';
+	import { deps, recheckDeps } from '$lib/deps.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import TextField from '$lib/ui/TextField.svelte';
 	import Select from '$lib/ui/Select.svelte';
@@ -88,7 +95,7 @@
 	import ProviderCatalogPicker from './ProviderCatalogPicker.svelte';
 	import CustomProviderForm from './CustomProviderForm.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
-	import { GROUPS, LYNSHEN_ONLY, resolveSection, searchRows, type SearchRow, type SectionKey } from './nav';
+	import { GROUPS, resolveSection, searchRows, type SearchRow, type SectionKey } from './nav';
 
 	let {
 		sessionId,
@@ -130,7 +137,7 @@
 		market: StorefrontIcon,
 		agents: RobotIcon,
 		acp: PlugsConnectedIcon,
-		daemon: DesktopTowerIcon,
+		daemon: DeviceMobileIcon,
 		updates: InfoIcon
 	};
 	const current = $derived(resolveSection(section));
@@ -174,6 +181,16 @@
 		editing = id;
 		await tick();
 		document.getElementById(`pcard-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+	}
+
+	/** Providers page with `p`'s key entry open: its card when it is listed,
+	 *  else the add dialog's key step for it. */
+	async function openProviderKey(p: Provider) {
+		if (addedProviders.some((x) => x.id === p.id)) return openProviderCard(p.id);
+		section = 'providers';
+		keyTarget = p;
+		keyInput = '';
+		editing = '__key__';
 	}
 
 	function onSearchKey(e: KeyboardEvent) {
@@ -261,7 +278,7 @@
 			.map((p) => ({
 				id: p.id,
 				name: cap(p.id),
-				description: p.base_url,
+				description: '',
 				base_url: p.base_url,
 				protocol: p.format as CatalogProvider['protocol'],
 				models: p.models,
@@ -284,7 +301,7 @@
 				provider: p.id,
 				group: p.id === 'lynshen' ? t('settings.behavior.groupLynShen') : t('settings.behavior.groupByok'),
 				context_window: m.context_window,
-				authed: keyed.includes(p.id)
+				authed: usable(p)
 			}))
 		)
 	);
@@ -296,18 +313,16 @@
 	function applyModel(key: string) {
 		const i = key.indexOf('::');
 		if (i < 0) return;
-		let p = allProviders.find((x) => x.id === key.slice(0, i));
+		const p = allProviders.find((x) => x.id === key.slice(0, i));
 		if (!p) return;
 		const name = key.slice(i + 2);
-		// Picking a model of a provider with no credentials (the builtin
-		// openai group, or the dead lynshen account gateway
-		// api.lynshen.org) would strand the engine on that provider.
-		// When the keyed monoize entry serves the same model, route there.
+		// A builtin provider without a key would strand the engine: keep the
+		// current default and send the user to that provider's key instead.
 		if (p.builtin && !keyed.includes(p.id)) {
-			const mz = allProviders.find((x) => x.id === 'monoize');
-			if (mz && keyed.includes('monoize') && mz.models.some((m) => m.name === name)) {
-				p = mz;
-			}
+			modelKey = `${cfg.provider ?? ''}::${cfg.model ?? ''}`;
+			toast.error(t('settings.page.providerNeedsKey', { provider: p.name ?? cap(p.id) }));
+			void openProviderKey(p);
+			return;
 		}
 		selectProvider(p);
 		cfg.model = name;
@@ -721,6 +736,39 @@
 		keyed = await readAuthProviders();
 		asrKey = '';
 	}
+
+	// ---------- custom background ----------
+	// The picked image is copied into the app data dir (set_background_image);
+	// prefs keep only the stored path. See prefs.applyBackground.
+	const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif'];
+	let bgBusy = $state(false);
+	const bgThumb = $derived(prefs.backgroundImage ? `${convertFileSrc(prefs.backgroundImage)}?v=${prefs.backgroundStamp}` : '');
+	async function pickBackground() {
+		const picked = await openDialog({
+			multiple: false,
+			directory: false,
+			filters: [{ name: t('settings.behavior.backgroundFilter'), extensions: IMAGE_EXTS }]
+		}).catch(() => null);
+		if (typeof picked !== 'string') return;
+		bgBusy = true;
+		try {
+			prefs.setBackgroundImage(await setBackgroundImage(picked));
+		} catch (e) {
+			toast.error(String(e));
+		} finally {
+			bgBusy = false;
+		}
+	}
+	async function removeBackground() {
+		prefs.setBackgroundImage('');
+		await clearBackgroundImage().catch(() => {});
+	}
+	const strengthOpts = $derived(
+		BACKGROUND_STRENGTHS.map((s) => ({ value: s, label: t(`settings.behavior.backgroundStrength.${s}`) }))
+	);
+
+	// The dependency check's refresh sits on the section heading.
+	const depIds = ['node', 'ffmpeg', 'git', 'gh'];
 </script>
 
 <svelte:window onkeydown={onWindowKey} />
@@ -756,8 +804,8 @@
 					<p class="none">{t('settings.page.noResults')}</p>
 				{/each}
 			{:else}
-				{#each GROUPS as g (g.key)}
-					<div class="group-label">{t(`settings.group.${g.key}`)}</div>
+				{#each GROUPS as g, gi (g.key)}
+					{#if gi > 0}<div class="sep" role="separator"></div>{/if}
 					{#each g.sections as key (key)}
 						{@const Icon = ICONS[key]}
 						<button class="item" class:on={current === key} aria-current={current === key ? 'page' : undefined} onclick={() => (section = key)}>
@@ -774,7 +822,6 @@
 		<div class="main">
 			<div class="col">
 				<h1>{t(`settings.section.${current}`)}</h1>
-				{#if LYNSHEN_ONLY.has(current)}<p class="scope">{t('settings.page.lynshenOnly')}</p>{/if}
 
 				{#if current === 'general'}
 					<SettingsSection title={t('settings.page.appearance')}>
@@ -792,6 +839,20 @@
 								onChange={(v) => setTheme(v as ThemePref)}
 							/>
 						</SettingsRow>
+						<SettingsRow id="background" title={t('settings.behavior.background')}>
+							{#if prefs.backgroundImage}
+								<span class="bg-thumb" style:background-image="url('{bgThumb}')" aria-hidden="true"></span>
+								<Button size="sm" disabled={bgBusy} onclick={pickBackground}>{t('settings.behavior.backgroundChange')}</Button>
+								<Button size="sm" variant="ghost" onclick={removeBackground}>{t('settings.behavior.backgroundRemove')}</Button>
+							{:else}
+								<Button size="sm" disabled={bgBusy} onclick={pickBackground}><ImageIcon size={14} /> {t('settings.behavior.backgroundPick')}</Button>
+							{/if}
+						</SettingsRow>
+						{#if prefs.backgroundImage}
+							<SettingsRow id="background-strength" title={t('settings.behavior.backgroundVisibility')}>
+								<Segmented value={prefs.backgroundStrength} options={strengthOpts} onChange={(v) => prefs.setBackgroundStrength(v as (typeof BACKGROUND_STRENGTHS)[number])} />
+							</SettingsRow>
+						{/if}
 						{#if vibrancySupported()}
 							<SettingsRow id="vibrancy" title={t('settings.behavior.vibrancy')} description={t('settings.behavior.vibrancyHint')}>
 								<Switch checked={prefs.sidebarVibrancy} label={t('settings.behavior.vibrancy')} onChange={(on) => prefs.setSidebarVibrancy(on)} />
@@ -807,8 +868,8 @@
 								onChange={(v) => prefs.setDefaultSurface(v === 'tui' ? 'tui' : 'gui')}
 							/>
 						</SettingsRow>
-						<SettingsRow id="terminal-font" title={t('settings.behavior.terminalFont')} description={t('settings.behavior.terminalFontHint')}>
-							<TextField mono placeholder="MesloLGS NF" bind:value={() => prefs.terminalFont, (v) => prefs.setTerminalFont(String(v ?? ''))} />
+						<SettingsRow id="terminal-font" title={t('settings.behavior.terminalFont')}>
+							<div class="w-md"><TextField mono placeholder="MesloLGS NF" bind:value={() => prefs.terminalFont, (v) => prefs.setTerminalFont(String(v ?? ''))} /></div>
 						</SettingsRow>
 						<SettingsRow id="terminal-font-size" title={t('settings.behavior.terminalFontSize')}>
 							<Select
@@ -819,7 +880,7 @@
 						</SettingsRow>
 					</SettingsSection>
 					<SettingsSection title={t('settings.page.conversation')}>
-						<SettingsRow id="turn-stats" title={t('settings.behavior.turnStats')} description={t('settings.behavior.turnStatsHint')} stacked>
+						<SettingsRow id="turn-stats" title={t('settings.behavior.turnStats')} stacked>
 							<div class="stat-preview" aria-label={t('settings.behavior.turnStatsPreview')}>
 								<span class="sp-label">{t('settings.behavior.turnStatsPreview')}</span>
 								<div class="sp-line"></div>
@@ -844,9 +905,7 @@
 						<SettingsRow id="cache-miss" title={t('settings.behavior.cacheMissAlert')} description={t('settings.behavior.cacheMissAlertHint')}>
 							<Switch checked={prefs.cacheMissAlert} label={t('settings.behavior.cacheMissAlert')} onChange={(on) => prefs.setCacheMissAlert(on)} />
 						</SettingsRow>
-					</SettingsSection>
-					<SettingsSection title={t('settings.page.files')}>
-						<SettingsRow id="html-open" title={t('settings.behavior.htmlOpen')} description={t('settings.behavior.htmlOpenHint')}>
+						<SettingsRow id="html-open" title={t('settings.behavior.htmlOpen')}>
 							<Segmented
 								value={prefs.htmlOpenInBrowser ? 'browser' : 'editor'}
 								options={[
@@ -858,7 +917,7 @@
 						</SettingsRow>
 					</SettingsSection>
 					<SettingsSection title={t('settings.page.help')}>
-						<SettingsRow id="feedback" title={t('settings.help.feedback')} description={t('settings.help.feedbackHint')}>
+						<SettingsRow id="feedback" title={t('settings.help.feedback')}>
 							<Button size="sm" disabled={!onFeedback} onclick={() => onFeedback?.()}>{t('settings.help.feedbackOpen')}</Button>
 						</SettingsRow>
 						<SettingsRow id="telemetry" title={t('settings.help.telemetry')} description={t('settings.help.telemetryHint')}>
@@ -869,11 +928,11 @@
 					{@render loginNotice()}
 					<!-- 账户区：登录/余额/模型广场全部走 Monoize 网关（LynShen Console），
 					     旧 LynShen 账号 OAuth 已废弃。 -->
-					<SettingsSection title={t('settings.page.lynshenAccount')}>
+					<SettingsSection>
 						<SettingsRow
 							id="account-login"
-							title={monoizeUser ? t('settings.account.loggedIn') : t('settings.account.notLoggedIn')}
-							description={monoizeUser ? `${monoizeUser.username} · LynShen Console` : t('settings.page.lynshenAccountDesc')}
+							title={monoizeUser ? monoizeUser.username : t('settings.page.lynshenAccount')}
+							description={monoizeUser ? 'LynShen Console' : t('settings.account.notLoggedIn')}
 						>
 							{#if monoizeUser}
 								<Button size="sm" onclick={() => { editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.account.relogin')}</Button>
@@ -882,28 +941,30 @@
 								<Button variant="primary" size="sm" onclick={() => { editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.monoize.loginRegister')}</Button>
 							{/if}
 						</SettingsRow>
-						{#if monoizeUser}
-							<SettingsRow id="account-balance" title={t('settings.usage.balance')} description="https://www.lynshen.org">
-								<span>{monoizeTotal ? shownBalanceText(monoizeTotal.total_balance, monoizeTotal.currency, prefs.balanceCurrency) : '—'}</span>
+						{#if monoizeLogoutError}<p role="alert" class="mferr">{monoizeLogoutError}</p>{/if}
+					</SettingsSection>
+					{#if monoizeUser}
+						<SettingsSection title={t('settings.page.service')}>
+							<SettingsRow id="account-balance" title={t('settings.usage.balance')}>
+								<span class="balance">{monoizeTotal ? shownBalanceText(monoizeTotal.total_balance, monoizeTotal.currency, prefs.balanceCurrency) : '—'}</span>
 								<Segmented
 									value={prefs.balanceCurrency}
 									options={[{ value: 'CNY', label: 'CNY' }, { value: 'USD', label: 'USD' }]}
 									onChange={(v) => prefs.setBalanceCurrency(v as 'CNY' | 'USD')}
 								/>
 							</SettingsRow>
-							{#if monoizeLogoutError}<p role="alert" class="mferr">{monoizeLogoutError}</p>{/if}
-							<SettingsRow id="account-models" title={t('settings.monoize.square')} description={t('settings.monoize.squareHint')}>
-								<Button size="sm" onclick={openMonoizeSquare}><ListChecksIcon size={14} /> {t('settings.monoize.square')}</Button>
+							<SettingsRow id="account-models" title={t('settings.monoize.square')}>
+								<Button size="sm" onclick={openMonoizeSquare}><ListChecksIcon size={14} /> {t('settings.page.view')}</Button>
 							</SettingsRow>
-							<SettingsRow id="account-provider" title="Monoize" description={t('settings.monoize.managedKey')}>
+							<SettingsRow id="account-provider" title={t('settings.page.apiKey')} description={t('settings.monoize.managedKey')}>
 								<Button size="sm" onclick={() => openProviderCard('monoize')}>{t('settings.page.manage')}</Button>
 							</SettingsRow>
-						{/if}
-					</SettingsSection>
+						</SettingsSection>
+					{/if}
 				{:else if current === 'usage'}
 					<OverviewPanel />
 				{:else if current === 'voice'}
-					<SettingsSection title={t('settings.voice.groupLabel')} description={t('settings.voice.hint')}>
+					<SettingsSection title={t('settings.voice.groupLabel')}>
 						<SettingsRow id="voice-provider" title={t('settings.voice.provider')}>
 							<div class="w-md"><Select value={asr.provider} options={asrOptions} onChange={selectAsr} /></div>
 						</SettingsRow>
@@ -913,7 +974,7 @@
 						<SettingsRow id="voice-model" title={t('settings.voice.model')}>
 							<div class="w-lg"><TextField bind:value={asr.model} mono placeholder={selectedAsr.model} /></div>
 						</SettingsRow>
-						<SettingsRow id="voice-key" title={t('settings.page.voiceKey')} description={t('settings.page.voiceKeyDesc')}>
+						<SettingsRow id="voice-key" title={t('settings.page.voiceKey')}>
 							{#snippet detail()}
 								{#if keyed.includes(selectedAsr.authKey)}<span class="keyok"><CheckCircleIcon size={13} /> {t('settings.account.keyed')}</span>{/if}
 							{/snippet}
@@ -927,7 +988,7 @@
 				{:else if current === 'providers'}
 					{@render loginNotice()}
 					<SettingsSection>
-						<SettingsRow id="default-provider" title={t('settings.page.defaultProvider')} description={t('settings.page.defaultProviderDesc')}>
+						<SettingsRow id="default-provider" title={t('settings.page.defaultProvider')}>
 							<div class="w-md">
 								<Select value={cfg.provider ?? ''} options={providerOpts} onChange={setDefaultId} placeholder={t('settings.page.selectProvider')}>
 									{#snippet item(o)}
@@ -938,7 +999,7 @@
 							</div>
 						</SettingsRow>
 					</SettingsSection>
-					<SettingsSection id="provider-list" title={t('settings.account.groupLabel')} description={t('settings.account.hint')}>
+					<SettingsSection id="provider-list" title={t('settings.account.groupLabel')}>
 						{#each addedProviders as p (p.id)}
 							<ProviderAccountCard
 								provider={p}
@@ -985,10 +1046,7 @@
 								<div class="keystep">
 									<div class="keyhead">
 										<span class="tile"><Vendor provider={keyTarget.id} size={18} /></span>
-										<span class="keytxt">
-											<span class="keyname">{t('settings.catalog.connect', { provider: cap(keyTarget.id) })}</span>
-											<span class="keyurl">{keyTarget.base_url}</span>
-										</span>
+										<span class="keyname">{t('settings.catalog.connect', { provider: cap(keyTarget.id) })}</span>
 									</div>
 									{#if ['openai', 'openai-codex'].includes(keyTarget.id)}
 										<ProviderSignIn provider={keyTarget.id === 'openai' ? 'openai-codex' : keyTarget.id} onSuccess={async () => { keyed = await readAuthProviders(); editing = null; onAuthChange?.(); }} />
@@ -1016,45 +1074,9 @@
 							{/if}
 						</Modal>
 					{/if}
-
-					{#if squareOpen}
-						<Modal title={t('settings.monoize.squareTitle')} width={620} padded={false} onClose={() => (squareOpen = false)}>
-							<div class="square">
-								<p class="mfhint">{t('settings.monoize.squareHint')}</p>
-								{#if squareBusy}
-									<p class="mfhint">{t('settings.account.refreshing')}</p>
-								{:else if squareModels?.length}
-									<div class="sqhead">
-										<span>{t('settings.monoize.modelCount', { count: squareModels.reduce((n, m) => n + monoizeModelEntries(m).length, 0) })}</span>
-										<span class="sqactions">
-											<Button variant="secondary" size="sm" onclick={syncSquareModels}>{t('settings.monoize.syncModels')}</Button>
-										</span>
-									</div>
-								<div class="sqgrid">
-									{#each squareModels as m (m.model_id)}
-										{#each monoizeModelEntries(m) as name}
-											<div class="sqrow">
-												<span class="sqname"><Vendor model={m.model_id} size={14} /> {name}</span>
-												<span class="sqmeta">
-													{#if m.max_input_tokens}{fmt(m.max_input_tokens)}{/if}
-													{#if m.input_cost_per_token_nano != null && m.output_cost_per_token_nano != null}
-														 · ${(Number(m.input_cost_per_token_nano) / 1e9 * 1e6).toFixed(2)} / ${(Number(m.output_cost_per_token_nano) / 1e9 * 1e6).toFixed(2)} /M
-													{/if}
-												</span>
-											</div>
-										{/each}
-									{/each}
-								</div>
-								{:else}
-									<p class="mfhint">{squareSyncMsg || t('settings.account.noBalance')}</p>
-								{/if}
-								{#if squareSyncMsg && squareModels?.length}<p class="mfhint">{squareSyncMsg}</p>{/if}
-							</div>
-						</Modal>
-					{/if}
-					{:else if current === 'models'}
-					<SettingsSection title={t('settings.page.defaults')} description={t('settings.footHint')}>
-						<SettingsRow id="default-model" title={t('settings.behavior.defaultModel')} description={allModelOpts.length ? t('settings.page.defaultModelDesc') : t('settings.behavior.noModels')}>
+				{:else if current === 'models'}
+					<SettingsSection title={t('settings.page.defaults')}>
+						<SettingsRow id="default-model" title={t('settings.behavior.defaultModel')} description={allModelOpts.length ? undefined : t('settings.behavior.noModels')}>
 							<div class="w-lg">
 								<Select bind:value={modelKey} onChange={applyModel} options={allModelOpts} placeholder={t('settings.behavior.selectModel')}>
 									{#snippet item(o)}
@@ -1077,7 +1099,7 @@
 						</SettingsRow>
 					</SettingsSection>
 					<SettingsSection title={t('settings.behavior.compaction')}>
-						<SettingsRow id="compact-model" title={t('settings.behavior.compactModel')} description={t('settings.behavior.compactModelHint')}>
+						<SettingsRow id="compact-model" title={t('settings.behavior.compactModel')}>
 							<div class="w-lg">
 								<Select bind:value={cfg.compact_model} options={modelOpts} placeholder={t('settings.behavior.selectModel')}>
 									{#snippet item(o)}
@@ -1092,16 +1114,28 @@
 							<span class="unit">%</span>
 						</SettingsRow>
 					</SettingsSection>
+					<SettingsSection title={t('settings.behavior.titles')}>
+						<SettingsRow id="title-model" title={t('settings.behavior.titleModel')} description={t('settings.behavior.titleModelHint')}>
+							<div class="w-lg">
+								<Select value={cfg.title_model ?? ''} options={titleModelOpts} onChange={(v) => (cfg.title_model = v)}>
+									{#snippet item(o)}
+										{#if o.value}<span class="tile sm"><Vendor model={o.label ?? ''} size={15} /></span>{/if}
+										<span class="ell" class:mono={!!o.value}>{o.label}</span>
+									{/snippet}
+								</Select>
+							</div>
+						</SettingsRow>
+					</SettingsSection>
 				{:else if current === 'network'}
 					<SettingsSection title={t('settings.page.requests')}>
-						<SettingsRow id="retry-attempts" title={t('settings.behavior.retryAttempts')} description={t('settings.page.retryAttemptsDesc')}>
+						<SettingsRow id="retry-attempts" title={t('settings.behavior.retryAttempts')}>
 							<div class="w-num"><TextField bind:value={cfg.retry_attempts} type="number" align="right" /></div>
 						</SettingsRow>
-						<SettingsRow id="connect-timeout" title={t('settings.behavior.connectTimeout')} description={t('settings.page.connectTimeoutDesc')}>
+						<SettingsRow id="connect-timeout" title={t('settings.behavior.connectTimeout')} description={t('settings.page.zeroDefault')}>
 							<div class="w-num"><TextField bind:value={cfg.connect_timeout_seconds} type="number" align="right" /></div>
 							<span class="unit">{t('settings.behavior.seconds')}</span>
 						</SettingsRow>
-						<SettingsRow id="read-timeout" title={t('settings.behavior.readTimeout')} description={t('settings.page.readTimeoutDesc')}>
+						<SettingsRow id="read-timeout" title={t('settings.behavior.readTimeout')} description={t('settings.page.zeroDefault')}>
 							<div class="w-num"><TextField bind:value={cfg.read_timeout_seconds} type="number" align="right" /></div>
 							<span class="unit">{t('settings.behavior.seconds')}</span>
 						</SettingsRow>
@@ -1111,34 +1145,63 @@
 					<McpSection {sessionId} chat={caps(chat).mcpManage ? chat : undefined} />
 				{:else if current === 'market'}
 					<SettingsSection>
-						<SettingsRow id="market-open" title={t('settings.market.groupLabel')} description={t('settings.market.hint')}>
+						<SettingsRow id="market-open" title={t('settings.market.groupLabel')}>
 							<Button size="sm" disabled={!onMarket} onclick={() => onMarket?.()}><StorefrontIcon size={14} /> {t('settings.market.open')}</Button>
 						</SettingsRow>
 					</SettingsSection>
 				{:else if current === 'agents'}
 					<BackendSection />
 					{#if chat && caps(chat).ruleScopes}<PermissionRulesSection {sessionId} {chat} />{/if}
-					<div class="deps" id="set-dependencies"><Dependencies ids={['node', 'ffmpeg', 'git', 'gh']} /></div>
+					<SettingsSection id="dependencies" title={t('setup.deps.title')}>
+						{#snippet action()}
+							<button class="iconbtn" title={t('setup.deps.recheck')} aria-label={t('setup.deps.recheck')} disabled={deps.loading} onclick={recheckDeps}>
+								{#if deps.loading}<CircleNotchIcon size={14} class="spin" />{:else}<ArrowsClockwiseIcon size={14} />{/if}
+							</button>
+						{/snippet}
+						<Dependencies ids={depIds} heading={false} flat />
+					</SettingsSection>
 				{:else if current === 'acp'}
 					<AcpSection />
 				{:else if current === 'daemon'}
-					<DaemonSection>
-						<SettingsSection title={t('settings.behavior.titles')}>
-							<SettingsRow id="title-model" title={t('settings.behavior.titleModel')} description={t('settings.behavior.titleModelHint')}>
-								<div class="w-lg">
-									<Select value={cfg.title_model ?? ''} options={titleModelOpts} onChange={(v) => (cfg.title_model = v)}>
-										{#snippet item(o)}
-											{#if o.value}<span class="tile sm"><Vendor model={o.label ?? ''} size={15} /></span>{/if}
-											<span class="ell" class:mono={!!o.value}>{o.label}</span>
-										{/snippet}
-									</Select>
-								</div>
-							</SettingsRow>
-						</SettingsSection>
-					</DaemonSection>
+					<DaemonSection />
 				{:else if current === 'updates'}
 					<UpdateCard />
 					<ThirdPartyNotices />
+				{/if}
+
+				{#if squareOpen}
+					<Modal title={t('settings.monoize.squareTitle')} width={620} padded={false} onClose={() => (squareOpen = false)}>
+						<div class="square">
+							{#if squareBusy}
+								<p class="mfhint">{t('settings.account.refreshing')}</p>
+							{:else if squareModels?.length}
+								<div class="sqhead">
+									<span>{t('settings.monoize.modelCount', { count: squareModels.reduce((n, m) => n + monoizeModelEntries(m).length, 0) })}</span>
+									<span class="sqactions">
+										<Button variant="secondary" size="sm" onclick={syncSquareModels}>{t('settings.monoize.syncModels')}</Button>
+									</span>
+								</div>
+								<div class="sqgrid">
+									{#each squareModels as m (m.model_id)}
+										{#each monoizeModelEntries(m) as name}
+											<div class="sqrow">
+												<span class="sqname"><Vendor model={m.model_id} size={14} /> {name}</span>
+												<span class="sqmeta">
+													{#if m.max_input_tokens}{fmt(m.max_input_tokens)}{/if}
+													{#if m.input_cost_per_token_nano != null && m.output_cost_per_token_nano != null}
+														 · ${(Number(m.input_cost_per_token_nano) / 1e9 * 1e6).toFixed(2)} / ${(Number(m.output_cost_per_token_nano) / 1e9 * 1e6).toFixed(2)} /M
+													{/if}
+												</span>
+											</div>
+										{/each}
+									{/each}
+								</div>
+							{:else}
+								<p class="mfhint">{squareSyncMsg || t('settings.account.noBalance')}</p>
+							{/if}
+							{#if squareSyncMsg && squareModels?.length}<p class="mfhint">{squareSyncMsg}</p>{/if}
+						</div>
+					</Modal>
 				{/if}
 			</div>
 		</div>
@@ -1155,8 +1218,7 @@
 	.stat-preview {
 		position: relative;
 		padding: 16px 18px 14px;
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-lg);
+		border-radius: var(--r-md);
 		background: var(--surface);
 	}
 	.sp-label {
@@ -1210,7 +1272,7 @@
 	.stat-picks {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-		gap: 12px 24px;
+		gap: 10px 24px;
 		margin-top: 14px;
 	}
 
@@ -1303,25 +1365,23 @@
 		gap: 1px;
 		padding: 0 12px 16px;
 	}
-	.group-label {
-		padding: 16px 12px 6px;
-		font-size: var(--fs-xs);
-		color: var(--dim2);
-	}
-	.group-label:first-child {
-		padding-top: 6px;
+	/* Between groups of sections: space and a faint rule, no heading. */
+	.sep {
+		height: 1px;
+		margin: 8px 12px;
+		background: var(--hairline);
 	}
 	.item {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		width: 100%;
-		min-height: 36px;
+		min-height: 34px;
 		padding: 0 12px;
 		border: none;
 		border-radius: var(--r-md);
 		background: none;
-		color: var(--text);
+		color: var(--dim);
 		font: inherit;
 		font-size: var(--fs-sm);
 		text-align: left;
@@ -1335,6 +1395,7 @@
 	.item:hover,
 	.item.on {
 		background: var(--surface2);
+		color: var(--text);
 	}
 	.item.on > :global(svg) {
 		color: var(--text);
@@ -1371,32 +1432,61 @@
 		overflow-y: auto;
 		background: var(--bg);
 	}
+	/* Left-aligned next to the nav, like the Claude and ChatGPT settings. */
 	.col {
-		max-width: 720px;
-		margin: 0 auto;
-		padding: 56px 32px 80px;
+		max-width: calc(680px + 2 * 48px);
+		padding: 30px 48px 80px;
 		animation: rise var(--t-med) var(--ease-out);
 	}
 	h1 {
 		margin: 0;
 		font-family: var(--font-sans);
-		font-size: var(--fs-2xl);
+		font-size: var(--fs-lg);
 		font-weight: 600;
-		letter-spacing: -0.01em;
-		line-height: 1.15;
+		line-height: 32px;
 		color: var(--text);
 	}
-	.scope {
-		margin: 10px 0 0;
-		font-size: var(--fs-sm);
-		color: var(--dim);
+	/* The first section sits closer under the title. */
+	.col > h1 + :global(.sec) {
+		margin-top: 16px;
 	}
 	.notice {
-		margin-top: 28px;
+		margin-top: 20px;
 	}
-	.deps {
-		margin-top: 28px;
-		scroll-margin: 24px;
+	.iconbtn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border: none;
+		border-radius: var(--r-sm);
+		background: none;
+		color: var(--dim);
+		cursor: pointer;
+	}
+	.iconbtn:hover:not(:disabled) {
+		background: var(--surface2);
+		color: var(--text);
+	}
+	.iconbtn:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+	.balance {
+		font-size: var(--fs-sm);
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		color: var(--text);
+	}
+	.bg-thumb {
+		width: 44px;
+		height: 28px;
+		border-radius: var(--r-xs);
+		background-color: var(--surface2);
+		background-size: cover;
+		background-position: center;
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	/* control widths on the right of a row */
@@ -1423,14 +1513,14 @@
 		color: var(--ok);
 	}
 
-	/* "+ Add provider" as the last row of the providers card */
+	/* "+ Add provider" as the last row of the providers list */
 	.addrow {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		width: 100%;
 		min-height: 52px;
-		padding: 0 18px;
+		padding: 0;
 		border: none;
 		background: none;
 		color: var(--dim);
@@ -1441,7 +1531,6 @@
 		scroll-margin: 24px;
 	}
 	.addrow:hover {
-		background: var(--surface);
 		color: var(--text);
 	}
 
@@ -1462,20 +1551,9 @@
 		height: 34px;
 		border-radius: var(--r-sm);
 	}
-	.keytxt {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		min-width: 0;
-	}
 	.keyname {
 		font-size: var(--fs-sm);
 		font-weight: 600;
-	}
-	.keyurl {
-		font-family: var(--font-mono);
-		font-size: var(--fs-2xs);
-		color: var(--dim2);
 	}
 	.keyfoot {
 		display: flex;
@@ -1486,6 +1564,7 @@
 	/* Monoize 登录 / 模型广场 */
 	.mferr {
 		margin: 0;
+		padding: 8px 0;
 		font-size: var(--fs-xs);
 		color: var(--err);
 		word-break: break-all;

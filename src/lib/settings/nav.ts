@@ -1,6 +1,7 @@
-// Settings page structure: the nav groups and sections, and the static search
-// index of the rows each section renders (SettingsRow `id`s). Keep ROWS in sync
-// with the rows in SettingsPage and the section components.
+// Settings page structure: the nav's sections (in groups, shown as one flat
+// list with a gap between groups), and the static search index of the rows
+// each section renders (SettingsRow / SettingsSection `id`s). Keep ROWS in
+// sync with the rows in SettingsPage and the section components.
 
 export type SectionKey =
 	| 'general'
@@ -17,17 +18,12 @@ export type SectionKey =
 	| 'daemon'
 	| 'updates';
 
-// Grouped by what a setting applies to: the app itself, every coding agent,
-// or only sessions run by the LynShen CLI engine (its ~/.lynshen/config.json).
 export const GROUPS: { key: string; sections: SectionKey[] }[] = [
 	{ key: 'app', sections: ['general', 'account', 'usage', 'voice'] },
-	{ key: 'agents', sections: ['agents', 'acp', 'daemon', 'market'] },
-	{ key: 'lynshen', sections: ['providers', 'models', 'mcp', 'network'] },
-	{ key: 'about', sections: ['updates'] }
+	{ key: 'models', sections: ['providers', 'models', 'network'] },
+	{ key: 'agents', sections: ['agents', 'acp', 'mcp', 'market'] },
+	{ key: 'system', sections: ['daemon', 'updates'] }
 ];
-
-/** Sections whose settings only the LynShen CLI engine reads. */
-export const LYNSHEN_ONLY = new Set<SectionKey>(GROUPS.find((g) => g.key === 'lynshen')!.sections);
 
 const KEYS = new Set<string>(GROUPS.flatMap((g) => g.sections));
 
@@ -48,48 +44,50 @@ export interface SearchRow {
 export const ROWS: SearchRow[] = [
 	{ section: 'general', id: 'language', titleKey: 'settings.language' },
 	{ section: 'general', id: 'theme', titleKey: 'settings.theme' },
+	{ section: 'general', id: 'background', titleKey: 'settings.behavior.background' },
 	{ section: 'general', id: 'vibrancy', titleKey: 'settings.behavior.vibrancy', descKey: 'settings.behavior.vibrancyHint' },
 	{ section: 'general', id: 'default-surface', titleKey: 'settings.behavior.defaultSurface', descKey: 'settings.behavior.defaultSurfaceHint' },
-	{ section: 'general', id: 'terminal-font', titleKey: 'settings.behavior.terminalFont', descKey: 'settings.behavior.terminalFontHint' },
+	{ section: 'general', id: 'terminal-font', titleKey: 'settings.behavior.terminalFont' },
 	{ section: 'general', id: 'terminal-font-size', titleKey: 'settings.behavior.terminalFontSize' },
-	{ section: 'general', id: 'turn-stats', titleKey: 'settings.behavior.turnStats', descKey: 'settings.behavior.turnStatsHint' },
+	{ section: 'general', id: 'turn-stats', titleKey: 'settings.behavior.turnStats' },
 	{ section: 'general', id: 'cache-miss', titleKey: 'settings.behavior.cacheMissAlert', descKey: 'settings.behavior.cacheMissAlertHint' },
-	{ section: 'general', id: 'html-open', titleKey: 'settings.behavior.htmlOpen', descKey: 'settings.behavior.htmlOpenHint' },
-	{ section: 'general', id: 'feedback', titleKey: 'settings.help.feedback', descKey: 'settings.help.feedbackHint' },
+	{ section: 'general', id: 'html-open', titleKey: 'settings.behavior.htmlOpen' },
+	{ section: 'general', id: 'feedback', titleKey: 'settings.help.feedback' },
 	{ section: 'general', id: 'telemetry', titleKey: 'settings.help.telemetry', descKey: 'settings.help.telemetryHint' },
-	{ section: 'account', id: 'account-login', titleKey: 'settings.page.lynshenAccount', descKey: 'settings.page.lynshenAccountDesc' },
-	{ section: 'account', id: 'account-models', titleKey: 'shell.modelSetup.manage', descKey: 'settings.page.manageModelsDesc' },
-	{ section: 'account', id: 'account-sync', titleKey: 'settings.sync.title', descKey: 'settings.sync.desc' },
-	{ section: 'account', id: 'account-usage', titleKey: 'settings.usage.groupLabel', descKey: 'settings.usage.balance' },
-	{ section: 'usage', id: 'usage-daily', titleKey: 'settings.overview.summaryTitle', descKey: 'settings.overview.allHint' },
+	{ section: 'account', id: 'account-login', titleKey: 'settings.page.lynshenAccount' },
+	{ section: 'account', id: 'account-balance', titleKey: 'settings.usage.balance' },
+	{ section: 'account', id: 'account-models', titleKey: 'settings.monoize.square' },
+	{ section: 'account', id: 'account-provider', titleKey: 'settings.page.apiKey', descKey: 'settings.monoize.managedKey' },
+	{ section: 'usage', id: 'usage-daily', titleKey: 'settings.section.usage' },
 	{ section: 'usage', id: 'usage-detail', titleKey: 'settings.overview.breakdownTitle' },
-	{ section: 'voice', id: 'voice-provider', titleKey: 'settings.voice.provider', descKey: 'settings.voice.hint' },
+	{ section: 'voice', id: 'voice-provider', titleKey: 'settings.voice.provider' },
 	{ section: 'voice', id: 'voice-base-url', titleKey: 'settings.voice.baseUrl' },
 	{ section: 'voice', id: 'voice-model', titleKey: 'settings.voice.model' },
-	{ section: 'voice', id: 'voice-key', titleKey: 'settings.page.voiceKey', descKey: 'settings.page.voiceKeyDesc' },
-	{ section: 'providers', id: 'default-provider', titleKey: 'settings.page.defaultProvider', descKey: 'settings.page.defaultProviderDesc' },
-	{ section: 'providers', id: 'provider-list', titleKey: 'settings.account.groupLabel', descKey: 'settings.account.hint' },
-	{ section: 'providers', id: 'provider-add', titleKey: 'settings.custom.add', descKey: 'settings.catalog.hint' },
-	{ section: 'models', id: 'default-model', titleKey: 'settings.behavior.defaultModel', descKey: 'settings.page.defaultModelDesc' },
+	{ section: 'voice', id: 'voice-key', titleKey: 'settings.page.voiceKey' },
+	{ section: 'providers', id: 'default-provider', titleKey: 'settings.page.defaultProvider' },
+	{ section: 'providers', id: 'provider-list', titleKey: 'settings.account.groupLabel' },
+	{ section: 'providers', id: 'provider-add', titleKey: 'settings.custom.add' },
+	{ section: 'models', id: 'default-model', titleKey: 'settings.behavior.defaultModel' },
 	{ section: 'models', id: 'reasoning-effort', titleKey: 'settings.behavior.reasoningEffort', descKey: 'settings.page.reasoningEffortDesc' },
 	{ section: 'models', id: 'project-instructions', titleKey: 'settings.behavior.includeProjectInstructions', descKey: 'settings.behavior.includeProjectInstructionsSub' },
-	{ section: 'models', id: 'compact-model', titleKey: 'settings.behavior.compactModel', descKey: 'settings.behavior.compactModelHint' },
+	{ section: 'models', id: 'compact-model', titleKey: 'settings.behavior.compactModel' },
 	{ section: 'models', id: 'compaction-threshold', titleKey: 'settings.behavior.compactionThreshold', descKey: 'settings.behavior.compactionThresholdSub' },
-	{ section: 'network', id: 'retry-attempts', titleKey: 'settings.behavior.retryAttempts', descKey: 'settings.page.retryAttemptsDesc' },
-	{ section: 'network', id: 'connect-timeout', titleKey: 'settings.behavior.connectTimeout', descKey: 'settings.page.connectTimeoutDesc' },
-	{ section: 'network', id: 'read-timeout', titleKey: 'settings.behavior.readTimeout', descKey: 'settings.page.readTimeoutDesc' },
-	{ section: 'mcp', id: 'mcp-servers', titleKey: 'settings.mcp.groupLabel', descKey: 'settings.mcp.hint' },
-	{ section: 'mcp', id: 'mcp-extensions', titleKey: 'settings.ext.groupLabel', descKey: 'settings.ext.hint' },
-	{ section: 'market', id: 'market-open', titleKey: 'settings.market.groupLabel', descKey: 'settings.market.hint' },
+	{ section: 'models', id: 'title-model', titleKey: 'settings.behavior.titleModel', descKey: 'settings.behavior.titleModelHint' },
+	{ section: 'network', id: 'retry-attempts', titleKey: 'settings.behavior.retryAttempts' },
+	{ section: 'network', id: 'connect-timeout', titleKey: 'settings.behavior.connectTimeout' },
+	{ section: 'network', id: 'read-timeout', titleKey: 'settings.behavior.readTimeout' },
+	{ section: 'mcp', id: 'mcp-servers', titleKey: 'settings.mcp.groupLabel' },
+	{ section: 'mcp', id: 'mcp-extensions', titleKey: 'settings.ext.groupLabel' },
+	{ section: 'market', id: 'market-open', titleKey: 'settings.market.groupLabel' },
+	{ section: 'agents', id: 'default-backend', titleKey: 'settings.backend.defaultLabel' },
 	{ section: 'agents', id: 'shell-env', titleKey: 'settings.backend.shellEnvLabel', descKey: 'settings.backend.shellEnvHint' },
-	{ section: 'agents', id: 'backend-list', titleKey: 'settings.backend.groupLabel', descKey: 'settings.backend.hint' },
-	{ section: 'agents', id: 'default-backend', titleKey: 'settings.backend.defaultLabel', descKey: 'settings.backend.defaultHint' },
-	{ section: 'agents', id: 'dependencies', titleKey: 'setup.deps.title', descKey: 'setup.deps.sub' },
-	{ section: 'acp', id: 'acp-agents', titleKey: 'settings.acp.groupLabel', descKey: 'settings.acp.hint' },
-	{ section: 'daemon', id: 'title-model', titleKey: 'settings.behavior.titleModel', descKey: 'settings.behavior.titleModelHint' },
+	{ section: 'agents', id: 'backend-list', titleKey: 'settings.section.agents' },
+	{ section: 'agents', id: 'dependencies', titleKey: 'setup.deps.title' },
+	{ section: 'acp', id: 'acp-agents', titleKey: 'settings.section.acp' },
 	{ section: 'daemon', id: 'relay', titleKey: 'settings.backend.relayToggle', descKey: 'settings.backend.relayHint' },
-	{ section: 'daemon', id: 'devices', titleKey: 'settings.backend.devices', descKey: 'settings.backend.devicesHint' },
-	{ section: 'updates', id: 'app-version', titleKey: 'settings.update.currentVersion', descKey: 'settings.update.groupLabel' }
+	{ section: 'daemon', id: 'devices', titleKey: 'settings.backend.devices' },
+	{ section: 'updates', id: 'app-version', titleKey: 'settings.update.currentVersion' },
+	{ section: 'updates', id: 'licenses', titleKey: 'settings.licenses.title' }
 ];
 
 /** Rows whose title or description contains the query (case-insensitive). */

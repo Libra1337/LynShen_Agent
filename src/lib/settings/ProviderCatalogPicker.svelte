@@ -36,7 +36,6 @@
 </script>
 
 <div class="catalog">
-	<p class="catalog-hint">{t('settings.catalog.hint')}</p>
 	<label class="search">
 		<MagnifyingGlassIcon size={14} />
 		<TextField bind:value={query} placeholder={t('settings.catalog.search')} />
@@ -71,11 +70,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-	}
-	.catalog-hint {
-		margin: 0;
-		font-size: var(--fs-xs);
-		color: var(--dim);
 	}
 	.search {
 		display: flex;

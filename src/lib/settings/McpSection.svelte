@@ -152,7 +152,7 @@
 	const stateOf = (row: McpRow) => row.view?.state ?? 'unknown';
 </script>
 
-<SettingsSection id="mcp-servers" title={t('settings.mcp.groupLabel')} description={t(owned ? (chat?.backendId === 'codex' ? 'settings.mcp.codexHint' : 'settings.mcp.claudeHint') : 'settings.mcp.hint')}>
+<SettingsSection id="mcp-servers" title={owned ? t(chat?.backendId === 'codex' ? 'settings.mcp.codexTitle' : 'settings.mcp.claudeTitle') : undefined}>
 	{#if !live}
 		<div class="pad"><Notice tone="info">{t('settings.mcp.noSession')}</Notice></div>
 	{/if}
@@ -323,7 +323,7 @@
 	{/if}
 </SettingsSection>
 
-<SettingsSection id="mcp-extensions" title={t('settings.ext.groupLabel')} description={t('settings.ext.hint')}>
+<SettingsSection id="mcp-extensions" title={t('settings.ext.groupLabel')}>
 	{#if extensions.length === 0}
 		<SettingsRow description={t('settings.ext.empty')} />
 	{:else}
@@ -340,15 +340,14 @@
 <style>
 
 	.pad {
-		padding: 14px 18px;
+		padding: 14px 0;
 	}
 	.mcp-empty {
 		display: flex;
-		flex-direction: column;
 		align-items: center;
-		gap: 10px;
-		padding: 26px 18px;
-		text-align: center;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 14px 0;
 	}
 	.mcp-empty p {
 		margin: 0;
@@ -360,7 +359,7 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 6px 14px 6px 0;
+		padding: 6px 0;
 	}
 	.smain {
 		flex: 1;
@@ -368,7 +367,7 @@
 		display: flex;
 		align-items: center;
 		gap: 9px;
-		padding: 10px 12px 10px 18px;
+		padding: 10px 12px 10px 0;
 		border: none;
 		background: none;
 		color: var(--text);
@@ -440,7 +439,7 @@
 		margin-right: auto;
 	}
 	.sdetail {
-		padding: 4px 18px 12px 41px;
+		padding: 4px 0 12px 23px;
 		border-top: 1px dashed var(--hairline);
 	}
 	.serr {
@@ -478,7 +477,7 @@
 		align-items: center;
 		gap: 7px;
 		width: 100%;
-		padding: 14px 18px;
+		padding: 14px 0;
 		border: none;
 		background: none;
 		color: var(--dim);
@@ -486,7 +485,6 @@
 		cursor: pointer;
 	}
 	.addsrv:hover:not(:disabled) {
-		background: var(--surface2);
 		color: var(--text);
 	}
 	.addsrv:disabled {
@@ -496,7 +494,7 @@
 
 	/* add/edit form (mirrors the custom-provider form) */
 	.newsrv {
-		padding: 16px 18px;
+		padding: 16px 0;
 		display: flex;
 		flex-direction: column;
 		gap: 11px;
@@ -565,7 +563,7 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 14px 18px;
+		padding: 14px 0;
 		min-width: 0;
 	}
 	.ename {

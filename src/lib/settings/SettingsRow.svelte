@@ -1,8 +1,8 @@
 <script lang="ts">
-	// One setting inside a SettingsSection card: title and gray description on
-	// the left, the control on the right. `stacked` puts wide content (a list,
-	// a form, a heatmap) under the text instead. `id` is the search anchor
-	// (element id `set-<id>`, see settings/nav.ts).
+	// One setting inside a SettingsSection: title and an optional short gray
+	// line on the left, the control on the right. `stacked` puts wide content
+	// (a list, a form, a chart) under the text instead. `id` is the search
+	// anchor (element id `set-<id>`, see settings/nav.ts).
 	import type { Snippet } from 'svelte';
 
 	let {
@@ -42,8 +42,8 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 24px;
-		min-height: 60px;
-		padding: 14px 18px;
+		min-height: 56px;
+		padding: 12px 0;
 		scroll-margin: 24px;
 	}
 	.row.stacked {
@@ -51,21 +51,21 @@
 		align-items: stretch;
 		justify-content: flex-start;
 		gap: 12px;
+		padding: 14px 0;
 	}
 	.txt {
 		flex: 1;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 3px;
+		gap: 2px;
 	}
 	.title {
 		font-size: var(--fs-sm);
-		font-weight: 500;
 		color: var(--text);
 	}
 	.desc {
-		max-width: 60ch;
+		max-width: 52ch;
 		font-size: var(--fs-xs);
 		line-height: 1.45;
 		color: var(--dim);
