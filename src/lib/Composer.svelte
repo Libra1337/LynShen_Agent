@@ -6,11 +6,6 @@
 	import TargetIcon from 'phosphor-svelte/lib/TargetIcon';
 	import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
 	import FastForwardIcon from 'phosphor-svelte/lib/FastForwardIcon';
-	import ShieldCheckIcon from 'phosphor-svelte/lib/ShieldCheckIcon';
-	import ShieldWarningIcon from 'phosphor-svelte/lib/ShieldWarningIcon';
-	import HandIcon from 'phosphor-svelte/lib/HandIcon';
-	import ClipboardTextIcon from 'phosphor-svelte/lib/ClipboardTextIcon';
-	import NotePencilIcon from 'phosphor-svelte/lib/NotePencilIcon';
 	import StopCircleIcon from 'phosphor-svelte/lib/StopCircleIcon';
 	import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
@@ -18,8 +13,9 @@
 	import BranchMenu from '$lib/composer/BranchMenu.svelte';
 	import CommandIcon from 'phosphor-svelte/lib/CommandIcon';
 	import { toast } from '$lib/ui/toast.svelte';
+	import ModeMenu, { type ModeItem } from '$lib/composer/ModeMenu.svelte';
+	import EffortMenu from '$lib/composer/EffortMenu.svelte';
 	import BackendIcon from '$lib/BackendIcon.svelte';
-	import PopMenu, { type PopMenuItem } from '$lib/ui/PopMenu.svelte';
 	import { listFiles, saveTempImage, transcribeAudio } from '$lib/protocol';
 	import { VoiceRecorder } from '$lib/audio';
 	import VoiceWave from '$lib/composer/VoiceWave.svelte';
@@ -33,8 +29,8 @@
 	import ModelMenu from '$lib/composer/ModelMenu.svelte';
 	import type { SessionSwitch } from '$lib/composer/SessionSwitches.svelte';
 	import type { ToolProvider } from '$lib/composer/GroupPicker.svelte';
-	import Vendor from '$lib/Vendor.svelte';
 	import { modelColor, isTopEffort } from '$lib/modelColor';
+	import { planQuota } from '$lib/composer/quota';
 	import ComposerTray, { type TrayItem, type TraySection } from '$lib/composer/ComposerTray.svelte';
 	import { answerStep, startFlow, togglePick, type QuestionFlow } from '$lib/composer/tray';
 	import { effortLabel } from '$lib/composer/effort';
@@ -121,6 +117,7 @@
 	let showApproval = $state(false);
 	let showAdd = $state(false);
 	let branchOpen = $state(false);
+	let effortOpen = $state(false);
 	let modelButton = $state<HTMLButtonElement>();
 
 	// The model popover holds its own open flag so it can outlive an agent
@@ -135,6 +132,8 @@
 			return;
 		}
 		showAdd = false;
+		showApproval = false;
+		effortOpen = false;
 		modelOpen = true;
 		if (bcaps.modelPicker) onModel();
 	}
@@ -146,11 +145,12 @@
 	// (ACP agents — `modelOpen` is ours, not chat.picker). Capture phase so the
 	// key never reaches the pane's window handler or the editor.
 	function onWindowKeyCapture(e: KeyboardEvent) {
-		if (e.key === 'Escape' && (modelPopoverVisible || showAdd)) {
+		if (e.key === 'Escape' && (modelPopoverVisible || showAdd || effortOpen)) {
 			e.preventDefault();
 			e.stopPropagation();
 			if (modelPopoverVisible) closeModelPopover();
 			showAdd = false;
+			effortOpen = false;
 		}
 	}
 	function selectFromPopover(command: string) {
@@ -160,6 +160,14 @@
 	function setEffort(effort: string) {
 		if (effortDisabled) return;
 		onEffort(effort);
+	}
+	function toggleEffort() {
+		if (!effortOpen) {
+			if (modelPopoverVisible) closeModelPopover();
+			showAdd = false;
+			showApproval = false;
+		}
+		effortOpen = !effortOpen;
 	}
 
 	// The fallback label on the model button before the engine reports a model:
@@ -324,30 +332,36 @@
 		if (document.activeElement === el) caretToEnd();
 	});
 
-	// Claude exposes two extra native modes (plan / auto) between ask and edits;
-	// other backends keep the shared three (gated by extendedApprovalModes).
-	const APPROVAL_MODES: Record<string, PopMenuItem> = {
-		ask: { key: 'ask', label: t('chat.approvalAsk'), desc: t('chat.approvalAskDesc'), icon: HandIcon },
-		plan: { key: 'plan', label: t('chat.approvalPlan'), desc: t('chat.approvalPlanDesc'), icon: ClipboardTextIcon },
-		auto: { key: 'auto', label: t('chat.approvalAuto'), desc: t('chat.approvalAutoDesc'), icon: ShieldCheckIcon },
-		edits: { key: 'edits', label: t('chat.approvalEdits'), desc: t('chat.approvalEditsDesc'), icon: NotePencilIcon },
-		all: { key: 'all', label: t('chat.approvalAll'), desc: t('chat.approvalAllDesc'), icon: ShieldWarningIcon, tone: 'warn' }
-	};
+	// Claude and Codex expose two extra native modes (plan / auto) between ask
+	// and edits; other backends keep the shared three (extendedApprovalModes).
+	const APPROVAL_MODES = $derived<Record<string, ModeItem>>({
+		ask: { key: 'ask', label: t('chat.approvalAsk'), desc: t('chat.approvalAskDesc') },
+		plan: { key: 'plan', label: t('chat.approvalPlan'), desc: t('chat.approvalPlanDesc') },
+		auto: { key: 'auto', label: t('chat.approvalAuto'), desc: t('chat.approvalAutoDesc') },
+		edits: { key: 'edits', label: t('chat.approvalEdits'), desc: t('chat.approvalEditsDesc') },
+		all: { key: 'all', label: t('chat.approvalAll'), desc: t('chat.approvalAllDesc'), tone: 'warn' }
+	});
 	// An agent's session shows the agent's four modes, read-only: they are
-	// changed on its Agent page.
-	const APPROVAL = $derived(
-		(chat.agent
+	// changed on its Agent page. The recommended mode: auto where the engine
+	// has it, else auto-edit.
+	const APPROVAL = $derived.by(() => {
+		const keys = chat.agent
 			? ['ask', 'edits', 'auto', 'all']
 			: bcaps.extendedApprovalModes
 				? ['ask', 'plan', 'auto', 'edits', 'all']
-				: ['ask', 'edits', 'all']
-		).map((k) => ({
-			...APPROVAL_MODES[k],
-			checked: chat.approvalMode === k,
-			disabled: !!chat.agent
-		}))
-	);
-	const approvalCurrent = $derived(APPROVAL.find((a) => a.checked) ?? APPROVAL_MODES.ask);
+				: ['ask', 'edits', 'all'];
+		const recommended = keys.includes('auto') ? 'auto' : 'edits';
+		return keys.map((k) => ({ ...APPROVAL_MODES[k], recommended: k === recommended }));
+	});
+	const approvalCurrent = $derived(APPROVAL.find((a) => a.key === chat.approvalMode) ?? APPROVAL_MODES.ask);
+	function toggleApproval() {
+		if (!showApproval) {
+			if (modelPopoverVisible) closeModelPopover();
+			showAdd = false;
+			effortOpen = false;
+		}
+		showApproval = !showApproval;
+	}
 
 	// "+" menu: only capabilities the session already has. Files go through the
 	// page's picker (images / videos are detected from the picked paths); goal
@@ -400,8 +414,9 @@
 	// Persisting + pushing the mode to the engine lives with the page (it owns
 	// the session id); the picker only reports the choice.
 	function setApproval(m: string) {
-		onApproval(m as ApprovalMode);
 		showApproval = false;
+		el?.focus();
+		if (m !== chat.approvalMode) onApproval(m as ApprovalMode);
 	}
 
 
@@ -533,7 +548,12 @@
 	}
 	function toggleAdd() {
 		showAdd = !showAdd;
-		if (showAdd) el?.focus();
+		if (showAdd) {
+			if (modelPopoverVisible) closeModelPopover();
+			showApproval = false;
+			effortOpen = false;
+			el?.focus();
+		}
 	}
 	// Outside clicks close the "+" tray (rows and the "+" button keep focus in
 	// the editor via mousedown preventDefault, so they don't count).
@@ -618,17 +638,14 @@
 	// Gauge against the auto-compaction limit, so a full ring means "about to
 	// compact" (falls back to the window if the engine didn't send a limit).
 	// Only lynshen reports a real compaction threshold; claude/codex send limit 0,
-	// so we gauge against the raw window and label it "context used" instead of
-	// "to compaction" (which would be misleading — the CLI compacts before 100%).
+	// so we gauge against the raw window. The used side is the whole request
+	// when the engine breaks it down (lynshen compacts on that total), else
+	// the conversation.
 	const ctxAtThreshold = $derived(chat.contextLimit > 0);
 	const ctxLimit = $derived(chat.contextLimit || chat.contextWindow);
-	const ctxPct = $derived(
-		ctxLimit > 0 ? Math.min(100, Math.round((chat.contextTokens / ctxLimit) * 100)) : 0
-	);
-	// Context use is not shown all the time: only once it gets close to the
-	// limit, when it becomes something to act on.
-	const CTX_SHOW_PCT = 70;
-	const showCtx = $derived(bcaps.contextUsage && ctxLimit > 0 && ctxPct >= CTX_SHOW_PCT);
+	const ctxPct = $derived(ctxLimit > 0 ? Math.min(100, Math.round((chat.contextUsed / ctxLimit) * 100)) : 0);
+	const showCtx = $derived(bcaps.contextUsage && ctxLimit > 0);
+	const quota = $derived(planQuota(chat.planUsage));
 
 	function onKey(e: KeyboardEvent) {
 		// While an IME is composing (e.g. selecting a Chinese candidate with Enter),
@@ -671,7 +688,7 @@
 		}
 		if (bcaps.approvalModes && !chat.agent && matches(e, 'approvalMode')) {
 			e.preventDefault();
-			const i = APPROVAL.findIndex((a) => a.checked);
+			const i = APPROVAL.findIndex((a) => a.key === chat.approvalMode);
 			onApproval(APPROVAL[(i + 1) % APPROVAL.length].key as ApprovalMode);
 			return;
 		}
@@ -781,7 +798,7 @@
 
 <svelte:window onkeydowncapture={onWindowKeyCapture} />
 
-<div class="composer-wrap">
+<div class="composer-wrap" onfocusout={onComposerFocusOut}>
 	{#if atQuery !== null}
 		<MentionMenu matches={atMatches} query={atQuery} selected={atIdx} onSelect={applyAt} onHover={(i) => (atIdx = i)} />
 	{/if}
@@ -811,7 +828,7 @@
 			{/if}
 		</div>
 	{/if}
-	<div class="composer" onfocusout={onComposerFocusOut}>
+	<div class="composer">
 		{#if trayMode}
 			<ComposerTray
 				bind:this={tray}
@@ -824,138 +841,100 @@
 				onClose={closeTray}
 			/>
 		{/if}
-		<div
-			class="rich"
-			class:empty={input === ''}
-			bind:this={el}
-			contenteditable="true"
-			role="combobox"
-			tabindex="0"
-			aria-label={t(currentQ ? 'chat.questionPlaceholder' : chat.isChatMode ? 'chat.chatPlaceholder' : 'chat.composerPlaceholder')}
-			data-placeholder={chat.suggestion && !currentQ
-				? t('chat.suggestionPlaceholder', { text: chat.suggestion })
-				: t(currentQ ? 'chat.questionPlaceholder' : chat.isChatMode ? 'chat.chatPlaceholder' : 'chat.composerPlaceholder')}
-			oninput={syncFromDom}
-			onkeydown={onKey}
-			onpaste={onPaste}
-			oncompositionstart={() => (composing = true)}
-			oncompositionend={() => {
-				composing = false;
-				syncFromDom();
-			}}
-			aria-expanded={menuOpen}
-			aria-controls={atQuery !== null ? 'composer-menu' : 'cmp-tray'}
-			aria-autocomplete="list"
-			aria-activedescendant={activeOptionId}
-		></div>
-		<div class="composer-bar">
-			<button
-				class="addbtn"
-				class:on={showAdd}
-				disabled={!!currentQ}
-				onmousedown={(e) => e.preventDefault()}
-				onclick={toggleAdd}
-				aria-label={t('chat.addTitle')}
-				title={t('chat.addTitle')}
-				aria-expanded={showAdd}
-			>
-				<PlusIcon size={18} />
-			</button>
-			{#if bcaps.approvalModes}
-				<div class="footsel">
-					<button class="foot-chip" class:auto={chat.approvalMode !== 'ask'} class:warn={approvalCurrent.tone === 'warn'} onclick={() => (showApproval = !showApproval)} title={withShortcut(t('chat.approvalModeTitle'), 'approvalMode')}>
-						{#if approvalCurrent.icon}<approvalCurrent.icon size={17} />{/if}<span>{approvalCurrent.label}</span>
-					</button>
-					{#if showApproval}
-						<PopMenu
-							title={chat.agent ? t('chat.approvalAgent') : t('chat.approvalQuestion')}
-							items={APPROVAL}
-							placement="up-left"
-							onSelect={setApproval}
-							onClose={() => (showApproval = false)}
-						/>
-					{/if}
-				</div>
-			{/if}
-			<div class="cspace"></div>
-			{#if chat.efforts.length || bcaps.modelPicker || !backendLocked}
-				<!-- Model · effort: one button, one menu (agent, effort, models). -->
+		<!-- The box holds only the text and, at its right end, voice and send. -->
+		<div class="inrow">
+			<div
+				class="rich"
+				class:empty={input === ''}
+				bind:this={el}
+				contenteditable="true"
+				role="combobox"
+				tabindex="0"
+				aria-label={t(currentQ ? 'chat.questionPlaceholder' : chat.isChatMode ? 'chat.chatPlaceholder' : 'chat.composerPlaceholder')}
+				data-placeholder={chat.suggestion && !currentQ
+					? t('chat.suggestionPlaceholder', { text: chat.suggestion })
+					: t(currentQ ? 'chat.questionPlaceholder' : chat.isChatMode ? 'chat.chatPlaceholder' : 'chat.composerPlaceholder')}
+				oninput={syncFromDom}
+				onkeydown={onKey}
+				onpaste={onPaste}
+				oncompositionstart={() => (composing = true)}
+				oncompositionend={() => {
+					composing = false;
+					syncFromDom();
+				}}
+				aria-expanded={menuOpen}
+				aria-controls={atQuery !== null ? 'composer-menu' : 'cmp-tray'}
+				aria-autocomplete="list"
+				aria-activedescendant={activeOptionId}
+			></div>
+			<div class="box-acts">
+				{#if voiceLevels}<VoiceWave analyser={voiceLevels} />{/if}
 				<button
-					class="flatbtn model"
-					class:pending={effortDisabled}
-					bind:this={modelButton}
-					onclick={toggleModelPopover}
-					title={withShortcut(t('chat.switchModel'), 'model')}
-					aria-haspopup="dialog"
-					aria-expanded={modelPopoverVisible}
+					class="cact voice"
+					class:on={voice === 'rec'}
+					class:pulse={voice === 'rec'}
+					onclick={toggleVoice}
+					disabled={voice === 'busy'}
+					aria-label={t('chat.voiceTitle')}
+					title={voice === 'rec' ? t('chat.voiceStopTitle') : voice === 'busy' ? t('chat.voiceBusyTitle') : t('chat.voiceTitle')}
 				>
-					<!-- Model changes slide the name in; the top effort sweeps in the model's colour. -->
-					{#key chat.model}
-						<span class="mswap">
-							{#if chat.backendId === 'lynshen' && chat.model}<Vendor model={chat.model} size={15} />{:else}<BackendIcon backend={chat.backendId} size={15} />{/if}
-							<span class="m">{modelDisplayName || stripGroupSuffix(chat.modelLabel || '') || chat.model || backendLabel}</span>
-						</span>
-					{/key}
-					{#if chat.efforts.length}{#key chat.effort}<span
-								class="e"
-								class:effort-max={isTopEffort(chat.effort, chat.efforts)}
-								style:--effort-accent={modelColor(chat.model) || 'var(--text)'}>{effortLabel(chat.effort) || t('chat.effortTitle')}</span
-							>{/key}{/if}
-					{#if chat.ultracode}<span class="e">· Ultracode</span>{/if}
+					{#if voice === 'busy'}<CircleNotchIcon size={15} class="spin" />{:else if voice === 'rec'}<StopCircleIcon size={16} />{:else}<MicrophoneIcon size={17} />{/if}
 				</button>
-			{:else if chat.model}
-				<span class="flatbtn model static"><BackendIcon backend={chat.backendId} size={15} /><span>{modelDisplayName || stripGroupSuffix(chat.modelLabel || '') || chat.model}</span></span>
-			{/if}
-			{#if modelPopoverVisible}
-				<ModelMenu
-					{chat}
-					canPickModel={bcaps.modelPicker}
-					rows={bcaps.modelPicker ? modelRows : []}
-					showSearch={modelSearch}
-					{backendLocked}
-					{toolProvider}
-					{effortDisabled}
-					anchor={modelButton}
-					bind:query={pickerQuery}
-					bind:selIdx={pickerSelIdx}
-					onClose={closeModelPopover}
-					onSelect={selectFromPopover}
-					onEffort={setEffort}
-					{onSwitch}
-					{onBackend}
-					onRefreshModels={() => onModel()}
-				/>
-			{/if}
-			{#if voiceLevels}<VoiceWave analyser={voiceLevels} />{/if}
-			<button
-				class="cact voice"
-				class:on={voice === 'rec'}
-				class:pulse={voice === 'rec'}
-				onclick={toggleVoice}
-				disabled={voice === 'busy'}
-				aria-label={t('chat.voiceTitle')}
-				title={voice === 'rec' ? t('chat.voiceStopTitle') : voice === 'busy' ? t('chat.voiceBusyTitle') : t('chat.voiceTitle')}
-			>
-				{#if voice === 'busy'}<CircleNotchIcon size={15} class="spin" />{:else if voice === 'rec'}<StopCircleIcon size={15} />{:else}<MicrophoneIcon size={17} />{/if}
-			</button>
-			{#if chat.busy && !currentQ}
-				<button class="cact stop" onclick={onStop} aria-label={t('chat.stopTitle')} title={withShortcut(t('chat.stopTitle'), 'stop')}><SquareIcon size={15} /></button>
-			{:else}
-				<button class="cact send" onclick={submit} disabled={!input.trim() && !attachments.length && !videos.length} aria-label={t('chat.sendTitle')} title={t('chat.sendTitle')}><ArrowUpIcon size={17} /></button>
-			{/if}
+				{#if chat.busy && !currentQ}
+					<button class="cact stop" onclick={onStop} aria-label={t('chat.stopTitle')} title={withShortcut(t('chat.stopTitle'), 'stop')}><SquareIcon size={13} weight="fill" /></button>
+				{:else}
+					<button class="cact send" onclick={submit} disabled={!input.trim() && !attachments.length && !videos.length} aria-label={t('chat.sendTitle')} title={t('chat.sendTitle')}><ArrowUpIcon size={16} weight="bold" /></button>
+				{/if}
+			</div>
 		</div>
 	</div>
-	<!-- Slim strip in the blank area under the card: branch · approval | context. -->
+	<!-- One slim row under the box: add · mode · branch | model · effort · context. -->
 	<div class="composer-foot">
+		<button
+			class="fbtn add"
+			class:on={showAdd}
+			disabled={!!currentQ}
+			onmousedown={(e) => e.preventDefault()}
+			onclick={toggleAdd}
+			aria-label={t('chat.addTitle')}
+			title={t('chat.addTitle')}
+			aria-expanded={showAdd}
+		>
+			<PlusIcon size={17} />
+		</button>
+		{#if bcaps.approvalModes}
+			<span class="anchor">
+				<button
+					class="fbtn mode"
+					class:on={showApproval}
+					class:warn={approvalCurrent.tone === 'warn'}
+					onclick={toggleApproval}
+					title={withShortcut(t('chat.approvalModeTitle'), 'approvalMode')}
+					aria-haspopup="menu"
+					aria-expanded={showApproval}
+				>{approvalCurrent.label}</button>
+				{#if showApproval}
+					<ModeMenu
+						items={APPROVAL}
+						current={chat.approvalMode}
+						note={chat.agent ? t('chat.approvalAgent') : ''}
+						disabled={!!chat.agent}
+						onSelect={setApproval}
+						onClose={() => (showApproval = false)}
+					/>
+				{/if}
+			</span>
+		{/if}
 		{#if gitBranch}
 			<!-- Switching under a running turn would change its files mid-edit. -->
-			<span class="branch-anchor">
+			<span class="anchor branch-anchor">
 				<button
-					class="foot-branch"
+					class="fbtn branch"
+					class:on={branchOpen}
 					disabled={!gitCwd || chat.busy}
 					title={chat.busy ? t('chat.branchMenu.busy') : t('chat.gitBranch')}
 					onclick={() => (branchOpen = !branchOpen)}
-				><GitBranchIcon size={12} /><span class="branch-name">{gitBranch}</span></button>
+				><GitBranchIcon size={13} /><span class="branch-name">{gitBranch}</span></button>
 				{#if branchOpen && gitCwd}
 					<BranchMenu
 						cwd={gitCwd}
@@ -968,10 +947,91 @@
 			</span>
 		{/if}
 		<div class="fspace"></div>
+		{#if chat.efforts.length || bcaps.modelPicker || !backendLocked}
+			<!-- The model button opens the model menu (agent, model, effort, provider). -->
+			<button
+				class="fbtn model"
+				class:on={modelPopoverVisible}
+				class:pending={effortDisabled}
+				bind:this={modelButton}
+				onclick={toggleModelPopover}
+				title={withShortcut(t('chat.switchModel'), 'model')}
+				aria-haspopup="dialog"
+				aria-expanded={modelPopoverVisible}
+			>
+				{#key chat.model}
+					<span class="mswap">
+						{#if chat.backendId !== 'lynshen'}<BackendIcon backend={chat.backendId} size={14} />{/if}
+						<span class="m">{modelDisplayName || stripGroupSuffix(chat.modelLabel || '') || chat.model || backendLabel}</span>
+					</span>
+				{/key}
+				{#if chat.ultracode}<span class="u">Ultracode</span>{/if}
+			</button>
+		{:else if chat.model}
+			<span class="fbtn model static"
+				><BackendIcon backend={chat.backendId} size={14} /><span class="m">{modelDisplayName || stripGroupSuffix(chat.modelLabel || '') || chat.model}</span></span
+			>
+		{/if}
+		{#if modelPopoverVisible}
+			<ModelMenu
+				{chat}
+				canPickModel={bcaps.modelPicker}
+				rows={bcaps.modelPicker ? modelRows : []}
+				showSearch={modelSearch}
+				{backendLocked}
+				{toolProvider}
+				{effortDisabled}
+				anchor={modelButton}
+				bind:query={pickerQuery}
+				bind:selIdx={pickerSelIdx}
+				onClose={closeModelPopover}
+				onSelect={selectFromPopover}
+				onEffort={setEffort}
+				{onSwitch}
+				{onBackend}
+				onRefreshModels={() => onModel()}
+			/>
+		{/if}
+		{#if chat.efforts.length}
+			<span class="anchor">
+				<button
+					class="fbtn effort"
+					class:on={effortOpen}
+					class:pending={effortDisabled}
+					onclick={toggleEffort}
+					title={t('chat.effortTitle')}
+					aria-haspopup="dialog"
+					aria-expanded={effortOpen}
+				>
+					{#key chat.effort}<span
+							class="e"
+							class:effort-max={isTopEffort(chat.effort, chat.efforts)}
+							style:--effort-accent={modelColor(chat.model) || 'var(--text)'}>{effortLabel(chat.effort) || t('chat.effortTitle')}</span
+						>{/key}
+				</button>
+				{#if effortOpen}
+					<EffortMenu
+						efforts={chat.efforts}
+						effort={chat.effort}
+						disabled={effortDisabled}
+						accent={modelColor(chat.model)}
+						onEffort={setEffort}
+						onClose={() => (effortOpen = false)}
+					/>
+				{/if}
+			</span>
+		{/if}
 		{#if showCtx}
-			<div class="foot-ctx">
-				<ContextIndicator pct={ctxPct} atThreshold={ctxAtThreshold} contextTokens={chat.contextTokens} contextLimit={ctxLimit} totalIn={chat.totalIn} totalOut={chat.totalOut} cost={chat.cost} runMs={chat.runMs} />
-			</div>
+			<ContextIndicator
+				used={chat.contextUsed}
+				window={chat.contextWindow}
+				limit={ctxLimit}
+				pct={ctxPct}
+				atThreshold={ctxAtThreshold}
+				breakdown={chat.contextBreakdown}
+				cacheHitRate={chat.cacheHitRate}
+				{quota}
+			/>
 		{/if}
 	</div>
 </div>
@@ -987,18 +1047,27 @@
 	.composer {
 		background: var(--panel);
 		border-radius: var(--r-2xl);
-		padding: 14px 16px 12px;
+		padding: 10px 10px 10px 18px;
 		box-shadow: var(--shadow-float);
 		transition: box-shadow var(--t-med) var(--ease-out);
 	}
 	.composer:focus-within {
 		box-shadow: var(--shadow-float-strong);
 	}
+	/* Text on the left, voice and send at the right end, bottom-aligned so
+	   they stay put while a long message grows the box. */
+	.inrow {
+		display: flex;
+		align-items: flex-end;
+		gap: 8px;
+	}
 	.rich {
 		position: relative;
-		width: 100%;
-		min-height: 22px;
-		max-height: 180px;
+		flex: 1;
+		min-width: 0;
+		align-self: center;
+		min-height: 24px;
+		max-height: 220px;
 		overflow-y: auto;
 		border: none;
 		outline: none;
@@ -1007,7 +1076,7 @@
 		font-family: var(--font-sans);
 		font-size: var(--fs-md);
 		line-height: 1.55;
-		padding: 2px 0 8px;
+		padding: 4px 0;
 		white-space: pre-wrap;
 		overflow-wrap: break-word;
 		word-break: break-word;
@@ -1080,43 +1149,158 @@
 		margin-right: 3px;
 		font-size: var(--fs-2xs);
 	}
-	.composer-bar {
+	.box-acts {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 6px;
+		flex-shrink: 0;
+	}
+	.cact {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border-radius: var(--r-full);
+		border: none;
+		cursor: pointer;
+		flex-shrink: 0;
+		transition:
+			transform var(--t-fast) var(--ease-spring),
+			background var(--t-fast) var(--ease-out),
+			color var(--t-fast) var(--ease-out),
+			opacity var(--t-med) var(--ease-out);
+	}
+	.cact:active:not(:disabled) {
+		transform: scale(0.9);
+	}
+	/* Flat send: the accent when ready, quiet gray when there's nothing to send. */
+	.cact.send {
+		background: var(--accent);
+		color: var(--on-accent);
+	}
+	.cact.send:hover:not(:disabled) {
+		opacity: 0.85;
+	}
+	.cact.send:disabled {
+		background: color-mix(in oklab, var(--text) 18%, var(--panel));
+		color: var(--panel);
+		cursor: default;
+	}
+	/* Stop while a turn runs: same place and size as send. */
+	.cact.stop {
+		background: var(--accent);
+		color: var(--on-accent);
+	}
+	.cact.stop:hover {
+		opacity: 0.85;
+	}
+	/* Voice: a plain icon until it records. */
+	.cact.voice {
+		background: none;
+		color: var(--dim);
+	}
+	.cact.voice:hover:not(:disabled) {
+		background: var(--surface2);
+		color: var(--text);
+	}
+	.cact.voice.on {
+		color: var(--err);
+		background: color-mix(in oklab, var(--err) 12%, transparent);
+	}
+	.cact.voice:disabled {
+		cursor: default;
+		color: var(--dim2);
+	}
+
+	/* ---------- footer row (outside the box, edges aligned with it) ---------- */
+	.composer-foot {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		min-width: 0;
+		margin-top: 6px;
 		white-space: nowrap;
 	}
-	.flatbtn {
+	.anchor {
+		position: relative;
+		display: inline-flex;
+		min-width: 0;
+	}
+	/* Every footer control: plain text, a fill on hover, no border. */
+	.fbtn {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		padding: 5px 8px;
+		min-width: 0;
+		height: 30px;
+		padding: 0 8px;
 		border: none;
 		border-radius: var(--r-sm);
 		background: none;
-		color: var(--text);
-		font-size: var(--fs-sm);
+		color: var(--dim);
 		font-family: var(--font-sans);
-		cursor: pointer;
-		transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
-	}
-	.flatbtn:hover {
-		background: var(--surface2);
-	}
-	.flatbtn:active:not(.static) {
-		transform: scale(0.97);
-	}
-	/* Model · effort trigger: model name, effort dimmer beside it. */
-	.flatbtn.model {
-		min-width: 0;
-	}
-	.flatbtn.model span {
-		min-width: 0;
-		max-width: 220px;
 		font-size: var(--fs-sm);
-		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			background var(--t-fast) var(--ease-out),
+			color var(--t-fast) var(--ease-out);
+	}
+	.fbtn:hover:not(:disabled):not(.static),
+	.fbtn.on {
+		background: var(--surface2);
+		color: var(--text);
+	}
+	.fbtn:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+	.fbtn.static {
+		cursor: default;
+	}
+	/* The first and last controls sit on the box's edges. */
+	.fbtn.add {
+		width: 30px;
+		padding: 0;
+		justify-content: center;
+		margin-left: -2px;
+	}
+	.fbtn.mode.warn {
+		color: var(--warn);
+	}
+	.fbtn.branch {
+		gap: 5px;
+		font-family: var(--font-mono);
+		font-size: var(--fs-2xs);
+		color: var(--dim2);
+	}
+	.fbtn.branch:disabled {
+		opacity: 1;
+	}
+	.branch-name {
+		max-width: 160px;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+	.branch-anchor {
+		flex-shrink: 1;
+	}
+	.fspace {
+		flex: 1;
+		min-width: 8px;
+	}
+	.fbtn.model {
+		flex-shrink: 1;
+	}
+	.fbtn.model .m {
+		min-width: 0;
+		max-width: 240px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.fbtn.model .u {
+		flex-shrink: 0;
+		color: var(--dim2);
 	}
 	.mswap {
 		display: inline-flex;
@@ -1132,192 +1316,11 @@
 			filter: blur(3px);
 		}
 	}
-	.flatbtn.model .e {
-		flex-shrink: 0;
-		color: var(--dim);
-		animation: rise var(--t-fast) var(--ease-out);
-	}
-	.flatbtn.model.pending {
+	.fbtn.pending {
 		opacity: 0.6;
 	}
-	/* Circular "+" opening the add menu. */
-	.addbtn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 34px;
-		height: 34px;
-		flex-shrink: 0;
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-full);
-		background: none;
-		color: var(--dim);
-		cursor: pointer;
-		transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
-	}
-	.addbtn:hover,
-	.addbtn.on {
-		background: var(--surface2);
-		color: var(--text);
-	}
-	.addbtn:active:not(:disabled) {
-		transform: scale(0.94);
-	}
-	.addbtn:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-	/* read-only model label for backends without an in-chat model picker */
-	.flatbtn.static {
-		cursor: default;
-	}
-	.flatbtn.static:hover {
-		background: none;
-	}
-	.flatbtn.static:active {
-		transform: none;
-	}
-	.footsel {
-		position: relative;
-		display: inline-flex;
-	}
-	.cspace {
-		flex: 1;
-	}
-	.cact {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 36px;
-		height: 36px;
-		border-radius: var(--r-full);
-		border: none;
-		cursor: pointer;
-		flex-shrink: 0;
-		transition:
-			transform var(--t-fast) var(--ease-spring),
-			box-shadow var(--t-med) var(--ease-out),
-			background var(--t-fast) var(--ease-out),
-			color var(--t-fast) var(--ease-out),
-			opacity var(--t-med) var(--ease-out);
-	}
-	.cact:active:not(:disabled) {
-		transform: scale(0.9);
-	}
-	/* Flat send: white (text color) when ready, quiet gray when there's nothing
-	   to send. No gradients, no borders, no glow. */
-	.cact.send {
-		background: var(--accent);
-		color: var(--on-accent);
-	}
-	.cact.send:hover:not(:disabled) {
-		opacity: 0.85;
-	}
-	.cact.send:active:not(:disabled) {
-		transform: scale(0.9);
-	}
-	.cact.send:disabled {
-		background: color-mix(in oklab, var(--text) 32%, var(--panel));
-		color: var(--on-accent);
-		cursor: default;
-	}
-	.cact.stop {
-		background: color-mix(in oklab, var(--err) 14%, transparent);
-		color: var(--err);
-	}
-	.cact.stop:hover {
-		background: color-mix(in oklab, var(--err) 22%, transparent);
-	}
-	/* Small circular voice button, quiet until it records. */
-	.cact.voice {
-		background: var(--surface2);
-		color: var(--dim);
-	}
-	.cact.voice:hover:not(:disabled) {
-		color: var(--text);
-	}
-	.cact.voice.on {
-		color: var(--err);
-		background: color-mix(in oklab, var(--err) 12%, transparent);
-	}
-	.cact.voice:disabled {
-		cursor: default;
-		color: var(--dim2);
-	}
-
-	/* ---------- footer strip (outside the card) ---------- */
-	.composer-foot {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 7px 10px 0;
-		min-height: 24px;
-		color: var(--dim);
-	}
-	.branch-anchor {
-		position: relative;
-		display: inline-flex;
-		min-width: 0;
-	}
-	.foot-branch {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		min-width: 0;
-		margin: -2px -6px;
-		padding: 2px 6px;
-		border: none;
-		border-radius: var(--r-xs);
-		background: none;
-		font-family: var(--font-mono);
-		font-size: var(--fs-2xs);
-		color: var(--dim);
-		cursor: pointer;
-		transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
-	}
-	.foot-branch:hover:not(:disabled) {
-		background: var(--surface2);
-		color: var(--text);
-	}
-	.foot-branch:disabled {
-		cursor: default;
-	}
-	.branch-name {
-		max-width: 180px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.foot-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		padding: 5px 8px;
-		border: none;
-		border-radius: var(--r-sm);
-		background: none;
-		color: var(--dim);
-		font-size: var(--fs-sm);
-		font-family: var(--font-sans);
-		cursor: pointer;
-		transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
-	}
-	.foot-chip:hover {
-		background: var(--surface2);
-		color: var(--text);
-	}
-	.foot-chip.auto {
-		color: var(--text);
-	}
-	.foot-chip.warn {
-		color: var(--warn);
-	}
-	.fspace {
-		flex: 1;
-	}
-	.foot-ctx {
-		display: inline-flex;
-		align-items: center;
+	.fbtn.effort .e {
+		animation: rise var(--t-fast) var(--ease-out);
 	}
 
 	.queued {

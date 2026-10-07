@@ -1,7 +1,7 @@
 <script lang="ts">
-	// A small progress ring beside the composer's token count: it marks how full
-	// the context is; the numbers sit next to it and in the hover panel.
-	let { pct }: { pct: number } = $props();
+	// A small progress ring at the right end of the composer's footer: it marks
+	// how full the context is; the numbers are in its hover card.
+	let { pct, size = 14 }: { pct: number; size?: number } = $props();
 
 	const R = 6;
 	const C = 2 * Math.PI * R;
@@ -9,8 +9,8 @@
 	const stroke = $derived(pct >= 90 ? 'var(--err)' : pct >= 75 ? 'var(--warn)' : 'var(--dim)');
 </script>
 
-<svg class="ring" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-	<circle cx="8" cy="8" r={R} fill="none" stroke="var(--surface2)" stroke-width="2" />
+<svg class="ring" viewBox="0 0 16 16" width={size} height={size} aria-hidden="true">
+	<circle cx="8" cy="8" r={R} fill="none" stroke="var(--border-strong)" stroke-width="2" />
 	<circle
 		cx="8"
 		cy="8"
