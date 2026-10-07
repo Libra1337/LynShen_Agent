@@ -142,6 +142,22 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml
           cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
+      # Every release says what changed: release-notes/<version>.md (Chinese
+      # 更新公告) becomes the release body, which also lands in latest.json as
+      # the notes the update prompt shows.
+      - name: Read the release notes
+        id: notes
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          file="release-notes/$version.md"
+          test -s "$file" || { echo "missing $file"; exit 1; }
+          {
+            echo 'body<<LYNSHEN_NOTES_EOF'
+            cat "$file"
+            echo 'LYNSHEN_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       # tauri-action runs beforeBuildCommand (pnpm build), bundles the app with
       # the lynshen sidecar and uploads the installers to a release named after
       # the tag. With TAURI_SIGNING_PRIVATE_KEY set it additionally signs the
@@ -160,10 +176,7 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }} --config src-tauri/tauri.bundle.conf.json
-          releaseBody: |
-            Installers for macOS (Apple Silicon and Intel), Linux (x64) and Windows
-            (x64) with the LynShen CLI engine bundled. The app updates
-            itself from these releases.
+          releaseBody: ${{ steps.notes.outputs.body }}
 
       - name: Keep the manual build
         if: github.event_name == 'workflow_dispatch' && env.RELEASE_TAG == ''
