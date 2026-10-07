@@ -128,15 +128,20 @@
 	// Project/session tree + lifecycle lives in the store; the page keeps thin
 	// reactive aliases so templates and handlers read it naturally.
 	const store = new SessionStore();
-	const projects = $derived(store.userProjects);
-	const allSessions = $derived(store.allSessions);
+	// Aliases read the store on every use. Page-level $derived copies of the
+	// tree stopped following it after a workspace swap (a new chat then
+	// showed 该对话已关闭); the tree is small, so a scan per lookup is cheap.
 	const active = $derived(store.active);
 	const chat = $derived(store.chat);
 	const activeProject = $derived(store.activeProject);
 	const activeId = $derived(store.activeId);
-	// O(1) session lookup for the hot agent-event path (fires per stream chunk),
-	// instead of an O(n) allSessions.find on every event.
-	const sessionMap = $derived(new Map(allSessions.map((s) => [s.id, s])));
+	const sessionMap = {
+		get: (id: string) => store.allSessions.find((s) => s.id === id),
+		has: (id: string) => store.allSessions.some((s) => s.id === id),
+		*[Symbol.iterator]() {
+			for (const s of store.allSessions) yield [s.id, s] as const;
+		}
+	};
 	// The requirements on this computer (the daemon's list).
 	const requirements = new Requirements(daemon);
 	provideRequirements(requirements);
@@ -144,7 +149,7 @@
 	// it shows the engine's mode, and this client's mode is neither pushed
 	// over it nor saved from it (also when it was started elsewhere).
 	$effect(() => {
-		for (const s of allSessions) {
+		for (const s of store.allSessions) {
 			const sid = s.chat.sessionId;
 			if (sid && requirements.bySession.get(sid)?.gate?.session === sid) s.chat.followEngineMode = true;
 		}
@@ -301,11 +306,11 @@
 	/** What a running daemon session shown here is doing now (its plan's
 	 *  current step). */
 	function currentStep(session: string): string | undefined {
-		const chat = allSessions.find((s) => s.chat.sessionId === session)?.chat;
+		const chat = store.allSessions.find((s) => s.chat.sessionId === session)?.chat;
 		return chat?.plan.find((p) => p.status === 'in_progress')?.step;
 	}
 	const workspaceProjects = $derived(
-		projects.filter((p) => !p.worktree && !p.chats).map((p) => ({ id: p.id, path: p.path, name: p.name }))
+		store.userProjects.filter((p) => !p.worktree && !p.chats).map((p) => ({ id: p.id, path: p.path, name: p.name }))
 	);
 
 	/** Show a daemon session: an agent's on the workbench, a plain hosted one
@@ -856,7 +861,7 @@
 	}
 	// The same popover colours a sidebar project folder and sets its icon.
 	let projectChromeFor = $state<{ id: string; x: number; y: number } | null>(null);
-	const chromeProject = $derived(projectChromeFor ? (projects.find((p) => p.id === projectChromeFor!.id) ?? null) : null);
+	const chromeProject = $derived(projectChromeFor ? (store.userProjects.find((p) => p.id === projectChromeFor!.id) ?? null) : null);
 	function openProjectMenu(p: Project, ev: MouseEvent) {
 		ev.preventDefault();
 		projectChromeFor = { id: p.id, x: ev.clientX, y: ev.clientY };
@@ -1304,7 +1309,7 @@
 			<!-- LEFT: the navigator — workspace / projects / sessions. Clicking a session
 			     opens or focuses its chat tile on the canvas. -->
 			<Sidebar
-				{projects}
+				projects={store.userProjects}
 				activeId={showHome ? '' : activeId}
 				width={showSidebar ? sidebarWidth : 0}
 				resizing={sbResizing}
@@ -1351,7 +1356,7 @@
 			<div class="canvas">
 				{#if showHome || (store.loaded && !store.active && !pageProject)}
 					<HomePage
-						{projects}
+						projects={store.userProjects}
 						agents={agentDirectory.agents}
 						agentsOn={agentDirectory.status === 'on'}
 						onStart={(text) => startChat(text)}
