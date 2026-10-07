@@ -417,7 +417,7 @@ const shell = {
 		},
 		feedback: {
 			title: '反馈问题',
-			hint: '会以工单提交到你的 LynShen 账户，回复可在控制台的工单里查看。',
+			hint: '会以工单提交到你的 LynShen 账户，进度和回复可在控制台的「工单」页查看。',
 			kindBug: '问题',
 			kindIdea: '建议',
 			titleLabel: '标题',
@@ -436,7 +436,7 @@ const shell = {
 			logsNote: '发送前会去掉令牌、API Key、授权头和路径里的用户名，并压缩。预览显示的就是去除后的内容。',
 			noLogs: '没有找到日志文件。',
 			send: '提交',
-			sent: '已提交工单 {no}，回复可在控制台查看',
+			sent: '已提交工单 {no}，回复可在控制台的「工单」页查看',
 			needLogin: '请先登录 LynShen 账户再提交。',
 			environment: '版本：LynShen Desktop {version} · 系统：{system}'
 		},

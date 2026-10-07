@@ -9,7 +9,7 @@
 	import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
 	import XIcon from 'phosphor-svelte/lib/XIcon';
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
-	import { appVersion } from '$lib/about';
+	import { aboutApp } from '$lib/about';
 	import Modal from '$lib/ui/Modal.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import Notice from '$lib/ui/Notice.svelte';
@@ -90,7 +90,8 @@
 		sending = true;
 		error = '';
 		try {
-			const version = await appVersion();
+			const about = await aboutApp();
+			const version = about?.version ?? '';
 			const attachments: { name: string; type: string; data_url: string }[] = shots.map((s) => ({
 				name: s.name,
 				type: s.url.slice(5, s.url.indexOf(';')),
@@ -100,14 +101,16 @@
 				attachments.push({ name: 'lynshen-logs.txt.gz', type: 'application/gzip', data_url: await gzipDataURL(logBundle(logs)) });
 			const environment = t('shell.feedback.environment', { version: version || '?', system: platform() });
 			const ticket = await submitFeedback({
-				title: `[${t(kind === 'bug' ? 'shell.feedback.kindBug' : 'shell.feedback.kindIdea')}] ${title.trim()}`,
+				title: title.trim(),
 				body: `${body.trim()}\n\n---\n${environment}`,
-				category: kind === 'bug' ? 'technical' : 'general',
+				category: kind === 'bug' ? 'bug' : 'feature',
+				app_version: version.slice(0, 64),
+				os: (about ? `${platform()} ${about.arch}` : platform()).slice(0, 64),
 				attachments
 			});
 			telemetry.track('feedback_send');
 			body = '';
-			toast.success(t('shell.feedback.sent', { no: String(ticket.ticket_no_label ?? ticket.ticket_no ?? '') }), { duration: 8000 });
+			toast.success(t('shell.feedback.sent', { no: ticket.ticket_no ? `#${ticket.ticket_no}` : '' }), { duration: 8000 });
 			onClose();
 		} catch (e) {
 			const message = e instanceof Error ? e.message : String(e);
@@ -130,13 +133,14 @@
 	/>
 	<label class="field">
 		<span>{t('shell.feedback.titleLabel')}</span>
-		<input bind:value={title} placeholder={t(kind === 'bug' ? 'shell.feedback.titleBug' : 'shell.feedback.titleIdea')} />
+		<input bind:value={title} maxlength="200" placeholder={t(kind === 'bug' ? 'shell.feedback.titleBug' : 'shell.feedback.titleIdea')} />
 	</label>
 	<label class="field">
 		<span>{t('shell.feedback.bodyLabel')}</span>
 		<textarea
 			bind:value={body}
 			rows="6"
+			maxlength="9000"
 			placeholder={t(kind === 'bug' ? 'shell.feedback.bodyBug' : 'shell.feedback.bodyIdea')}
 			onpaste={onPaste}
 		></textarea>

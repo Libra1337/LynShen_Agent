@@ -956,10 +956,11 @@ fn diagnostic_logs() -> Vec<serde_json::Value> {
     .collect()
 }
 
-/// A bug report or suggestion, as a support ticket of the signed-in user.
+/// A bug report or suggestion, as a feedback ticket of the signed-in account
+/// (the gateway's 工单; sent with this desktop's device key).
 #[tauri::command(async)]
 fn submit_feedback(ticket: serde_json::Value) -> Result<serde_json::Value, String> {
-    lynshen_send("POST", "/v1/oauth/tickets", Some(&ticket))
+    monoize_auth::gateway_key_send("POST", "/api/desktop/feedback", Some(ticket))
 }
 
 /// What the 更新 page shows and a bug report needs: this app's version, the

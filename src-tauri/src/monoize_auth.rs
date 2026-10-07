@@ -52,13 +52,23 @@ fn reachable_base() -> &'static str {
 
 /// 带域名容灾的网关请求。`path` 是完整路径（dashboard 接口带 `/api` 前缀，
 /// key 级接口在根下）。网络层失败依次换域名；网关有应答时把响应体里的
-/// `message` 作为错误返回（登录失败原因等），不再切换。
+/// 错误信息（`message`，或 `error.message`）作为错误返回（登录失败原因等），不再切换。
 fn api_call(
     method: &str,
     path: &str,
     bearer: Option<&str>,
     body: Option<Value>,
 ) -> Result<Value, String> {
+    api_call_status(method, path, bearer, body).map_err(|(_, message)| message)
+}
+
+/// [`api_call`] that also returns the HTTP status of a gateway error.
+fn api_call_status(
+    method: &str,
+    path: &str,
+    bearer: Option<&str>,
+    body: Option<Value>,
+) -> Result<Value, (Option<u16>, String)> {
     let mut last_network_err = String::new();
     for index in base_order() {
         let mut req = http().request(method, &format!("{}{}", BASES[index], path));
@@ -72,38 +82,61 @@ fn api_call(
         match result {
             Ok(resp) => {
                 BASE_INDEX.store(index, Ordering::Relaxed);
-                return resp.into_json::<Value>().map_err(|e| e.to_string());
+                return resp.into_json::<Value>().map_err(|e| (None, e.to_string()));
             }
-            Err(ureq::Error::Status(_, resp)) => {
+            Err(ureq::Error::Status(status, resp)) => {
                 // 网关有应答（含 401/409 等业务错误）：透出错误信息，不切换域名。
                 BASE_INDEX.store(index, Ordering::Relaxed);
                 let parsed = resp.into_json::<Value>().ok();
-                return Err(match &parsed {
-                    Some(v) => v["message"]
-                        .as_str()
-                        .map(String::from)
-                        .unwrap_or_else(|| v.to_string()),
-                    None => format!("gateway error via {}", BASES[index]),
-                });
+                return Err((
+                    Some(status),
+                    match &parsed {
+                        Some(v) => gateway_error_message(v),
+                        None => format!("gateway error {status} via {}", BASES[index]),
+                    },
+                ));
             }
             Err(e) => {
                 last_network_err = format!("{}: {e}", BASES[index]);
             }
         }
     }
-    Err(format!("all gateways unreachable ({last_network_err})"))
+    Err((None, format!("all gateways unreachable ({last_network_err})")))
 }
 
-/// key 级接口（/user/balance、/v1/models）：用 auth.json 里存的 monoize key。
-pub(crate) fn gateway_key_get(path: &str) -> Result<Value, String> {
-    let key = crate::read_auth()
+/// The readable reason of a gateway error body: `{"message"}` (dashboard
+/// routes) or `{"error":{"message"}}` (OpenAI-style routes).
+fn gateway_error_message(v: &Value) -> String {
+    v["message"]
+        .as_str()
+        .or_else(|| v["error"]["message"].as_str())
+        .or_else(|| v["error"].as_str())
+        .map(String::from)
+        .unwrap_or_else(|| v.to_string())
+}
+
+fn gateway_key() -> Result<String, String> {
+    crate::read_auth()
         .get("providers")
         .and_then(|p| p.get("monoize"))
         .and_then(|v| v.as_str())
         .map(|s| s.trim().to_string())
         .filter(|k| !k.is_empty())
-        .ok_or_else(|| "未配置 Monoize API key".to_string())?;
-    api_call("GET", path, Some(&key), None)
+        .ok_or_else(|| "未配置 Monoize API key".to_string())
+}
+
+/// key 级接口（/user/balance、/v1/models）：用 auth.json 里存的 monoize key。
+pub(crate) fn gateway_key_get(path: &str) -> Result<Value, String> {
+    api_call("GET", path, Some(&gateway_key()?), None)
+}
+
+/// A request with the desktop's device key (the one this app's sign-in
+/// stored); a 401 reads `401 unauthorized: …` so the caller can ask to sign in.
+pub(crate) fn gateway_key_send(method: &str, path: &str, body: Option<Value>) -> Result<Value, String> {
+    api_call_status(method, path, Some(&gateway_key()?), body).map_err(|(status, message)| match status {
+        Some(401) => format!("401 unauthorized: {message}"),
+        _ => message,
+    })
 }
 
 fn read_session() -> Value {
