@@ -42,6 +42,43 @@ describe('UpdaterState', () => {
 		expect(state.source).toBe('lynshen');
 	});
 
+	it('asks on launch, and downloads only once the user chooses to update now', async () => {
+		commands();
+		const state = new UpdaterState();
+
+		await state.checkOnLaunch();
+
+		expect(state.asking).toBe(true);
+		expect(state.phase).toBe('available');
+		expect(calls('update_install')).toBe(0);
+
+		await state.updateNow();
+
+		expect(state.asking).toBe(false);
+		expect(state.phase).toBe('ready');
+		expect(calls('update_install')).toBe(1);
+	});
+
+	it('leaves a version put off for later alone until the next launch', async () => {
+		commands();
+		const state = new UpdaterState();
+
+		await state.checkOnLaunch();
+		state.dismiss();
+		expect(state.asking).toBe(false);
+
+		// The periodic background check does not download the declined version.
+		state.phase = 'idle';
+		await state.check(true, true);
+		expect(calls('update_install')).toBe(0);
+
+		// A newer one than the version put off is offered again.
+		state.phase = 'idle';
+		state.dismissed = '0.3.1';
+		await state.check(true, true);
+		expect(calls('update_install')).toBe(1);
+	});
+
 	it('keeps manual checks download-free until the user starts the download', async () => {
 		commands();
 		const state = new UpdaterState();

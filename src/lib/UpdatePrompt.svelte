@@ -1,9 +1,11 @@
 <script lang="ts">
-	// A downloaded update asks once to restart and install. A version the server no longer accepts
+	// On launch a newer version asks to update now or later; once downloaded,
+	// it asks once to restart and install. A version the server no longer accepts
 	// (updater.required) blocks the app until the update is in: it downloads,
 	// then only offers the restart.
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
+	import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
 	import Button from '$lib/ui/Button.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
 	import { readConfig } from '$lib/protocol';
@@ -12,7 +14,8 @@
 
 	const required = $derived(!!updater.required);
 	const ready = $derived(updater.phase === 'ready');
-	const open = $derived(required || (ready && updater.dismissed !== updater.version));
+	const asking = $derived(updater.asking && updater.phase === 'available');
+	const open = $derived(required || asking || ((ready || updater.phase === 'downloading') && updater.dismissed !== updater.version));
 	const busy = $derived(updater.phase === 'checking' || updater.phase === 'downloading');
 
 	async function openDownloads() {
@@ -28,16 +31,20 @@
 			<h2>
 				{required
 					? t('shell.updatePrompt.requiredTitle', { version: updater.required })
-					: t('shell.updatePrompt.readyTitle', { version: updater.version })}
+					: ready
+						? t('shell.updatePrompt.readyTitle', { version: updater.version })
+						: t('shell.updatePrompt.foundTitle', { version: updater.version })}
 			</h2>
 			<p class="hint">
 				{#if required && !ready}
 					{t('shell.updatePrompt.requiredHint')}
-				{:else}
+				{:else if ready}
 					{t('shell.updatePrompt.readyHint')}
+				{:else}
+					{t('shell.updatePrompt.foundHint')}
 				{/if}
 			</p>
-			{#if updater.notes && (ready || busy)}
+			{#if updater.notes && (ready || busy || asking)}
 				<pre class="notes selectable">{updater.notes}</pre>
 			{/if}
 			{#if busy}
@@ -51,7 +58,13 @@
 				<p class="hint">{t('shell.updatePrompt.unreachable')}</p>
 			{/if}
 			<div class="actions">
-				{#if ready}
+				{#if asking}
+					<Button variant="secondary" onclick={() => updater.dismiss()}>{t('shell.updatePrompt.later')}</Button>
+					<Button variant="primary" onclick={() => updater.updateNow()}>
+						<DownloadSimpleIcon size={14} />
+						{t('shell.updatePrompt.updateNow')}
+					</Button>
+				{:else if ready}
 					{#if !required}
 						<Button variant="secondary" onclick={() => updater.dismiss()}>{t('shell.updatePrompt.later')}</Button>
 					{/if}

@@ -1240,10 +1240,11 @@
 				for (const u of urls) handleDeepLink(u);
 			});
 			cleanups.push(undeep);
-			// Updates install in the background shortly after startup and every
-			// 10 minutes after that; the relaunch is the user's (UpdatePrompt),
-			// unless the server requires the version.
-			const updateTimer = setTimeout(() => updater.check(true, true), 5000);
+			// On launch a newer version asks to update now or later (UpdatePrompt);
+			// every 10 minutes after that one found later downloads in the
+			// background. The relaunch is the user's unless the server requires
+			// the version.
+			const updateTimer = setTimeout(() => updater.checkOnLaunch(), 3000);
 			const updateEvery = setInterval(() => updater.check(true, true), 10 * 60 * 1000);
 			cleanups.push(() => clearTimeout(updateTimer), () => clearInterval(updateEvery));
 			loadProviders();

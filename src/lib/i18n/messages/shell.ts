@@ -71,6 +71,9 @@ const shell = {
 		},
 		updatePrompt: {
 			label: '应用更新',
+			foundTitle: '发现新版本 LynShen {version}',
+			foundHint: '建议现在更新：下载在后台进行，完成后重启即可使用新版本。',
+			updateNow: '立即更新',
 			readyTitle: 'LynShen {version} 已就绪',
 			readyHint: '重启后使用新版本。正在运行的任务在后台服务里继续，不受影响。',
 			requiredTitle: '需要更新到 {version}',
@@ -940,6 +943,9 @@ const shell = {
 		},
 		updatePrompt: {
 			label: 'App update',
+			foundTitle: 'LynShen {version} is available',
+			foundHint: 'Update now: it downloads in the background, then a restart switches to the new version.',
+			updateNow: 'Update now',
 			readyTitle: 'LynShen {version} is ready',
 			readyHint: 'Restart to use the new version. Running tasks continue in the background service.',
 			requiredTitle: 'Update to {version} required',

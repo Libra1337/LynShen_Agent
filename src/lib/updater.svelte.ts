@@ -40,12 +40,30 @@ export class UpdaterState {
 	notes = $state('');
 	/** 服务器要求的最低版本，当前版本低于它时（必须更新）才有值。 */
 	required = $state('');
-	/** 用户对这个版本的「已就绪」弹窗点了「稍后」。 */
+	/** 用户对这个版本的更新提示点了「稍后」：本次运行内不再提示它。 */
 	dismissed = $state('');
+	/** 启动时发现的新版本在问用户（立即更新 / 稍后），还没开始下载。 */
+	asking = $state(false);
 
 	/** 是否有可用更新（侧栏小圆点据此显示）。 */
 	get available() {
 		return this.phase === 'available' || this.phase === 'downloading' || this.phase === 'ready';
+	}
+
+	/**
+	 * The check on launch: a newer version asks right away whether to update
+	 * now or later (a required one downloads without asking). Later skips that
+	 * version until the next launch; the periodic checks then only download.
+	 */
+	async checkOnLaunch() {
+		await this.check(true, false);
+		if (this.phase === 'available' && !this.required && this.dismissed !== this.version) this.asking = true;
+	}
+
+	/** 「立即更新」：下载并验签，完成后提示重启。 */
+	async updateNow() {
+		this.asking = false;
+		await this.download();
 	}
 
 	/**
@@ -66,7 +84,8 @@ export class UpdaterState {
 				this.source = u.source;
 				this.notes = u.notes ?? '';
 				this.phase = 'available';
-				if (autoInstall || this.required) await this.download();
+				const declined = this.dismissed === u.version;
+				if ((autoInstall && !declined) || this.required) await this.download();
 			} else {
 				this.version = '';
 				this.source = '';
@@ -124,9 +143,10 @@ export class UpdaterState {
 		this.required = min && current && olderThan(current, min) ? min : '';
 	}
 
-	/** 「已就绪」弹窗：稍后再说（这次运行内不再弹出这个版本）。 */
+	/** 「稍后」：这次运行内不再提示、也不再自动下载这个版本；下次启动再问。 */
 	dismiss() {
 		this.dismissed = this.version;
+		this.asking = false;
 	}
 
 	/** 保存工作区、安装更新并重启应用。 */
