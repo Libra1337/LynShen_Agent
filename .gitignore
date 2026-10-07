@@ -21,3 +21,6 @@ static/lynshen-cli-third-party-notices.txt
 .zcode-tmp/
 
 __pycache__/
+
+# Claude Code worktrees and local settings
+.claude/

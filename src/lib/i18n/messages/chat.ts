@@ -216,7 +216,8 @@ const chat = {
 			hideRaw: '收起',
 			requestId: '请求 ID',
 			thisTool: '该工具',
-			action: { restart: '重启会话', login: '去登录', account: '查看账户', compact: '压缩对话', model: '换个模型' },
+			action: { restart: '重启会话', login: '去登录', account: '查看账户', compact: '压缩对话', model: '换个模型', providers: '检查密钥' },
+			providerKey: { title: '{subject} 的 API Key 无效', hint: '服务商拒绝了这个密钥。在设置 → 提供商里更新 {subject} 的密钥后再试。' },
 			lynshenAuth: {
 				title: 'LynShen 登录凭据已过期',
 				hint: '会话启动时拿到的登录凭据有效期约 1 小时，现在已经失效。重启会话会换上新凭据，对话内容保留。'
@@ -478,7 +479,8 @@ const chat = {
 			hideRaw: 'Hide',
 			requestId: 'Request ID',
 			thisTool: 'the tool',
-			action: { restart: 'Restart session', login: 'Sign in', account: 'View account', compact: 'Compact', model: 'Change model' },
+			action: { restart: 'Restart session', login: 'Sign in', account: 'View account', compact: 'Compact', model: 'Change model', providers: 'Check key' },
+			providerKey: { title: '{subject} API key rejected', hint: 'The provider refused this key. Update the {subject} key in Settings → Providers, then retry.' },
 			lynshenAuth: {
 				title: 'LynShen credential expired',
 				hint: 'The credential this session started with lasts about an hour and has run out. Restarting the session takes a new one and keeps the conversation.'

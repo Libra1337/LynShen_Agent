@@ -14,16 +14,19 @@
 	let {
 		text,
 		backend = '',
+		provider = '',
 		onAction,
 		onDismiss
 	}: {
 		text: string;
 		backend?: string;
+		/** The LynShen engine's provider: tells a wrong key from an expired login. */
+		provider?: string;
 		onAction?: (action: ErrorAction) => void;
 		onDismiss?: () => void;
 	} = $props();
 
-	const info = $derived(describeError(text, backend));
+	const info = $derived(describeError(text, backend, provider));
 	const subject = $derived(info?.subject ?? t('chat.err.thisTool'));
 	let showRaw = $state(false);
 </script>

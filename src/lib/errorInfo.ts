@@ -3,7 +3,7 @@
 // url: …`); this names what went wrong, what to do, and which button does it.
 // Unknown errors return null and show as they came.
 
-export type ErrorAction = 'restart' | 'login' | 'account' | 'compact' | 'model';
+export type ErrorAction = 'restart' | 'login' | 'account' | 'compact' | 'model' | 'providers';
 
 export interface ErrorInfo {
 	/** i18n key under `chat.err.<kind>` for the title and the hint. */
@@ -36,8 +36,13 @@ function requestIdOf(raw: string): string | undefined {
 	return /request[ _-]?id["']?\s*[:=]\s*["']?([\w-]{8,})/i.exec(raw)?.[1];
 }
 
-/** `backend` is the session's engine (`lynshen`, `claude`, `codex`, `acp`). */
-export function describeError(raw: string, backend = ''): ErrorInfo | null {
+/** The providers whose credential is a LynShen sign-in: a 401 there is an
+ *  expired session, not a wrong key. */
+const LYNSHEN_PROVIDERS = new Set(['lynshen', 'monoize']);
+
+/** `backend` is the session's engine (`lynshen`, `claude`, `codex`, `acp`);
+ *  `provider` the LynShen engine's provider (`monoize`, `deepseek`, …). */
+export function describeError(raw: string, backend = '', provider = ''): ErrorInfo | null {
 	const text = stripEngineHint(raw);
 	const low = text.toLowerCase();
 	const status = statusOf(text);
@@ -62,6 +67,10 @@ export function describeError(raw: string, backend = ''): ErrorInfo | null {
 	if (status === 401 || /\bunauthori[sz]ed\b|invalid[_ ](api[_ ])?(key|token)|token (is )?expired|authentication_error/i.test(low)) {
 		// Through the LynShen gateway: the credential the session started with
 		// ran out (it is handed over once, at start); a restart takes a new one.
+		// A key of the user's own (DeepSeek, OpenRouter, …) was refused: it is
+		// wrong or revoked, and only Settings fixes it.
+		if (backend === 'lynshen' && provider && !LYNSHEN_PROVIDERS.has(provider))
+			return info('providerKey', 'providers', provider);
 		if (/lynshen/i.test(text) || backend === 'lynshen') return info('lynshenAuth', 'restart');
 		return info('toolAuth', undefined, tool || undefined);
 	}

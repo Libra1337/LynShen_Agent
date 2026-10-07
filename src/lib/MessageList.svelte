@@ -44,6 +44,7 @@
 		onFile,
 		onDismiss,
 		backend = '',
+		provider = '',
 		onErrorAction,
 		traceOf,
 		loadImage,
@@ -78,6 +79,8 @@
 		onDismiss?: (m: Msg) => void;
 		/** The session's engine, for reading its errors. */
 		backend?: string;
+		/** The LynShen engine's provider (see ErrorNotice). */
+		provider?: string;
 		/** An error notice's fix (restart, sign in, compact …). */
 		onErrorAction?: (action: ErrorAction) => void;
 		/** A tool call whose run the agent trace shows (claude's Agent / Workflow). */
@@ -541,7 +544,7 @@
 				<ToolCard name={m.name} output={m.output} running={m.running} isError={m.isError} subagent={m.subagent} trace={traceOf?.(m) ?? undefined} />
 			{/if}
 		{:else if m.kind === 'error'}
-			<ErrorNotice text={m.text} {backend} onAction={onErrorAction} onDismiss={onDismiss ? () => onDismiss(m) : undefined} />
+			<ErrorNotice text={m.text} {backend} {provider} onAction={onErrorAction} onDismiss={onDismiss ? () => onDismiss(m) : undefined} />
 				{/if}
 			</div>
 		{/if}

@@ -14,6 +14,13 @@ describe('describeError', () => {
 		expect(stripEngineHint(raw)).not.toContain('codex login');
 	});
 
+	it('reads a 401 on a provider key of the user as a key to fix, a gateway 401 as an expired login', () => {
+		const raw = 'LLM API returned HTTP 401: {"error":{"message":"Authentication Fails, Your api key: ****test is invalid","type":"authentication_error"}}';
+		expect(describeError(raw, 'lynshen', 'deepseek')).toMatchObject({ kind: 'providerKey', action: 'providers', subject: 'deepseek', status: 401 });
+		expect(describeError(raw, 'lynshen', 'monoize')).toMatchObject({ kind: 'lynshenAuth', action: 'restart' });
+		expect(describeError(raw, 'lynshen')).toMatchObject({ kind: 'lynshenAuth' });
+	});
+
 	it('names the tool for a 401 from its own account', () => {
 		expect(describeError('unexpected status 401 Unauthorized: invalid api key, url: https://api.openai.com/v1/responses', 'codex'))
 			.toMatchObject({ kind: 'toolAuth', subject: 'Codex' });
