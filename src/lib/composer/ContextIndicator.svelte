@@ -3,6 +3,7 @@
 	import { getLocale, t } from '$lib/i18n';
 	import { BREAKDOWN_KEYS, fmtCtxTokens, fmtPct, type BreakdownKey, type ContextBreakdown } from './contextUsage';
 	import { fmtResetAt, remainingPct, type QuotaSource } from './quota';
+	import { costText, type BillingCost } from '$lib/sessionCost';
 
 	// The composer's context ring and the card it shows on hover or keyboard
 	// focus: how full the next request is (by part, when the engine breaks it
@@ -16,7 +17,10 @@
 		atThreshold = false,
 		breakdown = null,
 		cacheHitRate = null,
-		quota = null
+		quota = null,
+		cost = 0,
+		billing = null,
+		billingError = ''
 	}: {
 		/** Tokens the next request holds. */
 		used: number;
@@ -33,6 +37,11 @@
 		cacheHitRate?: number | null;
 		/** null hides the remaining-quota part. */
 		quota?: QuotaSource | null;
+		/** The engine's cost estimate for the session, USD (0: none). */
+		cost?: number;
+		/** What the gateway settled for the session's requests. */
+		billing?: BillingCost | null;
+		billingError?: string;
 	} = $props();
 
 	const uid = $props.id();
@@ -95,6 +104,14 @@
 				<span class="name">{t('chat.cacheHit')}</span>
 				<span class="num">{fmtPct(cacheHitRate * 100)}</span>
 			</div>
+		{/if}
+		{#if cost > 0 || billing || billingError}
+			<div class="sep"></div>
+			<div class="row" title={billing ? t('chat.costSettledHint') : undefined}>
+				<span class="name">{t('chat.cost')}</span>
+				<span class="num">{costText(cost, billing)}</span>
+			</div>
+			{#if billingError}<div class="caption">{t('chat.costError', { error: billingError })}</div>{/if}
 		{/if}
 		{#if quota?.windows.length}
 			<div class="sep"></div>

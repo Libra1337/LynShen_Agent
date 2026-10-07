@@ -1031,6 +1031,9 @@
 				breakdown={chat.contextBreakdown}
 				cacheHitRate={chat.cacheHitRate}
 				{quota}
+				cost={chat.cost}
+				billing={chat.billing}
+				billingError={chat.billingError}
 			/>
 		{/if}
 	</div>
