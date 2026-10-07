@@ -290,6 +290,12 @@
 	const modelOpts = $derived(models.map((m) => ({ value: m.name, label: m.display_name || m.name, ...m })));
 	// Empty = the main model (the engine's `Config::title`).
 	const titleModelOpts = $derived([{ value: '', label: t('settings.behavior.followMainModel') }, ...modelOpts]);
+	// Empty = the engine picks the first model named like an image model.
+	const imageModelOpts = $derived([
+		{ value: '', label: t('settings.behavior.imageModelAuto') },
+		...modelOpts.filter((m) => /image/i.test(m.value)),
+		...modelOpts.filter((m) => !/image/i.test(m.value))
+	]);
 	const effortOpts = $derived(efforts.map((e) => ({ value: e, label: cap(e) })));
 	// All providers' models in one list (provider-qualified), so the default-model
 	// picker isn't limited to whichever provider is currently the default.
@@ -374,6 +380,7 @@
 			reasoning_effort: cfg.reasoning_effort,
 			compact_model: cfg.compact_model,
 			title_model: cfg.title_model ?? '',
+			image_model: cfg.image_model ?? '',
 			compaction_threshold_percent: Number(cfg.compaction_threshold_percent) || 75,
 			retry_attempts: Number(cfg.retry_attempts) || 0,
 			connect_timeout_seconds: Number(cfg.connect_timeout_seconds) || 0,
@@ -1162,6 +1169,18 @@
 						<SettingsRow id="title-model" title={t('settings.behavior.titleModel')} description={t('settings.behavior.titleModelHint')}>
 							<div class="w-lg">
 								<Select value={cfg.title_model ?? ''} options={titleModelOpts} onChange={(v) => (cfg.title_model = v)}>
+									{#snippet item(o)}
+										{#if o.value}<span class="tile sm"><Vendor model={o.label ?? ''} size={15} /></span>{/if}
+										<span class="ell" class:mono={!!o.value}>{o.label}</span>
+									{/snippet}
+								</Select>
+							</div>
+						</SettingsRow>
+					</SettingsSection>
+					<SettingsSection title={t('settings.behavior.images')}>
+						<SettingsRow id="image-model" title={t('settings.behavior.imageModel')} description={t('settings.behavior.imageModelHint')}>
+							<div class="w-lg">
+								<Select value={cfg.image_model ?? ''} options={imageModelOpts} onChange={(v) => (cfg.image_model = v)}>
 									{#snippet item(o)}
 										{#if o.value}<span class="tile sm"><Vendor model={o.label ?? ''} size={15} /></span>{/if}
 										<span class="ell" class:mono={!!o.value}>{o.label}</span>
