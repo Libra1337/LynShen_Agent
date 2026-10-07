@@ -1,4 +1,4 @@
-import { fetchMonoizeModels, type MonoizeModel, type MonoizeRoute } from '$lib/protocol';
+import { fetchMonoizeModels, readConfig, writeConfig, type MonoizeModel, type MonoizeRoute } from '$lib/protocol';
 import { PROVIDER_CATALOG } from './catalog';
 
 /** A gateway model as the picker and config.json hold it. */
@@ -27,11 +27,17 @@ function catalogModel(id: string): CatalogModel | undefined {
 	return models.find((m) => m.name === id) ?? models.find((m) => m.name.toLowerCase() === id.toLowerCase());
 }
 
+/** The window assumed for a gateway model nobody registered one for: an
+ *  engine compacts only against a known window, and none would mean never. */
+export const FALLBACK_CONTEXT_WINDOW = 128_000;
+
 /**
  * Turns the gateway's model list into picker entries. Metadata comes from what
  * the user already configured for that id, else the bundled catalog, so every
  * model keeps its reasoning efforts (a model with none listed would offer only
- * "none" in the picker).
+ * "none" in the picker). The window is the gateway's registered one when it has
+ * one (the engine compacts at a share of it), else the one already stored, else
+ * the catalog's, else FALLBACK_CONTEXT_WINDOW.
  */
 export function monoizeEntries(list: MonoizeModel[], known: { name: string }[] = []): MonoizeModelEntry[] {
 	const stored = new Map(known.map((m) => [m.name, m]));
@@ -41,6 +47,8 @@ export function monoizeEntries(list: MonoizeModel[], known: { name: string }[] =
 			const previous = stored.get(m.id) as Partial<MonoizeModelEntry> | undefined;
 			const catalog = catalogModel(m.id);
 			const efforts = previous?.reasoning_efforts?.length ? previous.reasoning_efforts : catalog?.reasoning_efforts;
+			const window = m.context_window || previous?.context_window || catalog?.context_window || FALLBACK_CONTEXT_WINDOW;
+			const output = m.max_output_tokens || previous?.max_output_tokens || catalog?.max_output_tokens;
 			return {
 				...catalog,
 				...previous,
@@ -48,6 +56,8 @@ export function monoizeEntries(list: MonoizeModel[], known: { name: string }[] =
 				display_name: m.id,
 				groups: m.groups ?? [],
 				routes: m.providers ?? [],
+				context_window: window,
+				...(output ? { max_output_tokens: output } : {}),
 				...(efforts?.length ? { reasoning_efforts: efforts } : {})
 			};
 		});
@@ -64,4 +74,8 @@ export async function refreshMonoizeCatalog() {
 	const entry = { ...existing, id: 'monoize', name: template.name, base_url: template.base_url,
 		format: template.protocol, builtin: false, source: 'catalog', models };
 	localStorage.setItem('lynshen-custom-providers', JSON.stringify([...custom.filter((p: { id: string }) => p.id !== 'monoize'), entry]));
+	// An engine on the gateway reads its windows (and compacts by them) from
+	// config.json: keep them current there too, not only when Settings is open.
+	const cfg = await readConfig().catch(() => null);
+	if (cfg?.provider === 'monoize') await writeConfig({ models });
 }

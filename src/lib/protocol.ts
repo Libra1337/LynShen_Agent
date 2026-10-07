@@ -363,6 +363,9 @@ export type MonoizeModel = {
 	groups?: string[];
 	routing_status?: string;
 	providers?: MonoizeRoute[];
+	/** The window the gateway registers for the model (DA-8d); null: none registered. */
+	context_window?: number | null;
+	max_output_tokens?: number | null;
 };
 export async function fetchMonoizeModels(): Promise<MonoizeModel[]> {
 	const v = await invoke<{ data?: MonoizeModel[] }>('fetch_monoize_models');
