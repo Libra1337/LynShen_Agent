@@ -1,4 +1,4 @@
-import { fetchMonoizeModels, type MonoizeModel } from '$lib/protocol';
+import { fetchMonoizeModels, type MonoizeModel, type MonoizeRoute } from '$lib/protocol';
 import { PROVIDER_CATALOG } from './catalog';
 
 /** A gateway model as the picker and config.json hold it. */
@@ -9,6 +9,8 @@ export interface MonoizeModelEntry {
 	display_name: string;
 	/** Gateway Groups that route this model for the signed-in key. */
 	groups: string[];
+	/** The Providers the key may pick for this model, in routing order. */
+	routes: MonoizeRoute[];
 	reasoning_efforts?: string[];
 	context_window?: number;
 	max_output_tokens?: number;
@@ -45,6 +47,7 @@ export function monoizeEntries(list: MonoizeModel[], known: { name: string }[] =
 				name: m.id,
 				display_name: m.id,
 				groups: m.groups ?? [],
+				routes: m.providers ?? [],
 				...(efforts?.length ? { reasoning_efforts: efforts } : {})
 			};
 		});

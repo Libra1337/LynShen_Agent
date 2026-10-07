@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildModelRows, stripGroupSuffix } from './modelRows';
+import { buildModelRows, splitRoute, stripGroupSuffix } from './modelRows';
 
 const groups = { codex: 'Codex', claude: 'Claude', lynshen: 'LynShen', byok: 'BYOK', system: 'System' };
 
@@ -248,6 +248,59 @@ describe('gateway model rows', () => {
 		expect(rows.map((r) => r.label)).toEqual(['DeepSeek-V4.1-Flash', 'claude-opus-5']);
 		expect(rows.find((r) => r.active)?.id).toBe('monoize::claude-opus-5');
 		expect(rows[1].command).toBe('/model claude-opus-5');
+	});
+
+	it('lists a model once per Provider, the account class and Provider below it', () => {
+		const accountLabels = { ...labels, accountClass: (c: string) => ({ private: '私有' })[c] ?? c };
+		const input = {
+			...base,
+			groups: accountLabels,
+			backendId: 'lynshen' as const,
+			provider: 'monoize',
+			configured: ['monoize'],
+			providersList: [
+				{
+					id: 'monoize',
+					models: [
+						{
+							name: 'deepseek-v4.1-flash',
+							groups: ['代理'],
+							routes: [
+								{ id: 'p-agent', name: '代理', group: '代理', account_class: 'private' },
+								{ id: 'p-lab', name: '新科研', group: '代理', account_class: 'private' }
+							]
+						},
+						{ name: 'glm-5.3', routes: [{ id: 'p-one', name: '国模模型组', account_class: 'private' }] }
+					]
+				}
+			],
+			models: [
+				{ model: 'deepseek-v4.1-flash', active: true },
+				{ model: 'glm-5.3', active: false }
+			]
+		};
+		const rows = buildModelRows(input);
+		expect(rows.map((r) => [r.label, r.detail])).toEqual([
+			['deepseek-v4.1-flash', '私有 · 代理'],
+			['deepseek-v4.1-flash', '私有 · 新科研'],
+			['glm-5.3', '私有 · 国模模型组']
+		]);
+		expect(new Set(rows.map((r) => r.id)).size).toBe(3);
+		// Nothing chosen yet: the first Provider (the one the gateway tries first) is checked.
+		expect(rows.filter((r) => r.active).map((r) => r.route)).toEqual(['p-agent']);
+		expect(splitRoute(rows[1].command)).toEqual({ command: '/model deepseek-v4.1-flash', route: 'p-lab' });
+		// One Provider: a single row, no route to pin.
+		expect(rows[2].route).toBeUndefined();
+		expect(rows[2].command).toBe('/model glm-5.3');
+
+		const chosen = buildModelRows({ ...input, routes: { 'deepseek-v4.1-flash': 'p-lab' } });
+		expect(chosen.filter((r) => r.active).map((r) => r.route)).toEqual(['p-lab']);
+	});
+
+	it('keeps a pick without a route and an effort after the model', () => {
+		expect(splitRoute('/model m high @route=p-1')).toEqual({ command: '/model m high', route: 'p-1' });
+		expect(splitRoute('@switch monoize m @route=p-2')).toEqual({ command: '@switch monoize m', route: 'p-2' });
+		expect(splitRoute('/model m')).toEqual({ command: '/model m' });
 	});
 
 	it('strips a group suffix older configs stored in the label', () => {

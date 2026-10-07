@@ -14,6 +14,8 @@ export interface ModelRow {
 	command: string;
 	depth: number | undefined;
 	group?: string;
+	/** The gateway Provider this row pins the model to (`monoize_providers`). */
+	route?: string;
 }
 
 export interface EngineModel {
@@ -26,9 +28,23 @@ export interface EngineModel {
 	listed?: boolean;
 }
 
+/** A gateway Provider one picker row routes through (DA-8a). */
+export interface ModelRoute {
+	id: string;
+	name: string;
+	group?: string;
+	account_class?: string;
+}
+
 export interface CatalogProvider {
 	id: string;
-	models: { name: string; display_name?: string | null; context_window?: number; groups?: string[] }[];
+	models: {
+		name: string;
+		display_name?: string | null;
+		context_window?: number;
+		groups?: string[];
+		routes?: ModelRoute[];
+	}[];
 }
 
 export interface ModelGroupLabels {
@@ -37,6 +53,8 @@ export interface ModelGroupLabels {
 	/** "Group {group}" / "Channel {channel}" for the route line. */
 	routeGroup?: (group: string) => string;
 	routeChannel?: (channel: string) => string;
+	/** "私有" for `private`: the first half of a Provider row's second line. */
+	accountClass?: (accountClass: string) => string;
 }
 
 /** The provider's display name for the channel part of the route line. */
@@ -49,6 +67,25 @@ function routeOf(provider: string, groups: string[] | undefined, labels: ModelGr
 	const channel = CHANNEL_NAMES[provider] ?? provider;
 	if (labels.routeChannel) parts.push(labels.routeChannel(channel));
 	return parts.join(' · ');
+}
+
+/** Marks the Provider a pick routes through, after the model in its command. */
+export const ROUTE_MARK = '@route=';
+
+/** Splits `/model x [effort] @route=p` into the command without it and the Provider. */
+export function splitRoute(command: string): { command: string; route?: string } {
+	const parts = command.split(/\s+/);
+	const at = parts.findIndex((part) => part.startsWith(ROUTE_MARK));
+	if (at < 0) return { command };
+	const route = parts[at].slice(ROUTE_MARK.length);
+	parts.splice(at, 1);
+	return { command: parts.join(' '), route: route || undefined };
+}
+
+/** A Provider row's second line: account class and Provider, "私有 · 新科研". */
+function routeLineOf(route: ModelRoute, labels: ModelGroupLabels): string {
+	const scope = route.account_class && labels.accountClass ? labels.accountClass(route.account_class) : '';
+	return [scope, route.name].filter(Boolean).join(' · ');
 }
 
 /** "claude-opus（default）" → "claude-opus": older configs put the group in the label. */
@@ -181,6 +218,8 @@ export function buildModelRows(input: {
 	unsetWindow?: string;
 	/** The session's model, marked active when the rows come from the catalog. */
 	current?: string;
+	/** The gateway Provider chosen per model (`monoize_providers`). */
+	routes?: Record<string, string>;
 }): ModelRow[] {
 	const {
 		models,
@@ -192,7 +231,8 @@ export function buildModelRows(input: {
 		toolMode,
 		localLabel = '',
 		unsetWindow = '',
-		current = ''
+		current = '',
+		routes = {}
 	} = input;
 	if (backendId === 'claude' || backendId === 'codex') {
 		const onLynShen = toolMode === 'lynshen';
@@ -226,6 +266,7 @@ export function buildModelRows(input: {
 		return detailOf(byok ? provider : null, ctx);
 	};
 	const activeCatalog = providersList.find((p) => p.id === cur)?.models ?? [];
+	const routeLine = (route: ModelRoute) => routeLineOf(route, groups);
 	// Before the engine reports its list (a draft, or a provider just switched
 	// to) the provider's own catalog stands in, else the menu would be empty.
 	const engineModels: EngineModel[] = models.length
@@ -236,9 +277,9 @@ export function buildModelRows(input: {
 				active: m.name === current,
 				context_window: m.context_window
 			}));
-	const activeRows: ModelRow[] = engineModels.map((m) => {
+	const activeRows: ModelRow[] = engineModels.flatMap((m) => {
 		const entry = activeCatalog.find((row) => row.name === m.model);
-		return {
+		const row: ModelRow = {
 			id: `${cur}::${m.model}`,
 			label: stripGroupSuffix(entry?.display_name || m.label || m.model),
 			vendor: m.vendor || m.model,
@@ -248,20 +289,46 @@ export function buildModelRows(input: {
 			depth: undefined,
 			group: activeGroup
 		};
+		// A gateway model several Providers serve: one row each, "私有 · 新科研".
+		const choices = entry?.routes ?? [];
+		// One Provider: the same "私有 · 国模模型组" line, nothing to pin.
+		if (choices.length === 1) return [{ ...row, detail: routeLine(choices[0]) }];
+		if (choices.length < 2) return [row];
+		const chosen = choices.some((r) => r.id === routes[m.model]) ? routes[m.model] : choices[0].id;
+		return choices.map((route) => ({
+			...row,
+			id: `${row.id}::${route.id}`,
+			detail: routeLine(route),
+			active: m.active && route.id === chosen,
+			command: `${row.command} ${ROUTE_MARK}${route.id}`,
+			route: route.id
+		}));
 	});
 	const otherRows: ModelRow[] = (backendId !== 'lynshen' ? [] : providersList)
 		.filter((pv) => pv.id !== cur && configured.includes(pv.id))
 		.flatMap((pv) =>
-			pv.models.map((m) => ({
-				id: `${pv.id}::${m.name}`,
-				label: stripGroupSuffix(m.display_name || m.name),
-				vendor: m.name,
-				detail: lineTwo(pv.id, m.groups, m.context_window, true),
-				active: false,
-				command: `@switch ${pv.id} ${m.name}`,
-				depth: undefined,
-				group: pv.id === 'lynshen' ? groups.lynshen : groups.byok
-			}))
+			pv.models.flatMap((m) => {
+				const row: ModelRow = {
+					id: `${pv.id}::${m.name}`,
+					label: stripGroupSuffix(m.display_name || m.name),
+					vendor: m.name,
+					detail: lineTwo(pv.id, m.groups, m.context_window, true),
+					active: false,
+					command: `@switch ${pv.id} ${m.name}`,
+					depth: undefined,
+					group: pv.id === 'lynshen' ? groups.lynshen : groups.byok
+				};
+				const choices = m.routes ?? [];
+				if (choices.length === 1) return [{ ...row, detail: routeLine(choices[0]) }];
+				if (choices.length < 2) return [row];
+				return choices.map((route) => ({
+					...row,
+					id: `${row.id}::${route.id}`,
+					detail: routeLine(route),
+					command: `${row.command} ${ROUTE_MARK}${route.id}`,
+					route: route.id
+				}));
+			})
 		);
 	const order = [groups.lynshen, groups.byok];
 	return [...activeRows, ...otherRows].sort(

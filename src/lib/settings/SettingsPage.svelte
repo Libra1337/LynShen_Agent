@@ -664,7 +664,7 @@
 		}
 		const windows = new Map(squareModels.map((m) => [m.model_id, m]));
 		entry.models = monoizeEntries(
-			squareModels.map((m) => ({ id: m.model_id, groups: m.groups, routing_status: m.routing_status })),
+			squareModels.map((m) => ({ id: m.model_id, groups: m.groups, routing_status: m.routing_status, providers: m.providers })),
 			entry.models
 		).map((m) => {
 			const square = windows.get(m.name);

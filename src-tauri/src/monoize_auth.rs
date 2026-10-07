@@ -287,7 +287,8 @@ pub fn monoize_marketplace() -> Result<Value, String> {
         .flatten()
         .filter_map(|model| {
             model["id"].as_str().map(|id| json!({
-            "model_id": id, "groups": model["groups"], "routing_status": model["routing_status"]
+            "model_id": id, "groups": model["groups"], "routing_status": model["routing_status"],
+            "providers": model["providers"]
         }))
         })
         .collect::<Vec<_>>()))

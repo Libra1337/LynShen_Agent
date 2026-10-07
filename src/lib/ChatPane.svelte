@@ -44,9 +44,11 @@
 		gitCheckpointCapture,
 		gitCheckpointRestore,
 		resolveFileRef,
+		readConfig,
+		writeConfig,
 		type Op
 	} from '$lib/protocol';
-	import { buildModelRows, stripGroupSuffix, toolModels, type ToolModel } from '$lib/composer/modelRows';
+	import { buildModelRows, splitRoute, stripGroupSuffix, toolModels, type ToolModel } from '$lib/composer/modelRows';
 	import { confirm } from '$lib/ui/confirm.svelte';
 	import { BACKEND_LABELS, caps } from '$lib/backends';
 	import { defaultEffort } from '$lib/composer/effort';
@@ -523,12 +525,14 @@
 				lynshen: t('shell.modelGroup.lynshen'),
 				byok: t('shell.modelGroup.byok'),
 				routeGroup: (group) => t('chat.routeGroup', { group }),
-				routeChannel: (channel) => t('chat.routeChannel', { channel })
+				routeChannel: (channel) => t('chat.routeChannel', { channel }),
+				accountClass: (accountClass) => t(`chat.accountClass.${accountClass}`)
 			},
 			toolMode,
 			localLabel: t('chat.providerLocal'),
 			unsetWindow: t('chat.windowUnset'),
-			current: chat.model
+			current: chat.model,
+			routes
 		});
 	});
 
@@ -787,7 +791,11 @@
 		}
 	});
 
-	function selectRow(command: string) {
+	function selectRow(picked: string) {
+		// A Provider row: pin the model to it (`monoize_providers`, sent as
+		// X-Monoize-Provider from the next request), then pick the model.
+		const { command, route } = splitRoute(picked);
+		if (route) void pinRoute(command, route);
 		// A draft only records the model; it is applied when the first message
 		// starts the engine.
 		if (session.draft && command.startsWith('/model ')) {
@@ -855,6 +863,27 @@
 		send({ op: 'command', input: command });
 		chat.closePicker();
 	}
+	/** Records the Provider chosen for a gateway model; the engine reads it per request. */
+	let routes = $state<Record<string, string>>({});
+	async function pinRoute(command: string, route: string) {
+		const model = command.startsWith('@switch ') ? command.split(/\s+/)[2] : command.slice('/model '.length).trim().split(/\s+/)[0];
+		if (!model) return;
+		routes = { ...routes, [model]: route };
+		try {
+			const cfg = await readConfig();
+			const map = { ...((cfg.monoize_providers ?? {}) as Record<string, string>), [model]: route };
+			await writeConfig({ monoize_providers: map });
+		} catch (e) {
+			toast.error(t('chat.groupSaveFailed', { error: String(e) }));
+		}
+	}
+	$effect(() => {
+		if (chat.picker?.kind !== 'model') return;
+		readConfig()
+			.then((cfg) => (routes = { ...((cfg.monoize_providers ?? {}) as Record<string, string>) }))
+			.catch(() => {});
+	});
+
 	// Not through selectRow: that closes the model list, and the menu stays
 	// open while the effort changes.
 	function setEffort(effort: string) {

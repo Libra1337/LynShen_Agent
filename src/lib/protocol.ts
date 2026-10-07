@@ -355,7 +355,15 @@ export function fetchDeepseekBalance(): Promise<DeepseekBalance> {
 export function fetchMonoizeBalance(): Promise<DeepseekBalance> {
 	return invoke('fetch_monoize_balance');
 }
-export type MonoizeModel = { id: string; owned_by?: string; groups?: string[]; routing_status?: string };
+/** A Provider the key may route this model through (DA-8a). */
+export type MonoizeRoute = { id: string; name: string; group: string; account_class: string };
+export type MonoizeModel = {
+	id: string;
+	owned_by?: string;
+	groups?: string[];
+	routing_status?: string;
+	providers?: MonoizeRoute[];
+};
 export async function fetchMonoizeModels(): Promise<MonoizeModel[]> {
 	const v = await invoke<{ data?: MonoizeModel[] }>('fetch_monoize_models');
 	return Array.isArray(v.data) ? v.data : [];
@@ -388,6 +396,7 @@ export type MonoizeMarketplaceModel = {
 	max_output_tokens?: number | null;
 	groups?: string[];
 	routing_status?: string;
+	providers?: MonoizeRoute[];
 };
 /** Group labels are presentation only; model_id remains the request identifier. */
 export function monoizeModelEntries(m: MonoizeMarketplaceModel): string[] {
