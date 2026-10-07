@@ -7,7 +7,7 @@
 	const DELAY = 450;
 	const WARM = 400;
 
-	let tip = $state<{ text: string; x: number; y: number; above: boolean } | null>(null);
+	let tip = $state<{ text: string; x: number; y: number; side: 'below' | 'above' | 'right' } | null>(null);
 	let current: HTMLElement | null = null;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let lastHide = 0;
@@ -23,10 +23,16 @@
 		return el.dataset.tip ?? '';
 	}
 
+	// `data-tip-side="right"` (the collapsed sidebar's icons) shows the tip
+	// beside the element instead of below it.
 	function show(el: HTMLElement, text: string) {
 		const r = el.getBoundingClientRect();
+		if (el.dataset.tipSide === 'right') {
+			tip = { text, x: r.right + 8, y: r.top + r.height / 2, side: 'right' };
+			return;
+		}
 		const above = r.bottom + 40 > window.innerHeight;
-		tip = { text, x: r.left + r.width / 2, y: above ? r.top - 6 : r.bottom + 6, above };
+		tip = { text, x: r.left + r.width / 2, y: above ? r.top - 6 : r.bottom + 6, side: above ? 'above' : 'below' };
 	}
 	function hide() {
 		clearTimeout(timer);
@@ -55,7 +61,7 @@
 <svelte:window onpointerdown={hide} onkeydown={hide} onblur={hide} onwheel={hide} />
 
 {#if tip}
-	<div class="tip" class:above={tip.above} role="tooltip" style:left="{tip.x}px" style:top="{tip.y}px">{tip.text}</div>
+	<div class="tip" class:above={tip.side === 'above'} class:right={tip.side === 'right'} role="tooltip" style:left="{tip.x}px" style:top="{tip.y}px">{tip.text}</div>
 {/if}
 
 <style>
@@ -77,6 +83,9 @@
 	}
 	.tip.above {
 		transform: translate(-50%, -100%);
+	}
+	.tip.right {
+		transform: translateY(-50%);
 	}
 	@keyframes tip-in {
 		from {

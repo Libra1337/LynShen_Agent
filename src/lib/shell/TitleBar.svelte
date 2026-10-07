@@ -31,6 +31,7 @@
 		leftWidth: number;
 		/** The sidebar is being dragged: follow it without easing. */
 		resizing?: boolean;
+		/** The sidebar is expanded (not the icon rail). */
 		sidebarOpen: boolean;
 		onToggleSidebar: () => void;
 		/** Hide the toggle on full-window surfaces (the welcome screen). */
@@ -70,9 +71,9 @@
 		{#if showToggle}
 			<button
 				class="tb-btn"
-				title={withShortcut(t('shell.toggleSidebar'), 'sidebar')}
-				aria-label={t('shell.toggleSidebar')}
-				aria-pressed={sidebarOpen}
+				title={withShortcut(t(sidebarOpen ? 'shell.sidebarCollapse' : 'shell.sidebarExpand'), 'sidebar')}
+				aria-label={t(sidebarOpen ? 'shell.sidebarCollapse' : 'shell.sidebarExpand')}
+				aria-expanded={sidebarOpen}
 				onclick={onToggleSidebar}><SidebarSimpleIcon size={18} /></button
 			>
 		{/if}
@@ -136,8 +137,8 @@
 		flex-shrink: 0;
 		min-width: max-content;
 		padding-left: 14px;
-		/* Moves with the sidebar opening and closing (Sidebar.svelte). */
-		transition: width var(--t-med) var(--ease-out);
+		/* Moves with the sidebar collapsing and expanding (Sidebar.svelte). */
+		transition: width var(--t-sidebar) var(--ease-standard);
 	}
 	.lead.resizing {
 		transition: none;
