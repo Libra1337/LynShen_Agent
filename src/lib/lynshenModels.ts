@@ -21,7 +21,9 @@ export function savedModel(m: LynShenModel): Record<string, unknown> {
 }
 
 /** Refreshes saved metadata, or initializes recommendations after the first
- * account login. Existing user selections and their order are preserved. */
+ * account login. Existing user selections and their order are preserved; a
+ * pick the account can no longer reach (its group was taken away) is
+ * dropped. */
 export async function refreshLynShenModels(): Promise<boolean> {
 	const [live, cfg] = await Promise.all([fetchLynShenModels(), readConfig()]);
 	const saved = Array.isArray(cfg.lynshen_models) ? (cfg.lynshen_models as Record<string, unknown>[]) : [];
@@ -31,10 +33,11 @@ export async function refreshLynShenModels(): Promise<boolean> {
 		const model = byId.get(id);
 		return model ? [savedModel(model)] : [];
 	});
-	const next = saved.length ? saved.map((entry) => {
+	const kept = saved.flatMap((entry) => {
 		const model = byId.get(String(entry.name));
-		return model ? savedModel(model) : entry;
-	}) : recommended.length ? recommended : live.slice(0, 6).map(savedModel);
+		return model ? [savedModel(model)] : [];
+	});
+	const next = kept.length ? kept : recommended.length ? recommended : live.slice(0, 6).map(savedModel);
 	const patch: Record<string, unknown> = {};
 	if (JSON.stringify(next) !== JSON.stringify(saved)) patch.lynshen_models = next;
 	if (cfg.provider === 'lynshen') {

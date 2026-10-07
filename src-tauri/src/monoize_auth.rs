@@ -5,12 +5,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-/// 等价的网关域名，按序容灾。
-pub(crate) const BASES: [&str; 3] = [
-    "https://www.lynshen.org",
-    "https://api.lynshen.org",
-    "https://lynshen.org",
-];
+/// 等价的网关域名，按序容灾（www 连不上就换 api，轮换）。
+pub(crate) const BASES: [&str; 2] = ["https://www.lynshen.org", "https://api.lynshen.org"];
+
+/// 一个域名多久连不上就换下一个。
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// 上次成功的域名下标（失败切换后更新）。
 static BASE_INDEX: AtomicUsize = AtomicUsize::new(0);
 
@@ -20,8 +19,35 @@ fn session_path() -> PathBuf {
 
 fn http() -> ureq::Agent {
     ureq::AgentBuilder::new()
-        .timeout(std::time::Duration::from_secs(15))
+        .timeout_connect(CONNECT_TIMEOUT)
+        .timeout(Duration::from_secs(30))
         .build()
+}
+
+/// The domains in the order to try them: the last one that worked first.
+fn base_order() -> impl Iterator<Item = usize> {
+    let start = BASE_INDEX.load(Ordering::Relaxed);
+    (0..BASES.len()).map(move |offset| (start + offset) % BASES.len())
+}
+
+/// The first domain whose authorization page loads within CONNECT_TIMEOUT
+/// (tried in turn), or the last one that worked when none answers.
+fn reachable_base() -> &'static str {
+    let probe = ureq::AgentBuilder::new()
+        .timeout_connect(CONNECT_TIMEOUT)
+        .timeout(CONNECT_TIMEOUT)
+        .build();
+    for index in base_order() {
+        if probe
+            .get(&format!("{}/oauth/authorize", BASES[index]))
+            .call()
+            .is_ok()
+        {
+            BASE_INDEX.store(index, Ordering::Relaxed);
+            return BASES[index];
+        }
+    }
+    BASES[BASE_INDEX.load(Ordering::Relaxed)]
 }
 
 /// 带域名容灾的网关请求。`path` 是完整路径（dashboard 接口带 `/api` 前缀，
@@ -33,10 +59,8 @@ fn api_call(
     bearer: Option<&str>,
     body: Option<Value>,
 ) -> Result<Value, String> {
-    let start = BASE_INDEX.load(Ordering::Relaxed);
     let mut last_network_err = String::new();
-    for offset in 0..BASES.len() {
-        let index = (start + offset) % BASES.len();
+    for index in base_order() {
         let mut req = http().request(method, &format!("{}{}", BASES[index], path));
         if let Some(token) = bearer {
             req = req.set("Authorization", &format!("Bearer {token}"));
@@ -134,14 +158,18 @@ pub fn monoize_oauth_start() -> Result<Value, String> {
     if user_code.len() != 12 || !user_code.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err("Invalid authorization code".into());
     }
-    let base = BASES[BASE_INDEX.load(Ordering::Relaxed)];
+    // The page opens on a domain that answers now; the others are offered
+    // as alternates in case the browser cannot reach it.
+    let base = reachable_base();
+    let page = |base: &str| format!("{base}/oauth/authorize?user_code={user_code}");
+    let alternates: Vec<String> = BASES.iter().filter(|b| **b != base).map(|b| page(b)).collect();
     *guard = Some(Authorization {
         device_code,
         user_code: user_code.clone(),
         expires: Instant::now() + Duration::from_secs(600),
     });
     Ok(
-        json!({"user_code": user_code, "verification_uri_complete": format!("{base}/oauth/authorize?user_code={user_code}"), "interval": 5, "expires_in": 600}),
+        json!({"user_code": user_code, "verification_uri_complete": page(base), "alternates": alternates, "interval": 5, "expires_in": 600}),
     )
 }
 

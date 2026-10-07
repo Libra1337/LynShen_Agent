@@ -14,7 +14,7 @@ import { refreshLynShenModels, savedModel } from './lynshenModels';
 beforeEach(() => vi.clearAllMocks());
 
 describe('refreshLynShenModels', () => {
-	it('brings the picked models up to the gateway, keeping the pick and its order', async () => {
+	it('brings the picked models up to the gateway, keeping the pick and its order, dropping lost ones', async () => {
 		const old = savedModel({ id: 'b' });
 		readConfig.mockResolvedValue({ provider: 'lynshen', lynshen_models: [old, { name: 'gone', context_window: 1 }] });
 		fetchLynShenModels.mockResolvedValue([
@@ -23,10 +23,8 @@ describe('refreshLynShenModels', () => {
 		]);
 		expect(await refreshLynShenModels()).toBe(true);
 		const patch = writeConfig.mock.calls[0][0] as { lynshen_models: Record<string, unknown>[]; models: unknown };
-		expect(patch.lynshen_models.map((m) => [m.name, m.display_name, m.context_window])).toEqual([
-			['b', 'Bee', 200],
-			['gone', undefined, 1]
-		]);
+		// `gone` left with a group the account lost: it is not shown any more.
+		expect(patch.lynshen_models.map((m) => [m.name, m.display_name, m.context_window])).toEqual([['b', 'Bee', 200]]);
 		expect(patch.models).toBe(patch.lynshen_models);
 	});
 

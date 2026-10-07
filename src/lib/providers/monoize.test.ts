@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_CONTEXT_WINDOW, monoizeEntries } from './monoize';
+import { FALLBACK_CONTEXT_WINDOW, monoizeEntries, pickedMonoizeModels } from './monoize';
 
 describe('monoizeEntries', () => {
 	it('keeps every model its reasoning efforts, matching the catalog regardless of case', () => {
@@ -47,5 +47,30 @@ describe('monoizeEntries', () => {
 		expect(stored.context_window).toBe(400_000);
 		expect(catalogOnly.context_window).toBe(1_000_000);
 		expect(nothing.context_window).toBe(FALLBACK_CONTEXT_WINDOW);
+	});
+});
+
+describe('pickedMonoizeModels', () => {
+	const live = monoizeEntries([
+		{ id: 'glm-5.3', groups: ['国模'], providers: [{ id: 'p-a', name: '代理', group: '国模', account_class: 'private' }] },
+		{ id: 'kimi-k3', groups: ['代理'], providers: [{ id: 'p-b', name: '新科研', group: '代理', account_class: 'private' }] }
+	]);
+
+	it('drops picks, the model and pinned Providers a lost group took away', () => {
+		const patch = pickedMonoizeModels(live, {
+			provider: 'monoize',
+			model: 'grok-4.7',
+			lynshen_models: [{ name: 'grok-4.7' }, { name: 'kimi-k3' }],
+			monoize_providers: { 'grok-4.7': 'p-x', 'glm-5.3': 'p-gone', 'kimi-k3': 'p-b' }
+		});
+		expect(patch.lynshen_models).toEqual([{ name: 'kimi-k3' }]);
+		expect((patch.models as { name: string }[]).map((m) => m.name)).toEqual(['kimi-k3']);
+		expect(patch.model).toBe('kimi-k3');
+		expect(patch.monoize_providers).toEqual({ 'kimi-k3': 'p-b' });
+	});
+
+	it('shows every model when nothing was picked, and leaves another provider alone', () => {
+		expect((pickedMonoizeModels(live, { provider: 'monoize', model: 'glm-5.3' }).models as unknown[]).length).toBe(2);
+		expect(pickedMonoizeModels(live, { provider: 'deepseek', lynshen_models: [{ name: 'glm-5.3' }] })).toEqual({});
 	});
 });

@@ -77,5 +77,36 @@ export async function refreshMonoizeCatalog() {
 	// An engine on the gateway reads its windows (and compacts by them) from
 	// config.json: keep them current there too, not only when Settings is open.
 	const cfg = await readConfig().catch(() => null);
-	if (cfg?.provider === 'monoize') await writeConfig({ models });
+	if (cfg) {
+		const patch = pickedMonoizeModels(models, cfg);
+		if (Object.keys(patch).length) await writeConfig(patch);
+	}
+}
+
+/** What config.json keeps of the gateway list: the models chosen to show
+ *  (`lynshen_models`) that the key can still reach — one whose group was
+ *  taken away is dropped — and, on the gateway, the engine's model list:
+ *  those picks in their order, or every model when nothing was picked. */
+export function pickedMonoizeModels(
+	models: MonoizeModelEntry[],
+	cfg: Record<string, unknown>
+): Record<string, unknown> {
+	const live = new Map(models.map((m) => [m.name, m]));
+	const saved = Array.isArray(cfg.lynshen_models) ? (cfg.lynshen_models as { name?: unknown }[]) : [];
+	const picked = saved.filter((m) => live.has(String(m.name)));
+	const patch: Record<string, unknown> = {};
+	if (picked.length !== saved.length) patch.lynshen_models = picked;
+	// A Provider pinned for a model that no longer serves it would be refused
+	// (provider_unavailable): the gateway picks again once the pin is gone.
+	const pins = (cfg.monoize_providers ?? {}) as Record<string, string>;
+	const keptPins = Object.fromEntries(
+		Object.entries(pins).filter(([model, route]) => live.get(model)?.routes.some((r) => r.id === route))
+	);
+	if (Object.keys(keptPins).length !== Object.keys(pins).length) patch.monoize_providers = keptPins;
+	if (cfg.provider === 'monoize') {
+		const shown = picked.length ? picked.map((m) => live.get(String(m.name))!) : models;
+		patch.models = shown;
+		if (shown.length && !shown.some((m) => m.name === cfg.model)) patch.model = shown[0].name;
+	}
+	return patch;
 }

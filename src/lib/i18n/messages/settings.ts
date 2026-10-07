@@ -83,6 +83,8 @@ const settings = {
             browserLogin: '在浏览器中授权 LynShen',
             browserWaiting: '等待浏览器授权…',
             browserCancel: '取消授权',
+            browserAlternate: '浏览器打不开授权页？',
+            browserAlternateLink: '换备用线路 {n}',
             browserHint: '在官网登录并确认授权。请核对下方代码；客户端不会获取你的密码。',
             revokeFailed: '撤销授权失败，请检查网络后重试。登录凭据已保留。',
 
@@ -490,6 +492,8 @@ const settings = {
             browserLogin: 'Authorize LynShen in browser',
             browserWaiting: 'Waiting for browser approval…',
             browserCancel: 'Cancel authorization',
+            browserAlternate: 'Page not loading?',
+            browserAlternateLink: 'Try alternate {n}',
             browserHint: 'Sign in on the website and approve access. Match the code below; the app never receives your password.',
             revokeFailed: 'Could not revoke access. Check your connection and retry. Credentials were retained.',
 
