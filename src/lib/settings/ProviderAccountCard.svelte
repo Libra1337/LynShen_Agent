@@ -97,7 +97,6 @@
 				{#if isDefault}<span class="defbadge"><CheckCircleIcon size={11} /> {t('settings.account.default')}</span>{/if}
 				{#if !provider.builtin}<span class="tagx">{provider.source === 'catalog' ? t('settings.account.byok') : t('settings.account.custom')}</span>{/if}
 			</span>
-			<span class="pcard-url">{#if provider.name}{provider.id} · {/if}{provider.base_url}</span>
 		</span>
 		<span class="pcard-right">
 			{#if provider.id === 'lynshen' && monoizeUser && monoizeTotal}
@@ -139,9 +138,7 @@
 						<Button size="sm" onclick={onRefreshModels}><ArrowClockwiseIcon size={13} /> {t('settings.account.refreshModels')}</Button>
 						<Button variant="danger" size="sm" onclick={onMonoizeLogout}><SignOutIcon size={13} /> {t('settings.account.logout')}</Button>
 					</div>
-					<p class="mmsg">{t('settings.monoize.managedKey')}</p>
 				{:else}
-					<p class="mmsg">{t('settings.monoize.loginHint')}</p>
 					<div class="cardact">
 						<Button variant="primary" size="sm" onclick={onOpenMonoizeLogin}><SignInIcon size={13} /> {t('settings.monoize.loginRegister')}</Button>
 					</div>
@@ -156,16 +153,13 @@
 						<Button size="sm" onclick={onRefreshModels}><ArrowClockwiseIcon size={13} /> {t('settings.account.refreshModels')}</Button>
 						<Button variant="danger" size="sm" onclick={onMonoizeLogout}><SignOutIcon size={13} /> {t('settings.account.logout')}</Button>
 					</div>
-					<p class="mmsg">{t('settings.monoize.managedKey')}</p>
 				{:else if authed}
 					<ProviderBalance balance={monoizeBal} />
 					<div class="mrow">
 						<Button variant="secondary" size="sm" onclick={onRefreshModels}><ArrowClockwiseIcon size={13} /> {t('settings.account.refreshModels')}</Button>
 						{#if monoizeModelsMsg}<span class="mmsg">{monoizeModelsMsg}</span>{/if}
 					</div>
-					<p class="mmsg">{t('settings.monoize.managedKeyOptional')}</p>
 				{:else}
-					<p class="mmsg">{t('settings.monoize.loginHint')}</p>
 					<div class="cardact">
 						<Button variant="primary" size="sm" onclick={onOpenMonoizeLogin}><SignInIcon size={13} /> {t('settings.monoize.loginRegister')}</Button>
 					</div>
@@ -194,18 +188,15 @@
 </div>
 
 <style>
-	/* A row of the Providers card (SettingsSection draws the frame and the
-	   hairlines between rows); the clip keeps the hover fill in its corners. */
-	.pcard {
-		overflow: hidden;
-	}
+	/* A row of the Providers list (SettingsSection draws the hairlines
+	   between rows). */
 	.pcard-main {
 		width: 100%;
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		min-height: 60px;
-		padding: 12px 18px;
+		min-height: 56px;
+		padding: 10px 0;
 		border: none;
 		background: none;
 		color: var(--text);
@@ -213,8 +204,8 @@
 		text-align: left;
 		min-width: 0;
 	}
-	.pcard-main:hover {
-		background: var(--surface);
+	.pcard-main:hover .pcard-id {
+		color: var(--text);
 	}
 	.tile {
 		display: inline-flex;
@@ -239,7 +230,7 @@
 		align-items: center;
 		gap: 7px;
 		font-size: var(--fs-sm);
-		font-weight: 600;
+		font-weight: 500;
 	}
 	.tagx {
 		font-size: var(--fs-2xs);
@@ -248,14 +239,6 @@
 		border: 1px solid var(--hairline);
 		border-radius: var(--r-xs);
 		padding: 0 5px;
-	}
-	.pcard-url {
-		font-family: var(--font-mono);
-		font-size: var(--fs-2xs);
-		color: var(--dim2);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 	.stat {
 		font-size: var(--fs-2xs);
@@ -308,8 +291,7 @@
 		color: var(--dim2);
 	}
 	.pcard-body {
-		padding: 14px 18px;
-		border-top: 1px solid var(--hairline);
+		padding: 4px 0 16px 46px;
 		display: flex;
 		flex-direction: column;
 		gap: 12px;

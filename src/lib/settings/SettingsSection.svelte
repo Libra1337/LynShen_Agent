@@ -1,6 +1,7 @@
 <script lang="ts">
-	// One block of a settings page: a small heading (and optional gray line)
-	// over a rounded card whose children are SettingsRows or a wide block.
+	// One block of a settings page: a small heading over plain rows divided
+	// by hairlines (no card). Children are SettingsRows or wide blocks; a
+	// wide block lines up with the rows (no side padding).
 	import type { Snippet } from 'svelte';
 
 	let {
@@ -11,6 +12,7 @@
 		children
 	}: {
 		title?: string;
+		/** Optional gray line under the heading. Settings pages leave it out. */
 		description?: string;
 		/** Search anchor (element id `set-<id>`, see settings/nav.ts). */
 		id?: string;
@@ -27,78 +29,65 @@
 				{#if title}<h3>{title}</h3>{/if}
 				{#if description}<p>{description}</p>{/if}
 			</div>
-			{#if action}{@render action()}{/if}
+			{#if action}<div class="act">{@render action()}</div>{/if}
 		</div>
 	{/if}
-	<div class="card">
+	<div class="body">
 		{@render children()}
 	</div>
 </section>
 
 <style>
 	.sec {
-		margin-top: 28px;
+		margin-top: 36px;
 		scroll-margin: 24px;
 	}
 	.head {
 		display: flex;
-		align-items: flex-end;
+		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-		margin: 0 2px 10px;
+		min-height: 32px;
+		margin-bottom: 4px;
 	}
 	.txt {
 		min-width: 0;
 	}
 	h3 {
 		margin: 0;
-		font-size: var(--fs-md);
+		font-size: var(--fs-sm);
 		font-weight: 600;
 		color: var(--text);
 	}
 	p {
-		margin: 3px 0 0;
+		margin: 2px 0 0;
 		max-width: 64ch;
 		font-size: var(--fs-xs);
 		line-height: 1.45;
 		color: var(--dim);
 	}
-	.card {
-		background: var(--panel);
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-lg);
-	}
-	/* Light theme: --panel is the page's white; a faint fill lifts the card. */
-	:global([data-theme='light']) .card {
-		background: var(--surface);
-		border-color: var(--border);
-	}
-	/* No overflow clip (a Select's menu must escape the card): the end
-	   children take the card's corners so hover fills stay inside. */
-	.card > :global(:first-child) {
-		border-top-left-radius: inherit;
-		border-top-right-radius: inherit;
-	}
-	.card > :global(:last-child) {
-		border-bottom-left-radius: inherit;
-		border-bottom-right-radius: inherit;
+	.act {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
 	}
 	/* Rows, and any direct wide block, are divided by hairlines (doubled class:
 	   wins over a child's own `border: none`). */
-	.card.card > :global(* + *) {
+	.body.body > :global(* + *) {
 		border-top: 1px solid var(--hairline);
 	}
 	/* Search hit: SettingsPage adds .flash for a moment after scrolling here. */
-	.sec:global(.flash) .card {
+	.sec:global(.flash) .body {
 		animation: flash 1.6s var(--ease-out);
 	}
 	@keyframes flash {
 		0%,
 		40% {
-			box-shadow: 0 0 0 3px var(--accent-soft);
+			background: var(--accent-soft);
 		}
 		100% {
-			box-shadow: 0 0 0 3px transparent;
+			background: transparent;
 		}
 	}
 </style>

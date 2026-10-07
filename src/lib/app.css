@@ -466,3 +466,36 @@ input[type='number'] {
 	-moz-appearance: textfield;
 	appearance: textfield;
 }
+
+/* Custom canvas background (Settings → 通用 → 背景). prefs.svelte.ts sets
+   `--canvas-image` and `data-canvas-bg` (its strength) on the root. The image
+   fills the canvas (`.canvas`, right of the sidebar) under a veil of the
+   theme's --bg; the veil's opacity keeps text readable in both themes. The
+   surfaces in between (mosaic, leaves, chat pane) turn transparent so the
+   veiled image shows; floating surfaces (composer, cards, menus) keep their
+   own fills; a maximized leaf, which covers the others, repaints the
+   veiled image. The sidebar is outside .canvas and stays as it is. */
+:root[data-canvas-bg] {
+	--canvas-veil: 80%;
+}
+:root[data-canvas-bg='faint'] {
+	--canvas-veil: 90%;
+}
+:root[data-canvas-bg='strong'] {
+	--canvas-veil: 62%;
+}
+:root[data-canvas-bg] .canvas,
+:root[data-canvas-bg] .canvas .leaf.maxed {
+	background-color: var(--bg);
+	background-image:
+		linear-gradient(color-mix(in oklab, var(--bg) var(--canvas-veil), transparent), color-mix(in oklab, var(--bg) var(--canvas-veil), transparent)),
+		var(--canvas-image);
+	background-size: cover;
+	background-position: center;
+	background-repeat: no-repeat;
+}
+:root[data-canvas-bg] .canvas .mosaic,
+:root[data-canvas-bg] .canvas .leaf:not(.maxed),
+:root[data-canvas-bg] .canvas .chatpane {
+	background: transparent;
+}

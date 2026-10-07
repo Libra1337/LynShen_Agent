@@ -30,7 +30,7 @@
 	};
 </script>
 
-<SettingsSection id="permission-rules" title={t('settings.rules.title')} description={t('settings.rules.hint')}>
+<SettingsSection id="permission-rules" title={t('settings.rules.title')}>
 	{#if !live}
 		<div class="pad"><Notice tone="info">{t('settings.rules.noSession')}</Notice></div>
 	{:else if error}
@@ -56,16 +56,16 @@
 
 <style>
 	.pad {
-		padding: 12px 16px;
+		padding: 12px 0;
 	}
 	.empty {
 		margin: 0;
-		padding: 14px 16px;
+		padding: 14px 0;
 		color: var(--dim);
 		font-size: var(--fs-sm);
 	}
 	.group {
-		padding: 10px 16px;
+		padding: 10px 0;
 	}
 	.group + .group {
 		border-top: 1px solid var(--hairline);

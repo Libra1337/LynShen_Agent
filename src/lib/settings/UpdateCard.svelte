@@ -17,7 +17,7 @@
 	});
 </script>
 
-<SettingsSection title={t('settings.update.groupLabel')}>
+<SettingsSection>
 	<SettingsRow id="app-version" title={t('settings.update.currentVersion')} description={current ? `v${current}` : '…'}>
 		{#snippet detail()}
 			{#if updater.phase === 'latest'}

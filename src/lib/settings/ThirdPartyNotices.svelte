@@ -37,7 +37,7 @@
 			<Button size="sm" variant="secondary" onclick={() => (legal = doc)}>{t('settings.licenses.open')}</Button>
 		</SettingsRow>
 	{/each}
-	<SettingsRow id="licenses" title={t('settings.licenses.title')} description={t('settings.licenses.hint')}>
+	<SettingsRow id="licenses" title={t('settings.licenses.title')}>
 		<Button size="sm" variant="secondary" onclick={show}>{t('settings.licenses.open')}</Button>
 	</SettingsRow>
 </SettingsSection>

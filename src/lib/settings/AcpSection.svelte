@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Settings → 编程智能体 → ACP: manage the registry of Agent Client
+	// Settings → 外部智能体（ACP）: manage the registry of Agent Client
 	// Protocol agents the desktop may launch (id, name, command, args, env).
 	// The registry itself is owned and validated by the Rust side
 	// (acp_registry.rs) — this UI only reads it and submits whole entries.
@@ -125,7 +125,7 @@
 	onMount(load);
 </script>
 
-<SettingsSection id="acp-agents" title={t('settings.acp.groupLabel')} description={t('settings.acp.hint')}>
+<SettingsSection id="acp-agents">
 	{#if listError}
 		<div class="pad"><Notice>{listError}</Notice></div>
 	{/if}
@@ -224,10 +224,10 @@
 		display: flex;
 		align-items: flex-start;
 		gap: 12px;
-		padding: 14px 18px;
+		padding: 14px 0;
 	}
 	.pad {
-		padding: 14px 18px;
+		padding: 14px 0;
 	}
 	.atile {
 		display: inline-flex;
@@ -312,7 +312,7 @@
 		max-width: 420px;
 	}
 	.draft {
-		padding: 14px 18px;
+		padding: 14px 0;
 	}
 	.fl {
 		display: flex;
@@ -350,7 +350,7 @@
 	}
 	.empty {
 		margin: 0;
-		padding: 14px 18px;
+		padding: 14px 0;
 		font-size: var(--fs-xs);
 		color: var(--dim2);
 	}

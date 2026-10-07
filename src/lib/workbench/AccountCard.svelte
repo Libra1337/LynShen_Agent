@@ -66,7 +66,7 @@
 	{:else}
 		<div class="sec">
 			<div class="name">{user?.username ?? 'LynShen'}</div>
-			<div class="sub">LynShen Console · www.lynshen.org</div>
+			<div class="sub">LynShen Console</div>
 		</div>
 		<div class="sec rows">
 			<div class="kv">

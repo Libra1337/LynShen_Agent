@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Settings → 所有智能体 → 智能体: per-backend availability (check_backend), a
+	// Settings → 编码智能体: per-backend availability (check_backend), a
 	// one-click install when missing, a one-click upgrade when Claude Code /
 	// Codex has a newer release, a binary-path override and extra env
 	// (folded away), and the default backend for new sessions. All preferences
@@ -163,8 +163,8 @@
 	const defaultOpts = $derived(NATIVE_BACKEND_IDS.map((id) => ({ value: id, label: BACKEND_LABELS[id] })));
 </script>
 
-<SettingsSection id="backend-list" title={t('settings.backend.groupLabel')} description={t('settings.backend.hint')}>
-	<SettingsRow id="default-backend" title={t('settings.backend.defaultLabel')} description={t('settings.backend.defaultHint')}>
+<SettingsSection>
+	<SettingsRow id="default-backend" title={t('settings.backend.defaultLabel')}>
 		<div class="selw">
 			<Select value={settings.default} onChange={setDefault} options={defaultOpts}>
 				{#snippet item(o)}
@@ -199,6 +199,9 @@
 		</SettingsRow>
 	{/if}
 
+</SettingsSection>
+
+<SettingsSection id="backend-list" title={t('settings.backend.installed')}>
 	{#each NATIVE_BACKEND_IDS as id (id)}
 		{@const st = status[id]}
 		{@const dep = deps.list.find((d) => d.id === id)}
@@ -292,7 +295,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
-		padding: 14px 18px;
+		padding: 14px 0;
 	}
 	.bline {
 		display: flex;

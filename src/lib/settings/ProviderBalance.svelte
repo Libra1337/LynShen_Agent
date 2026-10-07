@@ -25,9 +25,8 @@
 		flex-direction: column;
 		gap: 6px;
 		padding: 10px 12px;
-		border: 1px solid var(--hairline);
 		border-radius: var(--r-md);
-		background: var(--surface2);
+		background: var(--surface);
 	}
 	.dsrow {
 		display: flex;

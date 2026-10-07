@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Settings → 智能体 → 远程访问 (rows inside a SettingsSection): the relay
+	// Settings → 远程访问 (rows inside a SettingsSection): the relay
 	// switch and status (relay_status / relay_set), "add device" with a QR code
 	// of a one-time pairing link (pair_link; pair_start for the LAN address when
 	// the relay is off), the paired devices with revoke, and the LAN/Tailscale
@@ -173,7 +173,7 @@
 	<Switch bind:checked={relayOn} label={t('settings.backend.relayToggle')} onChange={setRelay} />
 </SettingsRow>
 
-<SettingsRow id="devices" title={t('settings.backend.devices')} description={t('settings.backend.devicesHint')}>
+<SettingsRow id="devices" title={t('settings.backend.devices')}>
 	{#if !pairing}
 		<Button size="sm" onclick={addDevice}><DeviceMobileIcon size={13} /> {t('settings.backend.addDevice')}</Button>
 	{/if}
@@ -195,12 +195,11 @@
 						code: pairing.code,
 						minutes: String(Math.max(1, Math.round((pairing.expires_at - now) / 60000)))
 					})}</strong>
-					<span>{base ? t('settings.backend.pairScan', { address: base }) : t('settings.backend.pairNoAddress')}</span>
+					<span>{base ? t('settings.backend.pairLinkScan') : t('settings.backend.pairNoAddress')}</span>
 				{/if}
 				<span class="expires">{t('settings.backend.pairExpires', { time: remaining })}</span>
 				{#if pairing.link}
 					<div class="link-row">
-						<code class="link" title={pairing.link}>{pairing.link}</code>
 						<Button size="sm" onclick={copyLink}>
 							{#if copied}<CheckIcon size={13} /> {t('settings.backend.copied')}{:else}<CopyIcon size={13} /> {t('settings.backend.copyLink')}{/if}
 						</Button>
@@ -242,7 +241,7 @@
 				placeholder={t('settings.backend.remotePlaceholder')}
 				onchange={onAddressChange}
 			/>
-			<p class="hint">{t('settings.backend.lanAdvancedHint')} {t('settings.backend.remoteHint')}</p>
+			<p class="hint">{t('settings.backend.lanAdvancedHint')}</p>
 		</div>
 	{/if}
 </SettingsRow>
@@ -318,20 +317,6 @@
 		gap: 8px;
 		margin-top: 4px;
 		min-width: 0;
-	}
-	.link {
-		flex: 1;
-		min-width: 0;
-		padding: 6px 8px;
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-sm);
-		background: var(--surface2);
-		font-family: var(--font-mono);
-		font-size: var(--fs-2xs);
-		color: var(--dim);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 	.devices {
 		display: flex;
