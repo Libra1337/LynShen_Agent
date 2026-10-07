@@ -31,6 +31,8 @@ type PrefsShape = {
 	/** The view an existing conversation opens in: the chat, or its
 	 *  engine's own TUI. */
 	defaultSurface: 'gui' | 'tui';
+	/** The currency a USD balance is shown in (the website's CNY/USD switch). */
+	balanceCurrency: 'CNY' | 'USD';
 };
 
 export const TURN_STAT_KEYS = ['elapsed', 'ttft', 'tokens', 'files', 'tools', 'cost', 'model'] as const;
@@ -45,7 +47,8 @@ const DEFAULTS: PrefsShape = {
 	telemetry: true,
 	terminalFont: '',
 	terminalFontSize: 12.5,
-	defaultSurface: 'gui'
+	defaultSurface: 'gui',
+	balanceCurrency: 'CNY'
 };
 
 /** A terminal font size within 8–32 px; anything else is the default. */
@@ -98,6 +101,7 @@ class PrefsStore {
 	terminalFont = $state(DEFAULTS.terminalFont);
 	terminalFontSize = $state(DEFAULTS.terminalFontSize);
 	defaultSurface = $state(DEFAULTS.defaultSurface);
+	balanceCurrency = $state(DEFAULTS.balanceCurrency);
 
 	init() {
 		const p = load();
@@ -112,6 +116,7 @@ class PrefsStore {
 		this.terminalFont = typeof p.terminalFont === 'string' ? p.terminalFont : DEFAULTS.terminalFont;
 		this.terminalFontSize = fontSize(p.terminalFontSize);
 		this.defaultSurface = p.defaultSurface === 'tui' ? 'tui' : 'gui';
+		this.balanceCurrency = p.balanceCurrency === 'USD' ? 'USD' : 'CNY';
 		this.#applyVibrancy();
 		if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
 			invoke<string | null>('window_effect')
@@ -136,7 +141,8 @@ class PrefsStore {
 					telemetry: this.telemetry,
 					terminalFont: this.terminalFont,
 					terminalFontSize: this.terminalFontSize,
-					defaultSurface: this.defaultSurface
+					defaultSurface: this.defaultSurface,
+					balanceCurrency: this.balanceCurrency
 				})
 			);
 		} catch {
@@ -193,6 +199,11 @@ class PrefsStore {
 
 	setTerminalFontSize(v: number) {
 		this.terminalFontSize = fontSize(v);
+		this.#save();
+	}
+
+	setBalanceCurrency(v: 'CNY' | 'USD') {
+		this.balanceCurrency = v;
 		this.#save();
 	}
 

@@ -15,6 +15,26 @@ describe('countDiffLines', () => {
 });
 
 describe('ChatState.handle', () => {
+	it('records how long the model reasoned once the answer starts', () => {
+		vi.useFakeTimers();
+		try {
+			vi.setSystemTime(10_000);
+			const c = new ChatState();
+			c.handle({ type: 'reasoning_delta', delta: 'think' });
+			vi.setSystemTime(13_400);
+			c.handle({ type: 'reasoning_delta', delta: ' more' });
+			const block = c.messages.find((m) => m.kind === 'reasoning');
+			expect(block && block.kind === 'reasoning' && block.durationMs).toBeUndefined();
+			vi.setSystemTime(14_200);
+			c.handle({ type: 'assistant_delta', delta: 'answer' });
+			const done = c.messages.find((m) => m.kind === 'reasoning');
+			expect(done?.kind === 'reasoning' && done.durationMs).toBe(4200);
+			expect(done?.kind === 'reasoning' && done.collapsed).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('keeps a just-sent message that the arriving snapshot does not have yet', () => {
 		const c = new ChatState();
 		c.optimisticUser('first');

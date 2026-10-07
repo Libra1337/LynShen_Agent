@@ -62,7 +62,15 @@ export type Msg =
 			uuid?: string;
 			turn?: TurnStats;
 	  }
-	| { kind: 'reasoning'; text: string; collapsed: boolean }
+	| {
+			kind: 'reasoning';
+			text: string;
+			collapsed: boolean;
+			/** When the block's first delta arrived (live turns only). */
+			startedAt?: number;
+			/** How long the model thought, once the block ended. */
+			durationMs?: number;
+	  }
 	| {
 			kind: 'tool';
 			callId: string;
@@ -823,11 +831,15 @@ export class ChatState {
 		this.#reasoningIdx = -1;
 	}
 
-	/** Collapse the active reasoning block once its tool call or the answer starts. */
+	/** Collapse the active reasoning block once its tool call or the answer
+	 *  starts (or the turn ends), recording how long the model thought. */
 	#collapseReasoning() {
 		if (this.#reasoningIdx >= 0) {
 			const m = this.messages[this.#reasoningIdx];
-			if (m?.kind === 'reasoning') m.collapsed = true;
+			if (m?.kind === 'reasoning') {
+				m.collapsed = true;
+				if (m.startedAt !== undefined && m.durationMs === undefined) m.durationMs = Date.now() - m.startedAt;
+			}
 			this.#reasoningIdx = -1;
 		}
 	}
@@ -1027,7 +1039,7 @@ export class ChatState {
 			case 'reasoning_delta': {
 				this.#outputStarted();
 				if (this.#reasoningIdx < 0) {
-					this.messages.push({ kind: 'reasoning', text: '', collapsed: false });
+					this.messages.push({ kind: 'reasoning', text: '', collapsed: false, startedAt: Date.now() });
 					this.#reasoningIdx = this.messages.length - 1;
 				}
 				const m = this.messages[this.#reasoningIdx];
@@ -1522,6 +1534,9 @@ export class ChatState {
 					// with its own automatic retries.
 					if (this.#turnStart !== null) this.autoRetries = 0;
 					this.#endTurn();
+					// A turn that ends on its thinking (stopped, or no answer) still
+					// records how long it thought.
+					this.#collapseReasoning();
 					this.#resetCurrent();
 					this.pendingApproval = null;
 					// Safety net: a lost tool_output (e.g. a subagent frame whose

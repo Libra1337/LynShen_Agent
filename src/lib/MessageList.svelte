@@ -485,7 +485,15 @@
 		{:else if m.kind === 'reasoning'}
 			<div class="reason" class:open={!m.collapsed}>
 				<button class="reason-head" onclick={() => (m.collapsed = !m.collapsed)}>
-					<span>{t('chat.reasoning')}</span>
+					<span>
+						{#if m.durationMs !== undefined}
+							{t('chat.reasoningFor', { t: fmtDur(Math.max(1000, m.durationMs)) })}
+						{:else if m === streamingReasoning && m.startedAt !== undefined}
+							{t('chat.reasoningNow')} <CallTimer since={m.startedAt} />
+						{:else}
+							{t('chat.reasoning')}
+						{/if}
+					</span>
 					<span class="rchev"><CaretRightIcon size={13} /></span>
 				</button>
 				{#if !m.collapsed}

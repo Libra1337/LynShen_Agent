@@ -13,7 +13,8 @@
 		type PlanUsage
 	} from '$lib/protocol';
 	import { t } from '$lib/i18n';
-	import { fmtBalance } from '$lib/money';
+	import { shownBalanceText } from '$lib/money';
+	import { prefs } from '$lib/prefs.svelte';
 	import Notice from '$lib/ui/Notice.svelte';
 
 	let loading = $state(true);
@@ -88,7 +89,7 @@
 			<div class="card">
 				<span class="ci"><WalletIcon size={15} /></span>
 				<span class="cl">{t('settings.usage.balance')}</span>
-				<span class="cv">{fmtBalance(account.balance)} {account.currency ?? ''}</span>
+				<span class="cv">{shownBalanceText(account.balance, account.currency, prefs.balanceCurrency)}</span>
 			</div>
 			<div class="card">
 				<span class="ci"><PackageIcon size={15} /></span>

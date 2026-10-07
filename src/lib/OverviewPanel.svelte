@@ -130,6 +130,7 @@
 		<span class="p">{pct(totalTokens(u))}</span>
 	</span>
 	<span class="n">{fmtTokens(u.input_tokens)}</span>
+	<span class="n cache">{fmtTokens(u.cached_input_tokens)}</span>
 	<span class="n">{fmtTokens(u.output_tokens)}</span>
 	<span class="n strong">{fmtTokens(totalTokens(u))}</span>
 	{#if showCost}<span class="n">{fmtCost(u.cost)}</span>{/if}
@@ -182,6 +183,7 @@
 			{#if hovered}
 				<span class="tdate">{shortDate(hovered.key)}</span>
 				<span>{t('settings.overview.input')} {fmtTokens(hovered.u.input_tokens)}</span>
+				<span class="tcache">{t('settings.overview.cache')} {fmtTokens(hovered.u.cached_input_tokens)}</span>
 				<span>{t('settings.overview.output')} {fmtTokens(hovered.u.output_tokens)}</span>
 				{#if showCost}<span>{t('settings.overview.cost')} {fmtCost(hovered.u.cost)}</span>{/if}
 				<span class="ttotal">{fmtTokens(totalTokens(hovered.u))}</span>
@@ -193,9 +195,16 @@
 			{#each days as x, i (x.key)}
 				{@const v = totalTokens(x.u)}
 				<div class="col" class:on={hover === i} role="presentation" onpointerenter={() => (hover = i)}>
-					<div class="b" class:zero={v === 0} style:height="{v ? Math.max(3, (v / peak) * 100) : 0}%"></div>
+					<!-- The cached part of the day's input, shaded at the bar's foot. -->
+					<div class="b" class:zero={v === 0} style:height="{v ? Math.max(3, (v / peak) * 100) : 0}%">
+						{#if v}<div class="bc" style:height="{Math.min(100, (x.u.cached_input_tokens / v) * 100)}%"></div>{/if}
+					</div>
 				</div>
 			{/each}
+		</div>
+		<div class="legend">
+			<span><i class="sw"></i>{t('settings.overview.uncached')}</span>
+			<span><i class="sw cache"></i>{t('settings.overview.cache')}</span>
 		</div>
 		<div class="axis">
 			<span>{shortDate(days[0].key)}</span>
@@ -215,6 +224,7 @@
 				<span class="name">{t('settings.overview.colName')}</span>
 				<span class="share">{t('settings.overview.colShare')}</span>
 				<span class="n">{t('settings.overview.input')}</span>
+				<span class="n">{t('settings.overview.cache')}</span>
 				<span class="n">{t('settings.overview.output')}</span>
 				<span class="n">{t('settings.overview.total')}</span>
 				{#if showCost}<span class="n">{t('settings.overview.cost')}</span>{/if}
@@ -349,7 +359,10 @@
 		background: var(--surface2);
 	}
 	.b {
+		display: flex;
+		align-items: flex-end;
 		width: 100%;
+		overflow: hidden;
 		border-radius: var(--r-xs);
 		background: var(--text);
 		opacity: 0.78;
@@ -359,6 +372,40 @@
 	}
 	.col.on .b {
 		opacity: 1;
+	}
+	/* The cached share of the day: the accent at the bar's foot. */
+	.bc {
+		width: 100%;
+		background: var(--accent);
+	}
+	.legend {
+		display: flex;
+		gap: 14px;
+		margin-top: 8px;
+		color: var(--dim);
+		font-size: var(--fs-2xs);
+	}
+	.legend span {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+	}
+	.sw {
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
+		background: var(--text);
+		opacity: 0.78;
+	}
+	.sw.cache {
+		background: var(--accent);
+		opacity: 1;
+	}
+	.tcache {
+		color: var(--accent);
+	}
+	.n.cache {
+		color: var(--dim);
 	}
 	.b.zero {
 		height: 2px !important;
@@ -378,7 +425,7 @@
 	}
 	.tr {
 		display: grid;
-		grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr) 76px 76px 84px;
+		grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 72px 72px 72px 80px;
 		align-items: center;
 		gap: 12px;
 		min-height: 48px;
@@ -386,7 +433,7 @@
 		font-size: var(--fs-sm);
 	}
 	.table.cost .tr {
-		grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.1fr) 72px 72px 80px 72px;
+		grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 68px 68px 68px 76px 68px;
 	}
 	.tr + .tr {
 		border-top: 1px solid var(--hairline);

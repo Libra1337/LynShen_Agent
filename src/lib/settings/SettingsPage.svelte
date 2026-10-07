@@ -72,6 +72,7 @@
 	import Switch from '$lib/ui/Switch.svelte';
 	import Checkbox from '$lib/ui/Checkbox.svelte';
 	import Segmented from '$lib/ui/Segmented.svelte';
+	import { shownBalanceText } from '$lib/money';
 	import Notice from '$lib/ui/Notice.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
 	import SettingsSection from './SettingsSection.svelte';
@@ -164,6 +165,15 @@
 		void el.offsetWidth; // restart the animation on a repeat hit
 		el.classList.add('flash');
 		setTimeout(() => el.classList.remove('flash'), 1700);
+	}
+
+	/** The account page's Manage: the provider card lives under Providers, so go
+	 *  there, open it and bring it into view. */
+	async function openProviderCard(id: string) {
+		section = 'providers';
+		editing = id;
+		await tick();
+		document.getElementById(`pcard-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 	}
 
 	function onSearchKey(e: KeyboardEvent) {
@@ -874,14 +884,19 @@
 						</SettingsRow>
 						{#if monoizeUser}
 							<SettingsRow id="account-balance" title={t('settings.usage.balance')} description="https://www.lynshen.org">
-								<span>{monoizeTotal ? `${monoizeTotal.total_balance} ${monoizeTotal.currency}` : '—'}</span>
+								<span>{monoizeTotal ? shownBalanceText(monoizeTotal.total_balance, monoizeTotal.currency, prefs.balanceCurrency) : '—'}</span>
+								<Segmented
+									value={prefs.balanceCurrency}
+									options={[{ value: 'CNY', label: 'CNY' }, { value: 'USD', label: 'USD' }]}
+									onChange={(v) => prefs.setBalanceCurrency(v as 'CNY' | 'USD')}
+								/>
 							</SettingsRow>
 							{#if monoizeLogoutError}<p role="alert" class="mferr">{monoizeLogoutError}</p>{/if}
 							<SettingsRow id="account-models" title={t('settings.monoize.square')} description={t('settings.monoize.squareHint')}>
 								<Button size="sm" onclick={openMonoizeSquare}><ListChecksIcon size={14} /> {t('settings.monoize.square')}</Button>
 							</SettingsRow>
 							<SettingsRow id="account-provider" title="Monoize" description={t('settings.monoize.managedKey')}>
-								<Button size="sm" onclick={() => (editing = 'monoize')}>{t('settings.page.manage')}</Button>
+								<Button size="sm" onclick={() => openProviderCard('monoize')}>{t('settings.page.manage')}</Button>
 							</SettingsRow>
 						{/if}
 					</SettingsSection>

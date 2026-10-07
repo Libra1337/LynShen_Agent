@@ -2,7 +2,8 @@
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
 	import { fetchMonoizeBalance, monoizeSession, type MonoizeUser } from '$lib/protocol';
 	import { t } from '$lib/i18n';
-	import { fmtBalance } from '$lib/money';
+	import { shownBalanceText } from '$lib/money';
+	import { prefs } from '$lib/prefs.svelte';
 
 	// The rail's account card: who is signed in to the LynShen Console
 	// (Monoize gateway), balance from /user/balance via the client key.
@@ -26,7 +27,8 @@
 	} = $props();
 
 	let user = $state<MonoizeUser | null>(null);
-	let balance = $state<string | null>(null);
+	let raw = $state<{ total_balance: string; currency: string } | null>(null);
+	const balance = $derived(raw ? shownBalanceText(raw.total_balance, raw.currency, prefs.balanceCurrency) : null);
 	let error = $state<string | null>(null);
 	let loading = $state(false);
 
@@ -37,9 +39,7 @@
 		Promise.all([monoizeSession(), fetchMonoizeBalance().catch(() => null)])
 			.then(([s, b]) => {
 				user = s.logged_in && s.session ? s.session.user : null;
-				balance = b?.balance_infos?.[0]
-					? `${fmtBalance(b.balance_infos[0].total_balance)} ${b.balance_infos[0].currency}`
-					: null;
+				raw = b?.balance_infos?.[0] ?? null;
 				error = null;
 			})
 			.catch((e) => (error = e instanceof Error ? e.message : String(e)))

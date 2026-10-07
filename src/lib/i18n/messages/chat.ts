@@ -2,6 +2,8 @@
 const chat = {
 	zh: {
 		reasoning: '推理',
+		reasoningNow: '推理中',
+		reasoningFor: '推理了 {t}',
 		actionDeferred: '没有人在看，{name}（{summary}）已记为待确认动作，可在工作台处理',
 		actionAllowed: '待确认动作 {id} 已批准',
 		actionDenied: '待确认动作 {id} 已拒绝',
@@ -266,6 +268,8 @@ const chat = {
 		actionAllowed: 'Pending action {id} allowed',
 		actionDenied: 'Pending action {id} denied',
 		reasoning: 'Reasoning',
+		reasoningNow: 'Reasoning',
+		reasoningFor: 'Reasoned for {t}',
 		rewindTitle: 'Rewind to this turn and rewrite (reverts file changes)',
 		quoteTitle: 'Quote into the composer',
 		tokens: '{n} tokens',

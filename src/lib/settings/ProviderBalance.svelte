@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n';
-	import { fmtBalance } from '$lib/money';
+	import { shownBalanceText } from '$lib/money';
+	import { prefs } from '$lib/prefs.svelte';
 	import type { DeepseekBalance } from '$lib/protocol';
 
 	let { balance }: { balance: DeepseekBalance | null } = $props();
@@ -9,9 +10,9 @@
 <div class="dsbal">
 	{#if balance?.balance_infos?.length}
 		{#each balance.balance_infos as b (b.currency)}
-			<div class="dsrow"><span>{t('settings.account.totalBalance')}</span><b>{fmtBalance(b.total_balance)} {b.currency}</b></div>
-			<div class="dsrow sub"><span>{t('settings.account.grantedBalance')}</span><span>{fmtBalance(b.granted_balance)}</span></div>
-			<div class="dsrow sub"><span>{t('settings.account.toppedUpBalance')}</span><span>{fmtBalance(b.topped_up_balance)}</span></div>
+			<div class="dsrow"><span>{t('settings.account.totalBalance')}</span><b>{shownBalanceText(b.total_balance, b.currency, prefs.balanceCurrency)}</b></div>
+			<div class="dsrow sub"><span>{t('settings.account.grantedBalance')}</span><span>{shownBalanceText(b.granted_balance, b.currency, prefs.balanceCurrency)}</span></div>
+			<div class="dsrow sub"><span>{t('settings.account.toppedUpBalance')}</span><span>{shownBalanceText(b.topped_up_balance, b.currency, prefs.balanceCurrency)}</span></div>
 		{/each}
 	{:else}
 		<p class="hint">{t('settings.account.noBalance')}</p>
