@@ -15,6 +15,7 @@
 	import FolderIcon from 'phosphor-svelte/lib/FolderIcon';
 	import FolderOpenIcon from 'phosphor-svelte/lib/FolderOpenIcon';
 	import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+	import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
 	import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
 	import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 	import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
@@ -30,9 +31,11 @@
 	import AgentAvatar from '$lib/AgentAvatar.svelte';
 	import { sessionStatus } from '$lib/sessionStatus';
 	import { listedSessions } from '$lib/session.svelte';
-	import { CHATS_ENABLED, type Project, type Session } from '$lib/types';
+	import { lastActive, type Project, type Session } from '$lib/types';
 	import type { AgentView } from '$lib/agents.svelte';
 	import RequirementTag from '$lib/requirements/RequirementTag.svelte';
+	import SidebarFooter from '$lib/workbench/SidebarFooter.svelte';
+	import type { ComponentProps } from 'svelte';
 	import { useRequirements } from '$lib/requirements.svelte';
 
 	let {
@@ -64,7 +67,10 @@
 		onAgentSession = () => {},
 		agentPending = () => 0,
 		pendingCount = 0,
-		onDesk = () => {}
+		onDesk = () => {},
+		onHome = () => {},
+		homeOpen = false,
+		footer
 	}: {
 		projects: Project[];
 		activeId: string;
@@ -107,6 +113,12 @@
 		/** Questions and pending actions waiting for the user. */
 		pendingCount?: number;
 		onDesk?: () => void;
+		/** The home page (Agent / 项目 / 对话 / 最近). */
+		onHome?: () => void;
+		/** The home page is in front. */
+		homeOpen?: boolean;
+		/** The account / settings row at the bottom. */
+		footer: ComponentProps<typeof SidebarFooter>;
 	} = $props();
 	const reqs = useRequirements();
 
@@ -139,8 +151,21 @@
 		const current = list.find((s) => s.id === activeId);
 		return current && !top.includes(current) ? [...top, current] : top;
 	}
-	const chats = $derived(CHATS_ENABLED ? projects.find((p) => p.chats) : undefined);
-	const codeProjects = $derived(projects.filter((p) => !p.chats));
+	// Conversations outside any project (`Project.home`, ~/Documents/LynShen)
+	// list under 对话 with the latest of every project, newest first; the
+	// projects list their own below.
+	const home = $derived(projects.find((p) => p.home));
+	const codeProjects = $derived(projects.filter((p) => !p.chats && !p.home));
+	const RECENT_LIMIT = 8;
+	const recent = $derived.by(() => {
+		const listed = projects
+			.filter((p) => !p.chats && !p.stale)
+			.flatMap((p) => listedSessions(p).map((s) => ({ s, p })));
+		return listed
+			.map((x, i) => ({ ...x, i, at: lastActive(x.s) }))
+			.sort((a, b) => b.at - a.at || a.i - b.i);
+	});
+	let showAllRecent = $state(false);
 
 	// Session filter: case-insensitive substring over session title + project
 	// name; empty project groups are hidden while a query is set.
@@ -162,6 +187,7 @@
 	}
 	const sessionMatches = (p: Project, s: Project['sessions'][number]) =>
 		!query || s.chat.title.toLowerCase().includes(query) || p.name.toLowerCase().includes(query);
+	const shownRecent = $derived(recent.filter((x) => sessionMatches(x.p, x.s)));
 
 	// Inline rename (dblclick a session title).
 	let renaming = $state<string | null>(null);
@@ -186,16 +212,10 @@
 		}
 	}
 
-	// "New chat" starts where you are: in the project of the active session,
-	// or as a chat when the active session is a chat (or nothing is open).
-	// With chats hidden it starts in the first project, or asks for one.
+	// "New chat" is a conversation of its own, in no project (as in Codex or
+	// ChatGPT); a project's own + starts one there.
 	function newHere() {
-		const p = projects.find((pr) => pr.sessions.some((s) => s.id === activeId));
-		const first = codeProjects.find((pr) => !pr.stale);
-		if (p && !p.chats) onNewSession(p);
-		else if (CHATS_ENABLED) onNewChat();
-		else if (first) onNewSession(first);
-		else onNewProject();
+		onNewChat();
 	}
 
 	// Drag a session row to reorder it within its project and pinned group.
@@ -300,6 +320,7 @@
 
 	<nav class="primary">
 		<button class="row" onclick={newHere}><NotePencilIcon size={18} /><span>{t('shell.newChat')}</span></button>
+		<button class="row" class:on={homeOpen} onclick={onHome}><HouseIcon size={18} weight={homeOpen ? 'fill' : 'regular'} /><span>{t('shell.home.title')}</span></button>
 		{#if agentsStatus !== 'off'}
 			<button class="row" onclick={onDesk}>
 				<TrayIcon size={18} /><span>{t('shell.desk.title')}</span>
@@ -309,7 +330,7 @@
 	</nav>
 
 
-	{#snippet sessRow(s: Session, nested = false, selectable = false, p?: Project)}
+	{#snippet sessRow(s: Session, nested = false, selectable = false, p?: Project, where?: string)}
 		{@const status = sessionStatus(s.chat)}
 		{@const req = s.chat.sessionId ? reqs.bySession.get(s.chat.sessionId) : undefined}
 		<!-- Listed rows (`p` given) drag within their project and pinned group. -->
@@ -363,6 +384,7 @@
 					role="presentation">{shownTitle(s.chat.title)}</span
 				>
 			{/if}
+			{#if where}<span class="where" title={where}>{where}</span>{/if}
 			{#if req}<RequirementTag id={req.id} title={req.title} />{/if}
 			<!-- A draft belongs to no backend until its first message. -->
 			{#if s.backendId && s.backendId !== 'lynshen' && !s.draft}
@@ -495,24 +517,26 @@
 			{/each}
 		</section>
 
-		<!-- Chats: conversations without a project. -->
-		{#if chats}
-			{@const active = listedSessions(chats).filter((s) => sessionMatches(chats, s))}
-			{@const arch = chats.sessions.filter((s) => s.archived && sessionMatches(chats, s))}
-			{#if !query || active.length || arch.length}
-				<section>
-					<div class="head">
-						<span>{chats.name}</span>
-						<button class="head-act" onclick={() => onHistory(chats)} aria-label={t('shell.history')} title={t('shell.history')}><ClockCounterClockwiseIcon size={16} /></button>
-						<button class="head-act" onclick={onNewChat} aria-label={t('shell.newChat')} title={t('shell.newChat')}><PlusIcon size={16} /></button>
-					</div>
-					{#each showAll[chats.id] || query ? active : firstSessions(active) as s (s.id)}{@render sessRow(s, false, false, chats)}{/each}
-					{#if active.length > SHOW_LIMIT && !query}
-						<button class="more" onclick={() => (showAll[chats.id] = !showAll[chats.id])}>{showAll[chats.id] ? t('shell.showLess') : t('shell.showMore')}</button>
+		<!-- 对话: the latest conversations, in a project or not, newest first. -->
+		{#if shownRecent.length || !query}
+			<section>
+				<div class="head">
+					<span>{t('shell.chats')}</span>
+					{#if home}
+						<button class="head-act" onclick={() => onHistory(home)} aria-label={t('shell.history')} title={t('shell.history')}><ClockCounterClockwiseIcon size={16} /></button>
 					{/if}
-					{@render archived(chats, arch, false)}
-				</section>
-			{/if}
+					<button class="head-act" onclick={onNewChat} aria-label={t('shell.newChat')} title={t('shell.newChat')}><PlusIcon size={16} /></button>
+				</div>
+				{#each showAllRecent || query ? shownRecent : shownRecent.slice(0, RECENT_LIMIT) as x (x.s.id)}
+					{@render sessRow(x.s, false, false, x.p.home ? x.p : undefined, x.p.home ? undefined : x.p.name)}
+				{:else}
+					<div class="note">{t('shell.home.noChats')}</div>
+				{/each}
+				{#if shownRecent.length > RECENT_LIMIT && !query}
+					<button class="more" onclick={() => (showAllRecent = !showAllRecent)}>{showAllRecent ? t('shell.showLess') : t('shell.showMore')}</button>
+				{/if}
+				{#if home}{@render archived(home, home.sessions.filter((s) => s.archived && sessionMatches(home, s)), false)}{/if}
+			</section>
 		{/if}
 
 		<!-- Projects: folders with their coding sessions nested. -->
@@ -521,6 +545,9 @@
 				<span>{t('shell.projects')}</span>
 				<button class="head-act" onclick={onNewProject} aria-label={t('shell.newProjectTitle')} title={t('shell.newProjectTitle')}><PlusIcon size={16} /></button>
 			</div>
+			{#if !codeProjects.length && !query}
+				<button class="sess ghost" onclick={onNewProject}><PlusIcon size={16} /><span class="sess-title">{t('shell.home.addProject')}</span></button>
+			{/if}
 			{#each codeProjects as p (p.id)}
 				{@const active = listedSessions(p).filter((s) => sessionMatches(p, s))}
 				{@const arch = p.sessions.filter((s) => s.archived && sessionMatches(p, s))}
@@ -549,9 +576,7 @@
 							{/if}
 							<button class="act" onclick={() => onNewSession(p)} aria-label={t('shell.newSessionInProject')} title={withShortcut(t('shell.newSessionInProject'), 'newSession')}><PlusIcon size={16} /></button>
 						{/if}
-						{#if codeProjects.length > 1 || p.stale}
-							<button class="act" class:always={p.stale} onclick={() => onCloseProject(p)} aria-label={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')} title={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')}><XIcon size={16} /></button>
-						{/if}
+						<button class="act" class:always={p.stale} onclick={() => onCloseProject(p)} aria-label={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')} title={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')}><XIcon size={16} /></button>
 					</div>
 					{#if open}
 						{#each showAll[p.id] || query ? active : firstSessions(active) as s (s.id)}{@render sessRow(s, true, false, p)}{/each}
@@ -567,6 +592,7 @@
 			{/each}
 		</section>
 	</div>
+	<SidebarFooter {...footer} />
 
 </div>
 </aside>
@@ -669,6 +695,9 @@
 	.sess:hover,
 	.more:hover,
 	.folder-row:hover {
+		background: var(--surface2);
+	}
+	.row.on {
 		background: var(--surface2);
 	}
 	.row span:first-of-type {
@@ -914,6 +943,16 @@
 		.sess-title.running {
 			animation: none;
 		}
+	}
+	/* Under 对话: the project a conversation belongs to. */
+	.where {
+		flex-shrink: 0;
+		max-width: 40%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--dim2);
+		font-size: var(--fs-xs);
 	}
 	.backend-chip {
 		display: inline-flex;

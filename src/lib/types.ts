@@ -39,6 +39,9 @@ export interface Session {
 	draft?: boolean;
 	/** Listed above the project's other sessions (persisted, desktop only). */
 	pinned?: boolean;
+	/** Last activity known from before this run (saved tab, daemon list), ms;
+	 *  see `lastActive`. */
+	at?: number;
 	/** Model and effort picked while a draft, applied when it starts. */
 	draftPick?: { model?: string; effort?: string };
 	/** Claude Code / Codex: runs through the LynShen gateway on the user's
@@ -90,6 +93,9 @@ export interface Project {
 	lastAcpAgent?: { id: string; name: string };
 	/** 对话分组：path 为 ~/.lynshen/chats，会话以对话模式（非编程）运行，只用 lynshen 引擎。 */
 	chats?: boolean;
+	/** 不属于任何项目的对话：path 为 ~/Documents/LynShen，会话照常以编程模式运行。
+	 *  侧栏不把它列为项目（会话列在「最近」），也不能移除。 */
+	home?: boolean;
 	/** 承载长期 Agent 会话的隐藏项目（每个 Agent 工作目录一个）：会话只在工作台里显示，
 	 *  不进侧栏和画布，也不保存、不同步给后台服务（随用随建）。 */
 	agents?: boolean;
@@ -101,3 +107,9 @@ export interface Project {
 /** 对话功能本版本隐藏（之后由新的助手取代）：桌面端和远程网页都不显示、不新建对话。
  *  已有的对话分组仍留在 workspaces.json 和后台服务里，只是不列出。改回 true 即恢复。 */
 export const CHATS_ENABLED = false;
+
+/** When a session was last active, ms (0: unknown): its last turn in this
+ *  run, else what was saved or listed. Orders 「最近」. */
+export function lastActive(s: Pick<Session, 'at' | 'chat'>): number {
+	return Math.max(s.chat.activeAt, s.at ?? 0);
+}

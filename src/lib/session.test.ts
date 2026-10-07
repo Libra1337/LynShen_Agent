@@ -12,6 +12,7 @@ vi.mock('./protocol', () => ({
 	sessionMeta: vi.fn(() => Promise.resolve()),
 	projectRoot: vi.fn(() => Promise.resolve('/tmp/demo')),
 	chatsDir: vi.fn(() => Promise.resolve('/home/u/.lynshen/chats')),
+	defaultWorkspaceDir: vi.fn(() => Promise.resolve('/home/u/Documents/LynShen')),
 	writeConfig: vi.fn(() => Promise.resolve()),
 	git: vi.fn(() => Promise.resolve('')),
 	sessionHistory: vi.fn(() =>
@@ -588,13 +589,12 @@ describe('SessionStore lifecycle', () => {
 		expect(store.projects[0].sessions[0].backendId).toBe('acp');
 	});
 
-	it('restore seeds a default project when nothing is saved', async () => {
+	it('a first run opens no project and no session (the home page shows)', async () => {
 		const store = new SessionStore();
 		await store.restore([]);
 		expect(store.loaded).toBe(true);
-		expect(store.projects).toHaveLength(1);
-		expect(store.projects[0].path).toBe('/tmp/demo');
-		expect(store.activeId).toBe(store.allSessions[0].id);
+		expect(store.projects).toHaveLength(0);
+		expect(store.activeId).toBe('');
 	});
 
 	it('restore re-opens saved tabs and activates the first', async () => {
@@ -919,36 +919,39 @@ describe('hidden chats', () => {
 	});
 });
 
-describe('SessionStore chats', () => {
-	it('newChat creates the chats group first and spawns a chat session', async () => {
+describe('SessionStore conversations outside a project', () => {
+	it('newChat starts in ~/Documents/LynShen, a group made once and never listed as a project', async () => {
 		const store = new SessionStore();
 		store.projects.push(proj());
 		const id = await store.newChat();
-		const chats = store.projects[0];
-		expect(chats.chats).toBe(true);
-		expect(chats.path).toBe('/home/u/.lynshen/chats');
-		expect(chats.sessions.map((s) => s.id)).toEqual([id]);
+		const home = store.home!;
+		expect(home.path).toBe('/home/u/Documents/LynShen');
+		expect(home.sessions.map((s) => s.id)).toEqual([id]);
+		expect(store.codeProjects.map((p) => p.id)).toEqual(['p1']);
 		begin(id);
 		await flush();
-		expect(hostSession).toHaveBeenCalledWith(id, chats.path, undefined, undefined, true, undefined);
-		// A second chat joins the same group.
+		// A coding session like any other, in that folder.
+		expect(hostSession).toHaveBeenCalledWith(id, home.path, undefined, undefined, false, undefined);
 		await store.newChat();
-		expect(store.projects.filter((p) => p.chats)).toHaveLength(1);
-		expect(store.projects[0].sessions).toHaveLength(2);
+		expect(store.projects.filter((p) => p.home)).toHaveLength(1);
+		expect(store.home!.sessions).toHaveLength(2);
 	});
 
-	it('chat sessions use the lynshen engine and survive serialize/restore as chats', async () => {
+	it('the group survives serialize/restore, and 最近 orders sessions by last activity', async () => {
 		const store = new SessionStore();
-		await store.newChat();
+		const p = proj();
+		store.projects.push(p);
+		const older = store.addSession(p);
+		const chat = await store.newChat('hello');
 		const saved = store.serialize();
-		expect(saved[0].chats).toBe(true);
+		expect(saved.find((x) => x.home)?.tabs?.[0]).toMatchObject({ id: chat });
 		const again = new SessionStore();
-		vi.mocked(hostSession).mockClear();
 		await again.restore(saved);
-		expect(again.projects[0].chats).toBe(true);
-		begin(again.projects[0].sessions[0].id);
-		await flush();
-		expect(hostSession).toHaveBeenCalledWith(expect.any(String), '/home/u/.lynshen/chats', undefined, undefined, true, undefined);
+		expect(again.home?.sessions.map((s) => s.id)).toEqual([chat]);
+		// The chat that sent a message is the most recent; it opens first.
+		expect(again.recentSessions[0].id).toBe(chat);
+		expect(again.activeId).toBe(chat);
+		expect(again.recentSessions.map((s) => s.id)).toContain(older);
 	});
 });
 
@@ -1081,9 +1084,9 @@ describe('SessionStore parallel-task worktrees', () => {
 		const stale = store.projects[0];
 		expect(stale.stale).toBe(true);
 		expect(stale.sessions).toHaveLength(0);
-		// active session落在仍然存活的项目上，不因 stale 项目崩溃
-		expect(store.projects[1].sessions.length).toBeGreaterThan(0);
-		expect(store.activeId).toBe(store.projects[1].sessions[0].id);
+		// 不因 stale 项目崩溃；没有会话时不再自动新建（显示主页）
+		expect(store.projects[1].sessions).toHaveLength(0);
+		expect(store.activeId).toBe('');
 		expect(store.loaded).toBe(true);
 	});
 });

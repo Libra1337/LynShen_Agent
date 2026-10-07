@@ -29,6 +29,7 @@ interface DaemonProject {
 	name: string;
 	path: string;
 	chats?: boolean;
+	home?: boolean;
 	worktree?: WorktreeMeta;
 	color?: string;
 	icon?: TabIcon;
@@ -59,6 +60,7 @@ function project(p: {
 	name: string;
 	path: string;
 	chats?: boolean;
+	home?: boolean;
 	worktree?: WorktreeMeta;
 	color?: unknown;
 	icon?: unknown;
@@ -71,6 +73,7 @@ function project(p: {
 		name: p.name,
 		path: p.path,
 		...(p.chats ? { chats: true } : {}),
+		...(p.home ? { home: true } : {}),
 		...(p.worktree ? { worktree: p.worktree } : {}),
 		...(color ? { color } : {}),
 		...(icon ? { icon } : {}),
@@ -175,8 +178,12 @@ export class DaemonSync {
 			this.#base = this.#base?.map(w => w.is_default ? { ...w, id: defaultId } : w) ?? null;
 		}
 		const remote: DaemonWorkspace[] = [];
-		for (const ws of incoming) {
-			const normalized = ws.is_default && defaultId ? { ...ws, id: defaultId } : ws;
+		// One workspace (as in Claude or ChatGPT): every other workspace a
+		// client saved folds into the default one, projects and all.
+		const target = defaultId ?? incoming[0]?.id;
+		const ordered = [...incoming.filter((w) => w.is_default), ...incoming.filter((w) => !w.is_default)];
+		for (const ws of ordered) {
+			const normalized = target ? { ...ws, id: target, is_default: true } : ws;
 			const prior = remote.find(w => w.id === normalized.id);
 			if (prior) {
 				prior.projects = [...prior.projects, ...normalized.projects.filter(p => !prior.projects.some(q => trim(q.path) === trim(p.path)))];
@@ -188,8 +195,8 @@ export class DaemonSync {
 		// list of a connection keeps and sends the projects only the desktop
 		// has: they were added while the two were apart.
 		const local = this.local();
-		const target = base ? rebase(local, base, remote) : union(remote, local);
-		if (remote.length > 0 && canonical(local) !== canonical(target)) this.#apply(target);
+		const merged = base ? rebase(local, base, remote) : union(remote, local);
+		if (remote.length > 0 && canonical(local) !== canonical(merged)) this.#apply(merged);
 		this.push();
 	}
 

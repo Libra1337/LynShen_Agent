@@ -64,7 +64,8 @@ export class WorkspaceStore {
 		if (raw != null) {
 			const parsed = parseWorkspacesFile(raw);
 			if (parsed) {
-				if (JSON.parse(raw).workspaces.filter((w: { isDefault?: boolean }) => w?.isDefault).length > 1) {
+				// Kept as it was before the workspaces were folded into one.
+				if (JSON.parse(raw).workspaces.length > 1) {
 					try { await appDataWrite('workspaces-before-default-merge.json', raw); }
 					catch (e) { this.#writable = false; console.error('workspaces: backup failed, running in-memory', e); }
 				}

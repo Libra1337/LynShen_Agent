@@ -1404,6 +1404,22 @@ fn project_root() -> String {
     resolve_cwd().display().to_string()
 }
 
+/// Where conversations outside any project run: `~/Documents/LynShen`.
+/// `create` makes it when missing; resolving the path alone touches nothing
+/// (macOS asks before an app first reads or writes Documents).
+#[tauri::command]
+fn default_workspace_dir(app: AppHandle, create: bool) -> Result<String, String> {
+    let documents = app
+        .path()
+        .document_dir()
+        .unwrap_or_else(|_| backend::home_dir().join("Documents"));
+    let dir = documents.join("LynShen");
+    if create {
+        std::fs::create_dir_all(&dir).map_err(|error| format!("{}: {error}", dir.display()))?;
+    }
+    Ok(dir.display().to_string())
+}
+
 /// The directory chat sessions run in (`~/.lynshen/chats`), created when
 /// missing so the file panel can list it before the first engine starts.
 #[tauri::command]
@@ -3441,6 +3457,7 @@ pub fn run() {
             git_checkpoint_restore,
             project_root,
             chats_dir,
+            default_workspace_dir,
             list_providers,
             list_dir,
             list_files,

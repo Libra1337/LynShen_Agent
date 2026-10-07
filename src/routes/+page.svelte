@@ -81,10 +81,9 @@
 	} from '$lib/workbench/canvas';
 	import { tuiBackendOf, tuiTabTitle } from '$lib/workbench/tuiTab';
 	import { canHandOffToTui, isValidResumeSessionId } from '$lib/tuiHandoff';
-	import type { WorkspaceEntry } from '$lib/workbench/workspaces';
 	import type { TabIcon } from '$lib/workbench/tabChrome';
 	import Mosaic from '$lib/workbench/Mosaic.svelte';
-	import WorkspaceRail from '$lib/workbench/WorkspaceRail.svelte';
+	import HomePage from '$lib/HomePage.svelte';
 	import TitleBar from '$lib/shell/TitleBar.svelte';
 	import TabChromePopover from '$lib/workbench/TabChromePopover.svelte';
 	import ChatPane, { type ChatPaneApi, type ProviderOption } from '$lib/ChatPane.svelte';
@@ -109,8 +108,8 @@
 	import { normalizeBackendId, BACKEND_LABELS, type BackendId } from '$lib/backends';
 	import Modal from '$lib/ui/Modal.svelte';
 	import BackendIcon from '$lib/BackendIcon.svelte';
-	import { agentDirectory, agentsOfWorkspace } from '$lib/agents.svelte';
-	import { CHATS_ENABLED, type Project, type WorktreeMeta } from '$lib/types';
+	import { agentDirectory } from '$lib/agents.svelte';
+	import type { Project, WorktreeMeta } from '$lib/types';
 	import PlanPanel from '$lib/PlanPanel.svelte';
 	import GoalPanel from '$lib/GoalPanel.svelte';
 	import ChangesPanel from '$lib/ChangesPanel.svelte';
@@ -181,7 +180,28 @@
 		settingsSection = section;
 		showDesk = false;
 		projectPageId = null;
+		showHome = false;
 		showSettings = true;
+	}
+	// The home page over the canvas (Agent / 项目 / 最近 and a box to start a
+	// conversation); a session shown on the canvas closes it.
+	let showHome = $state(false);
+	function openHome() {
+		showSettings = false;
+		showDesk = false;
+		projectPageId = null;
+		showHome = true;
+	}
+	/** A new conversation outside any project (~/Documents/LynShen), as the
+	 *  sidebar's 新对话 and the home page start it. */
+	async function startChat(firstMessage?: string) {
+		try {
+			await store.newChat(firstMessage);
+			showHome = false;
+			projectPageId = null;
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : String(e));
+		}
 	}
 	function closeSettings() {
 		showSettings = false;
@@ -210,6 +230,7 @@
 		deskSession = null;
 		showSettings = false;
 		projectPageId = null;
+		showHome = false;
 		showDesk = true;
 	}
 	// A project's page over the canvas (the sidebar stays); any session
@@ -219,11 +240,13 @@
 	function openProjectPage(p: Project) {
 		showDesk = false;
 		showSettings = false;
+		showHome = false;
 		projectPageId = p.id;
 	}
 	$effect(() => {
 		void store.activeId;
 		projectPageId = null;
+		showHome = false;
 	});
 	/** The project a new agent is created in ('' for none). */
 	let agentDialogProject = $state('');
@@ -365,8 +388,9 @@
 	});
 
 	let sidebarWidth = $state(292);
-	/** Width of the workspace rail (WorkspaceRail.svelte); the title bar aligns the title past it. */
-	const RAIL_WIDTH = 68;
+	/** Width left of the sidebar (none since the workspace rail is gone); the
+	 *  title bar aligns the title past it. */
+	const RAIL_WIDTH = 0;
 	let showSidebar = $state(true);
 	let sbResizing = $state(false);
 
@@ -558,10 +582,11 @@
 	/** Per-leaf “+” menu (and the empty-canvas buttons). */
 	function mosaicAdd(leafId: string | null, key: string) {
 		if (key === 'chat') {
-			const p = activeProject ?? store.shownProjects[0];
-			if (!p) return;
 			if (leafId) focusedLeaf = leafId;
-			newSession(p); // the activeId effect opens its tile in the focused leaf
+			// In the current project; with none open, a conversation of its own.
+			// The activeId effect opens its tile in the focused leaf.
+			if (activeProject && !activeProject.home) newSession(activeProject);
+			else void startChat();
 			return;
 		}
 		// The embedded browser is a singleton native webview — a second tab
@@ -732,9 +757,9 @@
 
 	// One list of projects and sessions with the daemon (and so with paired
 	// devices): the desktop's edits go to it, other clients' come back.
-	const sync = new DaemonSync(store, workspaces, () => store.loaded && !wsBusy);
+	const sync = new DaemonSync(store, workspaces, () => store.loaded);
 	$effect(() => {
-		if (!store.loaded || wsBusy) return;
+		if (!store.loaded) return;
 		// A list that came while the tree was being restored or swapped.
 		untrack(() => sync.flush());
 		void sync.local();
@@ -745,7 +770,7 @@
 	$effect(() => {
 		const list = agentDirectory.sessions;
 		void workspaces.activeId;
-		if (!store.loaded || wsBusy) return;
+		if (!store.loaded) return;
 		untrack(() => sync.reconcile(list));
 	});
 	// Tabs of an agent's sessions (restored ones too) keep the agent's
@@ -803,65 +828,6 @@
 			return;
 		}
 		dispatch(sid, { op: 'set_approval_mode', mode });
-	}
-
-	// ---------- workspaces ----------
-	// A workspace is a saved set of projects + its canvas layout. Switching
-	// swaps the whole session tree: snapshot the current one into its
-	// workspace, close all live engine sessions, then restore the target's
-	// projects (resume by id) and rebuild the canvas. Swaps must never
-	// overlap: `wsBusy` rejects (and disables in the tab bar) new transitions
-	// while one is in flight; the generation token is belt-and-braces so a
-	// stale restore can never persist its tree over a newer one.
-	let wsGen = 0;
-	let wsBusy = $state(false);
-	/** Swap the live session tree to `entry`'s projects and rebuild the canvas. */
-	async function swapToWorkspace(entry: WorkspaceEntry) {
-		const gen = ++wsGen;
-		wsBusy = true;
-		try {
-			tilesReady = false; // gate the tile effects during the swap
-			for (const p of [...store.projects]) store.removeProject(p);
-			store.loaded = false; // re-gate the persist effect during the swap
-			await store.restore(entry.projects);
-			if (gen !== wsGen) return;
-			initTiles();
-		} finally {
-			if (gen === wsGen) wsBusy = false;
-		}
-	}
-	async function switchWorkspace(id: string) {
-		if (id === workspaces.activeId || wsBusy) return;
-		workspaces.updateProjects(store.serialize());
-		const entry = workspaces.setActive(id);
-		if (!entry) return;
-		await swapToWorkspace(entry);
-	}
-	async function newWorkspace() {
-		if (wsBusy) return;
-		const entry = workspaces.create(t('shell.workspace.nth', { n: workspaces.workspaces.length + 1 }));
-		if (entry) await switchWorkspace(entry.id);
-	}
-	/** Delete a workspace (confirmed). Deleting the active one swaps the live
-	 *  session tree to the default workspace returned by the store. */
-	async function deleteWorkspace(id: string) {
-		if (wsBusy) return;
-		const ws = workspaces.workspaces.find((w) => w.id === id);
-		if (!ws) return;
-		if (ws.isDefault) {
-			toast.warn(t('shell.workspace.cannotDeleteDefault'));
-			return;
-		}
-		const ok = await confirm({
-			title: t('shell.workspace.delete'),
-			message: t('shell.workspace.deleteConfirm', { name: ws.name }),
-			confirmLabel: t('shell.workspace.delete'),
-			danger: true
-		});
-		if (!ok || wsBusy) return; // a swap may have started under the dialog
-		const next = workspaces.remove(id);
-		if (!next) return; // removed an inactive workspace — nothing to swap
-		await swapToWorkspace(next);
 	}
 
 	// ---------- session tab chrome (color / icon / rename) ----------
@@ -1064,7 +1030,8 @@
 				captureSignal += 1;
 			});
 		if (matches(e, 'find') && chat) return act(() => pane?.toggleFind());
-		if (matches(e, 'newSession')) return act(() => activeProject && newSession(activeProject));
+		if (matches(e, 'newSession'))
+			return act(() => (activeProject && !activeProject.home ? newSession(activeProject) : void startChat()));
 		if (matches(e, 'settings')) return act(() => !showSettings && openSettings());
 		if (matches(e, 'sidebar')) return act(toggleSidebar);
 		if (matches(e, 'audit')) return act(toggleAudit);
@@ -1213,10 +1180,11 @@
 					browser.handleEvent(p);
 				}
 			});
-			// 托盘菜单「新建会话」：在当前项目（或第一个项目）里开新会话。
+			// 托盘菜单「新建会话」：在当前项目里开新会话；没有项目时开一个独立对话。
 			const untray = await listen('tray-new-session', () => {
-				const p = store.activeProject ?? store.shownProjects[0];
-				if (p) newSession(p);
+				const p = store.activeProject;
+				if (p && !p.home) newSession(p);
+				else void startChat();
 			});
 			// Quitting (tray menu, Cmd+Q): save the workspaces first; the app
 			// waits for this (see begin_quit in src-tauri).
@@ -1304,8 +1272,8 @@
 		sidebarOpen={showSidebar}
 		onToggleSidebar={toggleSidebar}
 		showToggle={!showSetup}
-		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : showSetup ? 'LynShen' : pageProject ? pageProject.name : active ? shownTitle(active.chat.title) : ''}
-		subtitle={showSettings || showDesk || showSetup ? '' : (activeProject?.name ?? '')}
+		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : showSetup ? 'LynShen' : pageProject ? pageProject.name : showHome || !active ? t('shell.home.title') : shownTitle(active.chat.title)}
+		subtitle={showSettings || showDesk || showSetup || showHome || pageProject || !activeProject || activeProject.home ? '' : activeProject.name}
 		addOptions={showSettings || showDesk || showSetup ? [] : addOptions}
 		onAdd={(key) => mosaicAdd(focusedLeaf, key)}
 	>
@@ -1328,23 +1296,6 @@
 		{/snippet}
 	</TitleBar>
 	<div class="body">
-		<!-- FAR LEFT: the workspace rail (top-level context). -->
-		<WorkspaceRail
-			workspaces={workspaces.workspaces}
-			activeId={workspaces.activeId}
-			busy={wsBusy}
-			onSwitch={switchWorkspace}
-			onNew={newWorkspace}
-			onRename={(id, name) => workspaces.rename(id, name)}
-			onChrome={(id, chrome) => workspaces.setChrome(id, chrome)}
-			onDelete={deleteWorkspace}
-			loggedIn={providers.includes('monoize') || providers.includes('lynshen')}
-			updateAvailable={updater.available}
-			settingsOpen={showSettings}
-			onManageAccount={() => openSettings('account')}
-			onSettings={() => (showSettings ? closeSettings() : openSettings())}
-			onUpdate={() => openSettings('updates')}
-		/>
 		<!-- The content panel: session list + canvas, inset in the window chrome
 		     with a rounded top-left corner. Settings covers it as a page; the
 		     session list and canvas stay mounted (hidden) underneath so chats,
@@ -1354,16 +1305,16 @@
 			     opens or focuses its chat tile on the canvas. -->
 			<Sidebar
 				{projects}
-				{activeId}
+				activeId={showHome ? '' : activeId}
 				width={showSidebar ? sidebarWidth : 0}
 				resizing={sbResizing}
-				onSelect={(id) => ((store.activeId = id), (projectPageId = null))}
+				onSelect={(id) => ((store.activeId = id), (projectPageId = null), (showHome = false))}
 				onOpenProject={openProjectPage}
 				openProject={projectPageId}
 				onNewProject={addProject}
 				onNewTask={newTask}
 				onNewSession={(p) => newSession(p)}
-				onNewChat={() => store.newChat()}
+				onNewChat={startChat}
 				onCloseSession={removeSession}
 				onCloseProject={removeProject}
 				onArchiveSession={(id) => store.archiveSession(id)}
@@ -1374,7 +1325,7 @@
 				onSessionMenu={openSessionMenu}
 				onProjectMenu={openProjectMenu}
 				onHistory={(p) => store.openHistory(p)}
-				agents={agentsOfWorkspace(agentDirectory.agents, workspaces.workspaces, workspaces.activeId)}
+				agents={agentDirectory.agents}
 				agentsStatus={agentDirectory.status}
 				onOpenAgent={(a) => openDesk(a.id)}
 				onNewAgent={() => newAgent()}
@@ -1382,12 +1333,35 @@
 				agentPending={(id) => agentDirectory.pendingFor(id)}
 				pendingCount={agentDirectory.pending}
 				onDesk={() => openDesk(null)}
+				onHome={openHome}
+				homeOpen={showHome}
+				footer={{
+					loggedIn: providers.includes('monoize') || providers.includes('lynshen'),
+					updateAvailable: updater.available,
+					settingsOpen: showSettings,
+					onManageAccount: () => openSettings('account'),
+					onSettings: () => (showSettings ? closeSettings() : openSettings()),
+					onUpdate: () => openSettings('updates')
+				}}
 			/>
 			<div class="resizer side" class:hidden={!showSidebar} role="separator" aria-label={t('shell.remote.resizeSidebar')} onpointerdown={startSidebarResize}></div>
 
 			<!-- THE CANVAS: workspace tabs on top, one mosaic for chats, tool panels,
 			     TUI and audit tiles below. -->
 			<div class="canvas">
+				{#if showHome || (store.loaded && !store.active && !pageProject)}
+					<HomePage
+						{projects}
+						agents={agentDirectory.agents}
+						agentsOn={agentDirectory.status === 'on'}
+						onStart={(text) => startChat(text)}
+						onOpenSession={(id) => ((store.activeId = id), (showHome = false))}
+						onOpenProject={openProjectPage}
+						onAddProject={addProject}
+						onOpenAgent={(a) => openDesk(a.id)}
+						onNewAgent={() => newAgent()}
+					/>
+				{/if}
 				{#if pageProject}
 					{#key pageProject.id}
 						<ProjectPage
@@ -1405,15 +1379,8 @@
 				{/if}
 
 				<div class="stage">
-					{#if store.loaded && store.shownProjects.length === 0}
-						<div class="nochat" data-tauri-drag-region>
-							<span class="welcome-mark">LynShen</span>
-							<p class="welcome-tip">{t('shell.noChat')}</p>
-							<div class="welcome-actions">
-								<Button variant="primary" size="sm" onclick={addProject}>{t('shell.startFromProject')}</Button>
-								{#if CHATS_ENABLED}<Button size="sm" onclick={() => store.newChat()}>{t('shell.startChat')}</Button>{/if}
-							</div>
-						</div>
+					{#if store.loaded && store.shownSessions.length === 0}
+						<!-- The home page covers an empty canvas. -->
 					{:else}
 						<Mosaic
 							hideSoloBar
@@ -1827,32 +1794,6 @@
 		font-size: var(--fs-sm);
 		color: var(--dim2);
 	}
-	.nochat {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 12px;
-	}
-	.welcome-mark {
-		font-family: var(--font-sans);
-		font-weight: 600;
-		font-size: var(--fs-2xl);
-		letter-spacing: -0.005em;
-		color: var(--text);
-		opacity: 0.16;
-	}
-	.welcome-tip {
-		margin: 0;
-		font-size: var(--fs-md);
-		color: var(--dim);
-	}
-	.welcome-actions {
-		display: flex;
-		gap: 8px;
-	}
-
 	/* ---------- sidebar resizer ---------- */
 	.resizer {
 		width: 5px;

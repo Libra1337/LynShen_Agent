@@ -101,6 +101,36 @@ export function consolidateDefaults(file: WorkspacesFile): WorkspacesFile {
 	};
 }
 
+/** One workspace only, as in Claude or ChatGPT: the projects of every other
+ * workspace move into the default one (a project in several keeps the tabs
+ * of each), the open layout comes along, and the rest are dropped. */
+export function foldIntoDefault(file: WorkspacesFile): WorkspacesFile {
+	const target = file.workspaces.find((w) => w.isDefault) ?? file.workspaces[0];
+	if (!target || file.workspaces.length === 1) return file;
+	const active = file.workspaces.find((w) => w.id === file.active) ?? target;
+	const projects = new Map<string, SavedProject>();
+	for (const ws of [target, ...file.workspaces.filter((w) => w !== target)]) {
+		for (const p of ws.projects) {
+			const key = workspacePathKey(p.path);
+			const prior = projects.get(key);
+			if (!prior) {
+				projects.set(key, { ...p, tabs: [...(p.tabs ?? [])] });
+				continue;
+			}
+			const tabs = prior.tabs ?? [];
+			for (const tab of p.tabs ?? []) {
+				if (!tabs.some((t) => (tab.sid ? t.sid === tab.sid : t.id === tab.id))) tabs.push(tab);
+			}
+			prior.tabs = tabs;
+		}
+	}
+	return {
+		...file,
+		active: target.id,
+		workspaces: [{ ...target, isDefault: true, projects: [...projects.values()], layout: active.layout ?? target.layout }]
+	};
+}
+
 const isStr = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
 
 type SavedTab = NonNullable<SavedProject['tabs']>[number];
@@ -173,7 +203,7 @@ export function parseWorkspacesFile(text: string): WorkspacesFile | null {
 	// default so old files upgrade in place without a version bump.
 	if (!workspaces.some((w) => w.isDefault)) workspaces[0].isDefault = true;
 	const active = isStr(data.active) && workspaces.some((w) => w.id === data.active) ? data.active : workspaces[0].id;
-	return consolidateDefaults({ version: WORKSPACES_VERSION, active, workspaces });
+	return foldIntoDefault(consolidateDefaults({ version: WORKSPACES_VERSION, active, workspaces }));
 }
 
 /** Tolerant parse of the legacy dock-tabs value: bare panel strings (oldest

@@ -450,9 +450,10 @@ export function projectRoot(): Promise<string> {
 	return invoke('project_root');
 }
 
-/** `~/.lynshen/chats`, where chat sessions run (created when missing). */
-export function chatsDir(): Promise<string> {
-	return invoke('chats_dir');
+/** `~/Documents/LynShen`, where conversations outside any project run;
+ *  `create` makes it when missing. */
+export function defaultWorkspaceDir(create = false): Promise<string> {
+	return invoke('default_workspace_dir', { create });
 }
 export interface FsEntry {
 	name: string;

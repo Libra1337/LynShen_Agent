@@ -1,5 +1,5 @@
 import { AUTO_CONTINUE, ChatState, UNTITLED } from './chat.svelte';
-import { acpAgentsList, closeSession, daemon, hostSession, sessionMeta, sessionHistory, projectRoot, chatsDir, writeConfig, git } from './protocol';
+import { acpAgentsList, closeSession, daemon, hostSession, sessionMeta, sessionHistory, defaultWorkspaceDir, writeConfig, git } from './protocol';
 import type { EngineSpec } from './daemon';
 import { canHandOffToTui, isValidResumeSessionId } from './tuiHandoff';
 import { normalizeBackendId, type BackendId } from './backends';
@@ -13,7 +13,7 @@ import { saveComposerText } from './composerText';
 import { toast } from './ui/toast.svelte';
 import { telemetry } from './telemetry.svelte';
 import { normalizeColor, parseTabIcon, type TabIcon } from './workbench/tabChrome';
-import { CHATS_ENABLED, type Project, type Session, type WorktreeMeta } from './types';
+import { CHATS_ENABLED, lastActive, type Project, type Session, type WorktreeMeta } from './types';
 
 /** Optional per-tab chrome persisted alongside the session id + title. */
 export interface SavedTabChrome {
@@ -45,6 +45,8 @@ export interface SavedProject extends SavedTabChrome {
 		gateway?: boolean;
 		/** Claude Code: the model it last ran on (Session.model). */
 		model?: string;
+		/** Last activity, ms (see `lastActive`). */
+		at?: number;
 	} & SavedTabChrome)[];
 	/** 并行任务 worktree 项目的元数据（isWorktree/mainRepoPath/branch/baseBranch/slug）。 */
 	worktree?: WorktreeMeta;
@@ -54,6 +56,8 @@ export interface SavedProject extends SavedTabChrome {
 	lastAcpAgent?: { id: string; name: string };
 	/** 对话分组（见 Project.chats）。 */
 	chats?: boolean;
+	/** 不属于任何项目的对话（见 Project.home）。 */
+	home?: boolean;
 	/** 附加目录（见 Project.dirs）。 */
 	dirs?: string[];
 }
@@ -114,6 +118,23 @@ export class SessionStore {
 	}
 	get shownSessions() {
 		return this.shownProjects.flatMap((p) => p.sessions);
+	}
+	/** The group of conversations outside any project, once there is one. */
+	get home() {
+		return this.projects.find((p) => p.home);
+	}
+	/** Projects the user added (what the sidebar and home page list as projects). */
+	get codeProjects() {
+		return this.shownProjects.filter((p) => !p.home);
+	}
+	/** Every shown, unarchived session, most recently active first; one never
+	 *  active keeps its list position after the dated ones. */
+	get recentSessions() {
+		const listed = this.shownProjects.flatMap((p) => listedSessions(p));
+		return listed
+			.map((s, i) => ({ s, i, at: lastActive(s) }))
+			.sort((a, b) => b.at - a.at || a.i - b.i)
+			.map((x) => x.s);
 	}
 	get active() {
 		return this.allSessions.find((s) => s.id === this.activeId);
@@ -623,6 +644,7 @@ export class SessionStore {
 		name: string;
 		path: string;
 		chats?: boolean;
+		home?: boolean;
 		worktree?: WorktreeMeta;
 		color?: unknown;
 		icon?: unknown;
@@ -631,6 +653,7 @@ export class SessionStore {
 		if (this.userProjects.some((x) => x.id === project.id || samePath(x.path, project.path))) return;
 		const p: Project = { id: project.id, name: project.name, path: project.path, sessions: [] };
 		if (project.chats) p.chats = true;
+		if (project.home) p.home = true;
 		this.setProjectDirs(p, project.dirs);
 		if (project.worktree) p.worktree = project.worktree;
 		this.setProjectChrome(p, project);
@@ -739,14 +762,17 @@ export class SessionStore {
 		return s.id;
 	}
 
-	/** Start a chat (conversation and research, no project) in the chats
-	 *  group, which is created first in the list on first use. */
-	async newChat() {
-		if (!this.projects.some((p) => p.chats)) {
-			const path = await chatsDir();
-			this.projects.unshift({ id: this.uid(), name: t('shell.chats'), path, sessions: [], chats: true });
+	/** A new conversation outside any project. It runs in
+	 *  `~/Documents/LynShen`, whose group is made on first use. */
+	async newChat(firstMessage?: string) {
+		if (!this.home) {
+			const path = await defaultWorkspaceDir(true);
+			// The folder may already be a project the user added.
+			const known = this.userProjects.find((p) => samePath(p.path, path));
+			if (known) return this.addSession(known, firstMessage);
+			this.projects.unshift({ id: this.uid(), name: t('shell.home.chats'), path, sessions: [], home: true });
 		}
-		return this.addSession(this.projects.find((p) => p.chats)!);
+		return this.addSession(this.home!, firstMessage);
 	}
 
 	/** Create a project from a directory path and seed its first session.
@@ -1215,6 +1241,7 @@ export class SessionStore {
 			path: p.path,
 			...(p.worktree ? { worktree: p.worktree } : {}),
 			...(p.chats ? { chats: true } : {}),
+			...(p.home ? { home: true } : {}),
 			...(p.dirs?.length ? { dirs: p.dirs } : {}),
 			...(p.lastBackend && p.lastBackend !== 'lynshen' ? { lastBackend: p.lastBackend } : {}),
 			...(p.lastBackend === 'acp' && p.lastAcpAgent ? { lastAcpAgent: p.lastAcpAgent } : {}),
@@ -1234,6 +1261,7 @@ export class SessionStore {
 					...(s.backendId === 'acp' && s.acpAgent ? { acpAgent: s.acpAgent } : {}),
 					...(s.archived ? { archived: true } : {}),
 					...(s.pinned ? { pinned: true } : {}),
+					...(lastActive(s) ? { at: lastActive(s) } : {}),
 					...(s.color ? { color: s.color } : {}),
 					...(s.icon ? { icon: s.icon } : {}),
 				}))
@@ -1295,12 +1323,14 @@ export class SessionStore {
 						t.model
 					)
 				: this.#draftSaved(proj, t.id!, t.title, backend, !!t.archived, chrome, acpAgent);
-			if (t.pinned === true) proj.sessions.find((s) => s.id === id)!.pinned = true;
+			const restored = proj.sessions.find((s) => s.id === id)!;
+			if (t.pinned === true) restored.pinned = true;
+			if (typeof t.at === 'number' && t.at > 0) restored.at = t.at;
 		}
 	}
 
-	/** Restore saved projects + their open conversations, or seed a default
-	 *  project on first run. Sets `loaded` when done. A worktree project whose
+	/** Restore saved projects + their open conversations (a first run opens
+	 *  none: the home page shows). Sets `loaded` when done. A worktree project whose
 	 *  directory has vanished (task finished elsewhere / dir deleted) is kept in
 	 *  the list as `stale` — no sessions are spawned into a dead cwd — so the
 	 *  sidebar can offer a remove-from-list affordance instead of crashing. */
@@ -1317,6 +1347,7 @@ export class SessionStore {
 				}
 				const proj: Project = { id: p.id, name: p.name, path: p.path, sessions: [] };
 				if (p.chats === true) proj.chats = true;
+				if (p.home === true) proj.home = true;
 				this.setProjectDirs(proj, p.dirs);
 				this.setProjectChrome(proj, p);
 				if (p.lastBackend) proj.lastBackend = normalizeBackendId(p.lastBackend);
@@ -1344,13 +1375,7 @@ export class SessionStore {
 				// Pushed proxies are new objects: restore into the tree's copy.
 				this.#restoreTabs(this.projects[this.projects.length - 1], p.tabs ?? []);
 			}
-			const first = this.shownSessions.find((s) => !s.archived)?.id;
-			const firstLive = this.shownProjects.find((p) => !p.stale);
-			this.activeId = first || (firstLive && this.addSession(firstLive)) || '';
-		} else {
-			const root = await projectRoot();
-			this.projects.push({ id: this.uid(), name: base(root), path: root, sessions: [] });
-			this.addSession(this.projects[0]);
+			this.activeId = this.recentSessions[0]?.id ?? '';
 		}
 		this.loaded = true;
 	}

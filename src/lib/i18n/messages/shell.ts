@@ -103,19 +103,7 @@ const shell = {
 		chatGone: '该对话已关闭',
 
 		// workspaces
-		workspace: {
-			label: '工作区',
-			default: '默认工作区',
-			nth: '工作区 {n}',
-			switch: '切换工作区',
-			new: '新建工作区',
-			menu: '工作区选项',
-			rename: '重命名工作区',
-			delete: '删除工作区',
-			deleteConfirm: '删除工作区「{name}」？其中的项目布局与会话标签将被移除（对话记录仍保留在引擎侧）。',
-			cannotDeleteDefault: '默认工作区不能删除。',
-			defaultBadge: '默认工作区（不可删除）'
-		},
+		workspace: { default: '默认工作区' },
 		// shared chrome editor (workspace tabs, session tabs, project folders, agents)
 		chrome: {
 			title: '外观',
@@ -164,6 +152,25 @@ const shell = {
 		status: { approve: '待确认', answer: '待回答', running: '运行中', failed: '运行失败' },
 		updateShort: '可更新',
 		newChat: '新对话',
+		home: {
+			title: '主页',
+			chats: '对话',
+			noChats: '还没有对话',
+			addProject: '添加项目',
+			greeting: '今天做点什么？',
+			agents: 'Agent',
+			projects: '项目',
+			recent: '最近',
+			newAgent: '新建 Agent',
+			openProject: '打开项目',
+			empty: '还没有内容',
+			sessions: '{n} 个会话',
+			inProject: '在 {name}',
+			standalone: '独立对话',
+			justNow: '刚刚',
+			minutesAgo: '{n} 分钟前',
+			hoursAgo: '{n} 小时前'
+		},
 
 		// engine
 		engineDown: '引擎已停止运行',
@@ -976,19 +983,7 @@ const shell = {
 		chatGone: 'This conversation is closed',
 
 		// workspaces
-		workspace: {
-			label: 'Workspace',
-			default: 'Default workspace',
-			nth: 'Workspace {n}',
-			switch: 'Switch workspace',
-			new: 'New workspace',
-			menu: 'Workspace options',
-			rename: 'Rename workspace',
-			delete: 'Delete workspace',
-			deleteConfirm: 'Delete workspace "{name}"? Its project layout and session tabs are removed (conversations remain on the engine side).',
-			cannotDeleteDefault: 'The default workspace cannot be deleted.',
-			defaultBadge: 'Default workspace (cannot be deleted)'
-		},
+		workspace: { default: 'Default workspace' },
 		// shared chrome editor (workspace tabs, session tabs, project folders, agents)
 		chrome: {
 			title: 'Appearance',
@@ -1037,6 +1032,25 @@ const shell = {
 		status: { approve: 'Approve', answer: 'Answer', running: 'Running', failed: 'Failed' },
 		updateShort: 'Update',
 		newChat: 'New chat',
+		home: {
+			title: 'Home',
+			chats: 'Chats',
+			noChats: 'No chats yet',
+			addProject: 'Add project',
+			greeting: 'What shall we work on?',
+			agents: 'Agents',
+			projects: 'Projects',
+			recent: 'Recent',
+			newAgent: 'New agent',
+			openProject: 'Open project',
+			empty: 'Nothing here yet',
+			sessions: '{n} sessions',
+			inProject: 'in {name}',
+			standalone: 'Standalone chat',
+			justNow: 'just now',
+			minutesAgo: '{n} min ago',
+			hoursAgo: '{n} h ago'
+		},
 
 		// engine
 		engineDown: 'Engine has stopped',

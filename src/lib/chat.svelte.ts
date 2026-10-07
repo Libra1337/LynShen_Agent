@@ -281,6 +281,8 @@ export class ChatState {
 	autoRetries = 0;
 	/** The engine's last turn is an automatic "continue" (no bubble of its own). */
 	lastTurnAuto = false;
+	/** When this run last sent or finished a turn here, ms (0: not yet). */
+	activeAt = $state(0);
 	/** Where the messages of that turn start. */
 	#autoFrom = -1;
 
@@ -545,6 +547,7 @@ export class ChatState {
 	/** Show a just-sent user message immediately, before the engine echoes it.
 	 *  The echo is de-duplicated in the `user_message` handler. */
 	optimisticUser(content: string, images?: string[], auto = false) {
+		this.activeAt = Date.now();
 		if (!auto) {
 			this.autoRetries = 0;
 			this.autoRetry = null;
@@ -604,6 +607,7 @@ export class ChatState {
 
 	/** Stamp the turn's total elapsed onto its last assistant message. */
 	#endTurn() {
+		this.activeAt = Date.now();
 		this.#collapseReasoning();
 		if (this.#sending?.state !== 'failed') this.#setSend(null);
 		this.call = null;

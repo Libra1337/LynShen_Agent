@@ -81,19 +81,22 @@ describe('workspaces file', () => {
 		expect(tab).toMatchObject({ id: 't1', sid: 's', title: 'T', extra: 'kept' });
 	});
 
-	it('keeps version 1 and parses an old file without chrome, promoting the first workspace to default', () => {
+	it('keeps version 1 and folds an old file without chrome into its first workspace', () => {
 		expect(WORKSPACES_VERSION).toBe(1);
 		const old = JSON.stringify({
 			version: 1,
 			active: 'b',
 			workspaces: [
-				{ id: 'a', name: 'A', projects: [], layout: null },
-				{ id: 'b', name: 'B', projects: [], layout: null }
+				{ id: 'a', name: 'A', projects: [{ id: 'p1', name: 'one', path: '/w/one' }], layout: null },
+				{ id: 'b', name: 'B', projects: [{ id: 'p2', name: 'two', path: '/w/two' }], layout: { root: 'b-layout' } }
 			]
 		});
 		const parsed = parseWorkspacesFile(old);
-		expect(parsed?.workspaces.map((w) => !!w.isDefault)).toEqual([true, false]);
-		expect(parsed?.active).toBe('b');
+		expect(parsed?.workspaces.map((w) => [w.id, !!w.isDefault])).toEqual([['a', true]]);
+		expect(parsed?.active).toBe('a');
+		// The projects of both, and the layout of the one that was open.
+		expect(parsed?.workspaces[0].projects.map((p) => p.id)).toEqual(['p1', 'p2']);
+		expect(parsed?.workspaces[0].layout).toEqual({ root: 'b-layout' });
 		expect(parsed?.workspaces[0].color).toBeUndefined();
 		expect(parsed?.workspaces[0].icon).toBeUndefined();
 	});
@@ -166,7 +169,7 @@ describe('legacy migration', () => {
 	});
 });
 
-it('merges duplicate defaults while preserving saved chats, the active layout and named workspaces', () => {
+it('merges duplicate defaults and named workspaces into one, keeping saved chats and the active layout', () => {
  const raw = {version: 1, active: 'b', workspaces: [
   {id: 'a', name: 'default', isDefault: true, projects: [{id: 'p1', name: 'P', path: 'C:/Work/App', tabs: [{id: 't1', sid: 's1'}, {id: 't2', sid: 's2'}]}]},
   {id: 'b', name: 'default', isDefault: true, layout: {root: 'active-layout'}, projects: [{id: 'p2', name: 'P', path: 'c:/work/app/', tabs: [{id: 'new-t1', sid: 's1'}, {id: 'draft'}]}]},
@@ -174,7 +177,7 @@ it('merges duplicate defaults while preserving saved chats, the active layout an
  ]};
  const result = parseWorkspacesFile(JSON.stringify(raw))!;
  expect(result.active).toBe('b');
- expect(result.workspaces.map(w => w.id)).toEqual(['b', 'c']);
+ expect(result.workspaces.map(w => w.id)).toEqual(['b']);
  expect(result.workspaces[0].projects).toHaveLength(1);
  expect(result.workspaces[0].projects[0].tabs?.map(t => t.id)).toEqual(['new-t1', 'draft', 't2']);
  expect(result.workspaces[0].layout).toEqual({root: 'active-layout'});
