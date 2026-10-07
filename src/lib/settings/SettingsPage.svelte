@@ -335,6 +335,24 @@
 		}
 	}
 
+	// ---------- subagents ----------
+	// Models `spawn_agent` may pick besides the main one (config
+	// `subagent_models`); with none, subagents run on the main model.
+	const subagentPicked = $derived(((cfg.subagent_models ?? []) as { name: string }[]).map((m) => m.name));
+	const subagentOpts = $derived(modelOpts.filter((o) => !subagentPicked.includes(o.value) && o.value !== cfg.model));
+	function addSubagentModel(name: string) {
+		if (!name || subagentPicked.includes(name)) return;
+		cfg.subagent_models = [...((cfg.subagent_models ?? []) as unknown[]), { name, description: '' }];
+	}
+	function removeSubagentModel(name: string) {
+		cfg.subagent_models = ((cfg.subagent_models ?? []) as { name: string }[]).filter((m) => m.name !== name);
+	}
+	function setSubagentNote(name: string, description: string) {
+		cfg.subagent_models = ((cfg.subagent_models ?? []) as { name: string; description: string }[]).map((m) =>
+			m.name === name ? { ...m, description } : m
+		);
+	}
+
 	// Keep reasoning effort valid for the selected model.
 	function normalizeEffort() {
 		const efs = models.find((m) => m.name === cfg.model)?.reasoning_efforts ?? [];
@@ -361,6 +379,7 @@
 			connect_timeout_seconds: Number(cfg.connect_timeout_seconds) || 0,
 			read_timeout_seconds: Number(cfg.read_timeout_seconds) || 0,
 			include_project_instructions: !!cfg.include_project_instructions,
+			subagent_models: (cfg.subagent_models ?? []) as { name: string; description: string }[],
 			asr
 		};
 	}
@@ -1098,6 +1117,31 @@
 							<Switch bind:checked={cfg.include_project_instructions} label={t('settings.behavior.includeProjectInstructions')} />
 						</SettingsRow>
 					</SettingsSection>
+					<SettingsSection title={t('settings.subagents.title')}>
+						<SettingsRow id="subagent-models" title={t('settings.subagents.models')} description={t('settings.subagents.hint')} stacked>
+							<div class="subagents">
+								{#each (cfg.subagent_models ?? []) as m ((m as { name: string }).name)}
+									{@const entry = m as { name: string; description: string }}
+									<div class="subagent">
+										<span class="tile sm"><Vendor model={entry.name} size={15} /></span>
+										<span class="mono ell sa-name">{entry.name}</span>
+										<div class="sa-note">
+											<TextField bind:value={() => entry.description, (v) => setSubagentNote(entry.name, String(v ?? ''))} placeholder={t('settings.subagents.notePlaceholder')} />
+										</div>
+										<Button variant="ghost" size="sm" onclick={() => removeSubagentModel(entry.name)}>{t('settings.subagents.remove')}</Button>
+									</div>
+								{/each}
+								<div class="w-lg">
+									<Select value="" options={subagentOpts} onChange={addSubagentModel} placeholder={t('settings.subagents.add')}>
+										{#snippet item(o)}
+											<span class="tile sm"><Vendor model={o.label ?? ''} size={15} /></span>
+											<span class="mono ell">{o.label}</span>
+										{/snippet}
+									</Select>
+								</div>
+							</div>
+						</SettingsRow>
+					</SettingsSection>
 					<SettingsSection title={t('settings.behavior.compaction')}>
 						<SettingsRow id="compact-model" title={t('settings.behavior.compactModel')}>
 							<div class="w-lg">
@@ -1489,6 +1533,24 @@
 		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
+	.subagents {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.subagent {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.sa-name {
+		width: 180px;
+		flex-shrink: 0;
+	}
+	.sa-note {
+		flex: 1;
+		min-width: 0;
+	}
 	/* control widths on the right of a row */
 	.w-md {
 		width: 220px;

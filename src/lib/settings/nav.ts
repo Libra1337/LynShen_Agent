@@ -70,6 +70,7 @@ export const ROWS: SearchRow[] = [
 	{ section: 'models', id: 'default-model', titleKey: 'settings.behavior.defaultModel' },
 	{ section: 'models', id: 'reasoning-effort', titleKey: 'settings.behavior.reasoningEffort', descKey: 'settings.page.reasoningEffortDesc' },
 	{ section: 'models', id: 'project-instructions', titleKey: 'settings.behavior.includeProjectInstructions', descKey: 'settings.behavior.includeProjectInstructionsSub' },
+	{ section: 'models', id: 'subagent-models', titleKey: 'settings.subagents.models', descKey: 'settings.subagents.hint' },
 	{ section: 'models', id: 'compact-model', titleKey: 'settings.behavior.compactModel' },
 	{ section: 'models', id: 'compaction-threshold', titleKey: 'settings.behavior.compactionThreshold', descKey: 'settings.behavior.compactionThresholdSub' },
 	{ section: 'models', id: 'title-model', titleKey: 'settings.behavior.titleModel', descKey: 'settings.behavior.titleModelHint' },

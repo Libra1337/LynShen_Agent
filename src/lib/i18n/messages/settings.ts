@@ -2,6 +2,14 @@
 // Populated during the settings-area i18n migration.
 const settings = {
 	zh: {
+		subagents: {
+			title: '子智能体',
+			models: '可用模型',
+			hint: '主智能体可以把独立的子任务交给子智能体并行处理；不选时子智能体使用主模型',
+			add: '添加模型',
+			remove: '移除',
+			notePlaceholder: '什么时候用它，例如：简单的搜索和整理'
+		},
 		title: '设置',
 		language: '语言',
 		theme: '主题',
@@ -411,6 +419,14 @@ const settings = {
 		}
 	},
 	en: {
+		subagents: {
+			title: 'Subagents',
+			models: 'Models',
+			hint: 'The main agent can hand independent subtasks to subagents that run in parallel; with none picked they use the main model',
+			add: 'Add model',
+			remove: 'Remove',
+			notePlaceholder: 'When to use it, e.g. quick searches and summaries'
+		},
 		title: 'Settings',
 		language: 'Language',
 		theme: 'Theme',
