@@ -606,8 +606,6 @@ const shell = {
 			sandboxWorkspace: '可写工作目录',
 			sandboxFull: '不限制',
 			network: '允许联网',
-			workspace: '所属工作区',
-			workspaceHint: '只在这个工作区的工作台和侧栏里列出；它的会话和定时任务照常运行。',
 			project: '所属项目',
 			projectHint: '设了项目后，Agent 在项目主目录工作。',
 			directories: '其他目录',
@@ -744,9 +742,6 @@ const shell = {
 			errPast: '这个时间已经过了'
 		},
 		agents: {
-			all: '全部',
-			allTitle: '全部 Agent',
-			allHint: '显示所有工作区的 Agent',
 			title: 'Agent',
 			add: '新建 Agent',
 			unreachable: '连不上 lynshen daemon，正在重试',
@@ -1517,8 +1512,6 @@ const shell = {
 			sandboxWorkspace: 'Workspace write',
 			sandboxFull: 'Unrestricted',
 			network: 'Allow network',
-			workspace: 'Workspace',
-			workspaceHint: 'Listed only in this workspace\'s workbench and sidebar; its sessions and scheduled tasks run regardless.',
 			project: 'Project',
 			projectHint: 'With a project, the agent works in its main directory.',
 			directories: 'Other directories',
@@ -1655,9 +1648,6 @@ const shell = {
 			errPast: 'That time has passed'
 		},
 		agents: {
-			all: 'All',
-			allTitle: 'All agents',
-			allHint: 'Show the agents of every workspace',
 			title: 'Agents',
 			add: 'New agent',
 			unreachable: 'Cannot reach lynshen daemon; retrying',

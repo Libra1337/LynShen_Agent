@@ -24,10 +24,8 @@
 	import SettingsRow from '$lib/settings/SettingsRow.svelte';
 	import TabChromePopover from '$lib/workbench/TabChromePopover.svelte';
 	import { newAvatarSeed } from '$lib/avatar';
-	import { workspaces } from '$lib/workbench/workspaceStore.svelte';
 	import {
 		agentDirectory,
-		agentWorkspace,
 		type AgentChanges,
 		type AgentDetail,
 		type AgentView
@@ -388,15 +386,6 @@
 				<SettingsSection>
 					<SettingsRow title={t('shell.agentPage.name')}>
 						<input class="name" value={detail.agent.name} onchange={rename} />
-					</SettingsRow>
-					<SettingsRow title={t('shell.agentPage.workspace')} description={t('shell.agentPage.workspaceHint')}>
-						<div class="pick">
-							<Select
-								value={agentWorkspace(detail.agent, workspaces.workspaces)}
-								options={workspaces.workspaces.map((w) => ({ value: w.id, label: w.name }))}
-								onChange={(workspace) => change({ workspace })}
-							/>
-						</div>
 					</SettingsRow>
 					<SettingsRow title={t('shell.agentPage.project')} description={t('shell.agentPage.projectHint')}>
 						<div class="pick">

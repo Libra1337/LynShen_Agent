@@ -191,13 +191,6 @@
 {#if agentDirectory.status === 'on' && waited && !remoteProjects.supported}
 	<Notice tone="warn">{t('shell.remote.outdated')}</Notice>
 {:else}
-	{#if remoteProjects.workspaces.length > 1}
-		<div class="workspaces">
-			{#each remoteProjects.workspaces as ws (ws.id)}
-				<button class:on={remoteProjects.active?.id === ws.id} onclick={() => (remoteProjects.activeId = ws.id)}>{ws.name}</button>
-			{/each}
-		</div>
-	{/if}
 
 	{#if agentDirectory.agents.length}
 		<section>
@@ -303,26 +296,6 @@
 {/if}
 
 <style>
-	.workspaces {
-		display: flex;
-		gap: 6px;
-		overflow-x: auto;
-		margin-bottom: 8px;
-		padding-bottom: 2px;
-	}
-	.workspaces button {
-		flex-shrink: 0;
-		padding: 6px 12px;
-		border: 1px solid var(--border);
-		border-radius: var(--r-full);
-		background: none;
-		color: var(--dim);
-		font-size: var(--fs-sm);
-	}
-	.workspaces button.on {
-		border-color: var(--accent);
-		color: var(--text);
-	}
 	section + section {
 		margin-top: 20px;
 	}
@@ -367,14 +340,6 @@
 	.act,
 	.more,
 	.menu button,
-	.workspaces button {
-		cursor: pointer;
-		-webkit-tap-highlight-color: transparent;
-		transition:
-			background var(--t-fast) var(--ease-out),
-			color var(--t-fast) var(--ease-out),
-			transform var(--t-fast) var(--ease-out);
-	}
 	.folder:has(.folder-row:active),
 	.sess:has(.sess-main:active) {
 		background: var(--surface2);
@@ -385,9 +350,6 @@
 		transform: scale(0.985);
 	}
 	.act:active,
-	.workspaces button:active {
-		transform: scale(0.9);
-	}
 	.more:hover {
 		color: var(--text);
 	}

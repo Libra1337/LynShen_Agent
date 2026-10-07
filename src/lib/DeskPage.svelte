@@ -20,7 +20,7 @@
 	import RequirementDetail from '$lib/requirements/RequirementDetail.svelte';
 	import type { StartHow } from '$lib/requirements/StartButton.svelte';
 	import { needsYou, useRequirements, type Requirement } from '$lib/requirements.svelte';
-	import { agentDirectory, agentsOfWorkspace, agentWorkspace, type AgentView } from '$lib/agents.svelte';
+	import { agentDirectory, type AgentView } from '$lib/agents.svelte';
 	import { workspaces } from '$lib/workbench/workspaceStore.svelte';
 	import { t } from '$lib/i18n';
 
@@ -109,15 +109,9 @@
 	}
 
 	const shown = $derived(agentId ? agentDirectory.agents.find((a) => a.id === agentId) : undefined);
-	/** The agents listed: the open workspace's, or every agent. */
-	let showAll = $state(false);
-	const listed = $derived(
-		showAll ? agentDirectory.agents : agentsOfWorkspace(agentDirectory.agents, workspaces.workspaces, workspaces.activeId)
-	);
+	const listed = $derived(agentDirectory.agents);
 	const listedIds = $derived(listed.map((a) => a.id));
 	const pending = $derived(listed.reduce((n, a) => n + agentDirectory.pendingFor(a.id), 0) + yourTurn.length);
-	const workspaceName = (a: AgentView) =>
-		workspaces.workspaces.find((w) => w.id === agentWorkspace(a, workspaces.workspaces))?.name ?? '';
 	/** The shown agent's sessions, most recently active first. */
 	const shownSessions = $derived(
 		shown
@@ -189,11 +183,8 @@
 				{#if scheduleCount}<span class="count">{scheduleCount}</span>{/if}
 			</button>
 			<div class="group-label">
-				<span>{showAll ? t('shell.agents.allTitle') : t('shell.agents.title')}</span>
+				<span>{t('shell.agents.title')}</span>
 				<span class="grow"></span>
-				<button class="scope" class:on={showAll} aria-pressed={showAll} onclick={() => (showAll = !showAll)} title={t('shell.agents.allHint')}>
-					{t('shell.agents.all')}
-				</button>
 				<button class="add" onclick={onNewAgent} aria-label={t('shell.agents.add')} title={t('shell.agents.add')}><PlusIcon size={14} /></button>
 			</div>
 			{#each listed as a (a.id)}
@@ -202,7 +193,7 @@
 					<AgentAvatar agent={a} size={22} />
 					<span class="two">
 						<span class="label">{a.name}</span>
-						<span class="sub" class:live={a.busy && a.enabled}>{[showAll ? workspaceName(a) : '', projectName(a.project), status(a)].filter(Boolean).join(' · ')}</span>
+						<span class="sub" class:live={a.busy && a.enabled}>{[projectName(a.project), status(a)].filter(Boolean).join(' · ')}</span>
 					</span>
 					{#if waiting}<span class="badge" title={t('shell.desk.pendingFor', { n: waiting })}>{waiting}</span>
 					{:else if a.busy && a.enabled}<CircleNotchIcon size={14} class="spin busy" />{/if}
@@ -367,24 +358,6 @@
 	}
 	.grow {
 		flex: 1;
-	}
-	.scope {
-		margin-right: 2px;
-		padding: 1px 7px;
-		border: 1px solid transparent;
-		border-radius: var(--r-full);
-		background: none;
-		color: var(--dim2);
-		font: inherit;
-		font-size: var(--fs-2xs);
-		cursor: pointer;
-	}
-	.scope:hover {
-		color: var(--text);
-	}
-	.scope.on {
-		border-color: var(--border-strong);
-		color: var(--text);
 	}
 	.add {
 		display: inline-flex;
