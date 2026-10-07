@@ -311,6 +311,18 @@ describe('SessionStore lifecycle', () => {
 		expect(sendLine).toHaveBeenCalledWith(id, expect.stringContaining('later'));
 	});
 
+	it('an engine the daemon cannot start shows why at once instead of waiting for the daemon', async () => {
+		vi.mocked(hostSession).mockRejectedValueOnce(new Error('cannot start codex: No such file or directory (os error 2)'));
+		const store = new SessionStore();
+		const p = proj();
+		store.projects.push(p);
+		begin(store.addSession(p, undefined, 'codex'));
+		const s = p.sessions[0]!;
+		await flush();
+		expect(s.chat.daemonRetries).toBe(0);
+		expect(s.chat.messages.some((m) => m.kind === 'error' && m.text.includes('cannot start codex'))).toBe(true);
+	});
+
 	it.each(['lynshen', 'claude'] as const)(
 		'a %s session keeps retrying an unreachable daemon without spending its crash budget',
 		async (backend) => {

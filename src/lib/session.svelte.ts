@@ -58,6 +58,13 @@ export interface SavedProject extends SavedTabChrome {
 	dirs?: string[];
 }
 
+/** A start that failed because the daemon is not there (see daemon.ts), as
+ *  opposed to an error the daemon answered with. */
+function daemonUnreachable(e: unknown): boolean {
+	const message = e instanceof Error ? e.message : String(e);
+	return /cannot reach lynshen daemon|refused the connection|not connected to lynshen daemon|connection to lynshen daemon lost|could not start lynshen daemon|did not start|wrote no token/i.test(message);
+}
+
 /** Waits between attempts to reach an unreachable daemon, ms (~4.5 min). */
 const DAEMON_RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000, 30000, 30000, 30000, 30000, 30000, 30000, 30000];
 
@@ -132,8 +139,9 @@ export class SessionStore {
 		const s = this.allSessions.find((x) => x.chat === chat);
 		// The daemon can't be reached (restarting, being upgraded): keep trying
 		// for about 4.5 minutes, backing off, without spending the crash budget
-		// or stacking an error per attempt.
-		if (s && s.surface !== 'tui' && chat.daemonRetries < DAEMON_RETRY_DELAYS.length) {
+		// or stacking an error per attempt. Any other failure (the daemon
+		// answered: Codex not installed, a bad config) shows as it is.
+		if (s && s.surface !== 'tui' && daemonUnreachable(e) && chat.daemonRetries < DAEMON_RETRY_DELAYS.length) {
 			if (chat.daemonRetries === 0) chat.messages.push({ kind: 'system', text: t('shell.daemonReconnecting') });
 			const delay = DAEMON_RETRY_DELAYS[chat.daemonRetries++]!;
 			setTimeout(() => {
