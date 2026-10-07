@@ -2,7 +2,7 @@
 // 与侧栏设置入口的小圆点共享同一份状态，启动时的静默检查也写到这里。
 // 检查和下载使用 LynShen / Monoize，备用源来自应用配置。
 import { Channel, invoke } from '@tauri-apps/api/core';
-import { getVersion } from '@tauri-apps/api/app';
+import { appVersion } from '$lib/about';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { workspaces } from '$lib/workbench/workspaceStore.svelte';
 
@@ -138,7 +138,7 @@ export class UpdaterState {
 	async #checkRequired() {
 		const [min, current] = await Promise.all([
 			invoke<string>('update_policy').catch(() => ''),
-			getVersion().catch(() => '')
+			appVersion()
 		]);
 		this.required = min && current && olderThan(current, min) ? min : '';
 	}

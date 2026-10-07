@@ -344,6 +344,9 @@ const settings = {
 			lazy: '懒加载'
 		},
 		update: {
+			engineVersion: '引擎版本',
+			logs: '日志',
+			openLogs: '打开日志文件夹',
 			currentVersion: '当前版本',
 			check: '检查更新',
 			checking: '检查中…',
@@ -761,6 +764,9 @@ const settings = {
 			lazy: 'lazy'
 		},
 		update: {
+			engineVersion: 'Engine version',
+			logs: 'Logs',
+			openLogs: 'Open logs folder',
 			currentVersion: 'Current version',
 			check: 'Check for updates',
 			checking: 'Checking…',
