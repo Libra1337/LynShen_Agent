@@ -333,7 +333,7 @@
 	});
 
 	// Claude and Codex expose two extra native modes (plan / auto) between ask
-	// and edits; other backends keep the shared three (extendedApprovalModes).
+	// and edits (extendedApprovalModes); LynShen adds plan to the shared three.
 	const APPROVAL_MODES = $derived<Record<string, ModeItem>>({
 		ask: { key: 'ask', label: t('chat.approvalAsk'), desc: t('chat.approvalAskDesc') },
 		plan: { key: 'plan', label: t('chat.approvalPlan'), desc: t('chat.approvalPlanDesc') },
@@ -349,7 +349,9 @@
 			? ['ask', 'edits', 'auto', 'all']
 			: bcaps.extendedApprovalModes
 				? ['ask', 'plan', 'auto', 'edits', 'all']
-				: ['ask', 'edits', 'all'];
+				: bcaps.planMode
+					? ['ask', 'plan', 'edits', 'all']
+					: ['ask', 'edits', 'all'];
 		const recommended = keys.includes('auto') ? 'auto' : 'edits';
 		return keys.map((k) => ({ ...APPROVAL_MODES[k], recommended: k === recommended }));
 	});
@@ -384,7 +386,7 @@
 			});
 		}
 		const sections = [add];
-		if (bcaps.approvalModes && bcaps.extendedApprovalModes) {
+		if (bcaps.approvalModes && bcaps.planMode && !chat.agent) {
 			sections.push({
 				label: t('chat.modeSection'),
 				items: [

@@ -34,7 +34,10 @@
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
 	import { open } from '@tauri-apps/plugin-dialog';
 	import { treeRows } from '$lib/tree';
-	import { buildSetApprovalModeOp, needsClaudeYoloRespawn, type ApprovalMode, type ApproveOp } from '$lib/approval';
+	import { buildSetApprovalModeOp, needsClaudeYoloRespawn, toEngineMode, type ApprovalMode, type ApproveOp } from '$lib/approval';
+	import type { PlanAction } from '$lib/PlanCard.svelte';
+	import XIcon from 'phosphor-svelte/lib/XIcon';
+	import ClipboardTextIcon from 'phosphor-svelte/lib/ClipboardTextIcon';
 	import {
 		processVideo,
 		sessionHistory,
@@ -67,6 +70,9 @@
 	import RateLimitBanner from '$lib/RateLimitBanner.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import TaskStrip from '$lib/TaskStrip.svelte';
+	import ProgressCard from '$lib/agents/ProgressCard.svelte';
+	import { agentRows, type AgentRow } from '$lib/agentProgress';
+	import { parseToolOutput, toolTarget, toolVerb } from '$lib/toolSummary';
 	import { parseFileHref } from '$lib/fileRefs';
 	import type { Msg } from '$lib/chat.svelte';
 	import type { SessionSwitch } from '$lib/composer/SessionSwitches.svelte';
@@ -460,18 +466,6 @@
 
 	const isImage = (p: string) => /\.(png|jpe?g|gif|webp|bmp)$/i.test(p);
 	const base = (p: string) => p.replace(/\/+$/, '').split('/').pop() || p;
-	// Engine subagent lifecycle status → localized label (falls back to the raw value).
-	// 'done' is an alias of 'completed'.
-	const AGENT_STATUS_KEY: Record<string, string> = {
-		started: 'started',
-		running: 'running',
-		completed: 'completed',
-		done: 'completed',
-		interrupted: 'interrupted',
-		stopped: 'interrupted',
-		failed: 'failed',
-		closed: 'closed'
-	};
 	// The agent trace (AgentRunsPanel, a workbench panel) of this session.
 	const traceable = $derived(caps(chat).agentTrace && !!onOpenTrace);
 	function openTrace(agentId: string | null) {
@@ -486,7 +480,39 @@
 		if (chat.agentRuns.workflows.some((w) => w.toolUseId === m.callId)) return { label: t('dock.agents.open'), run: () => openTrace(null) };
 		return null;
 	}
-	const agentStatus = (s: string) => (AGENT_STATUS_KEY[s] ? t(`shell.agentStatus.${AGENT_STATUS_KEY[s]}`) : s);
+	// The subagents of this conversation: every run (the message list's cards
+	// find theirs), and the current turn's (the progress card). Derived from
+	// the trace and lifecycle state, never from the streaming text.
+	const lastTool = (label: string) => {
+		const m = chat.subagentLastTool[label];
+		return m ? `${toolVerb(m.name)} ${toolTarget(m.name, parseToolOutput(m.output))}`.trim() : '';
+	};
+	const allAgents = $derived(agentRows({ runs: chat.agentRuns, subagents: chat.subagents, lastTool }));
+	const turnAgents = $derived(
+		agentRows({ runs: chat.agentRuns, subagents: chat.subagents, lastTool, since: chat.turnStartedAt || Number.MAX_SAFE_INTEGER })
+	);
+	function openAgent(row: AgentRow) {
+		openTrace(row.workflow ? null : row.id);
+	}
+
+	// Plan mode: a proposed plan runs once approved, in the mode picked on its
+	// card; revising it sends the next message as the user's feedback.
+	const planMode = $derived<ApprovalMode>(
+		chat.modeBeforePlan && chat.modeBeforePlan !== 'plan' ? chat.modeBeforePlan : 'edits'
+	);
+	function planAction(id: string, action: PlanAction) {
+		const plan = chat.messages.find((m) => m.kind === 'plan' && m.id === id);
+		if (action.decision === 'approve') {
+			const mode = toEngineMode(action.mode) as Exclude<ReturnType<typeof toEngineMode>, 'plan'>;
+			send({ op: 'approve_plan', id, decision: 'approve', mode });
+			chat.setApprovalMode(action.mode);
+			if (plan?.kind === 'plan') plan.status = 'approved';
+			chat.planRevising = null;
+			return;
+		}
+		chat.planRevising = id;
+		composerEl?.focus();
+	}
 
 	// pickers (tree / model / resume) — this pane's session
 	const pickerTitle = $derived(
@@ -732,6 +758,19 @@
 				content = content.replace(re, () => `\n\n${block}\n\n`);
 			}
 			content = content.replace(/\n{3,}/g, '\n\n').trim();
+			// Revising a proposed plan: the message is the user's feedback on it.
+			const revising = chat.planRevising;
+			if (revising && !files.length && !videos.length && !imagePaths.length) {
+				const plan = chat.messages.find((m) => m.kind === 'plan' && m.id === revising);
+				if (plan?.kind === 'plan') plan.status = 'revising';
+				chat.planRevising = null;
+				if (!chat.busy || chat.restarting) chat.optimisticUser(content);
+				send({ op: 'approve_plan', id: revising, decision: 'revise', feedback: content });
+				input = '';
+				webRefs = [];
+				quotes = [];
+				return;
+			}
 			if (files.length)
 				content += `${content ? '\n\n' : ''}Attached files (read these):\n${files.join('\n')}`;
 			for (const v of videos) {
@@ -1149,17 +1188,6 @@
 			<button class="owner-link" onclick={() => ((session.requirement = undefined), (session.requirementStart = undefined))}>{t('shell.requirement.unlink')}</button>
 		</div>
 	{/if}
-	{#if Object.keys(chat.subagents).length}
-		<div class="agents">
-			{#each Object.entries(chat.subagents) as [path, info] (path)}
-				{#if info.label && traceable}
-					<button class="agent link" onclick={() => openTrace(path)} title={t('dock.agents.openAgent')}>{info.label} · {agentStatus(info.status)}{#if info.message}<span class="agent-msg">{info.message}</span>{/if}</button>
-				{:else}
-					<span class="agent">{info.label || path} · {agentStatus(info.status)}{#if info.message}<span class="agent-msg">{info.message}</span>{/if}</span>
-				{/if}
-			{/each}
-		</div>
-	{/if}
 	<TaskStrip
 		{chat}
 		onStop={(id) => send({ op: 'stop_task', task_id: id })}
@@ -1182,9 +1210,10 @@
 	{/if}
 
 	<div class="mainwrap" class:resizing={dragW !== null} bind:clientWidth={wrapW}>
+	<ProgressCard {chat} sessionId={session.id} rows={turnAgents} onOpen={traceable ? openAgent : undefined} />
 	<main bind:this={scroller} onscroll={onScroll} onwheel={onWheel}>
 		<div bind:this={contentEl}>
-			<MessageList bind:this={messageList} bind:mark messages={chat.messages} {streamingMsg} {streamingReasoning} phase={chat.phase} call={chat.call} compactionTokens={chat.compactionTokens} retry={chat.retry} autoRetry={chat.autoRetry} onAutoRetryNow={() => autoRetry.now(chat)} onAutoRetryCancel={() => autoRetry.cancel(chat)} {findActive} {scroller} onEdit={editMessage} onCite={citeText} onNote={noteRequirement} onRewind={rewindToMessage} onFile={openChatFile} onDismiss={(m) => (chat.messages = chat.messages.filter((x) => x !== m))} backend={chat.backendId} provider={chat.provider ?? ''} onErrorAction={fixError} traceOf={traceable ? traceOf : undefined} />
+			<MessageList bind:this={messageList} bind:mark messages={chat.messages} {streamingMsg} {streamingReasoning} phase={chat.phase} call={chat.call} compactionTokens={chat.compactionTokens} retry={chat.retry} autoRetry={chat.autoRetry} onAutoRetryNow={() => autoRetry.now(chat)} onAutoRetryCancel={() => autoRetry.cancel(chat)} {findActive} {scroller} onEdit={editMessage} onCite={citeText} onNote={noteRequirement} onRewind={rewindToMessage} onFile={openChatFile} onDismiss={(m) => (chat.messages = chat.messages.filter((x) => x !== m))} backend={chat.backendId} provider={chat.provider ?? ''} onErrorAction={fixError} traceOf={traceable ? traceOf : undefined} agents={allAgents} onOpenAgent={traceable ? openAgent : undefined} onPlan={planAction} {planMode} />
 		</div>
 		{#if chat.booting && chat.engineState !== 'exited'}
 			<div class="welcome spawning">
@@ -1262,6 +1291,17 @@
 		{/if}
 
 		<StatusStrip items={chat.statusLog} />
+
+		{#if chat.planRevising}
+			<div class="approval-wrap">
+				<div class="revising">
+					<ClipboardTextIcon size={14} />
+					<span class="rv-label">{t('chat.planCard.revising')}</span>
+					<span class="rv-hint">{t('chat.planCard.revisingHint')}</span>
+					<button class="rv-x" onclick={() => (chat.planRevising = null)} aria-label={t('chat.planCard.cancelRevise')} title={t('chat.planCard.cancelRevise')}><XIcon size={13} /></button>
+				</div>
+			</div>
+		{/if}
 
 		{#if gate && !chat.pendingApproval}
 			<div class="approval-wrap">
@@ -1493,43 +1533,48 @@
 		font-weight: 500;
 	}
 
-	.agents {
+	.revising {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		padding: 8px 18px;
-		border-bottom: 1px solid var(--hairline);
-	}
-	.agent {
-		display: inline-flex;
 		align-items: center;
-		gap: 6px;
-		font-family: var(--font-mono);
-		font-size: var(--fs-2xs);
-		color: var(--dim);
+		gap: 8px;
+		width: fit-content;
+		max-width: 100%;
+		padding: 5px 6px 5px 12px;
+		border-radius: var(--r-full);
+		background: var(--surface2);
+		color: var(--text);
+		font-size: var(--fs-xs);
+	}
+	.rv-label {
+		flex: none;
+		font-weight: 500;
+	}
+	.rv-hint {
 		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--dim);
+	}
+	.rv-x {
+		display: inline-flex;
+		flex: none;
+		padding: 3px;
+		border: none;
+		border-radius: var(--r-full);
+		background: none;
+		color: var(--dim);
+		cursor: pointer;
+	}
+	.rv-x:hover {
+		background: var(--surface2);
+		color: var(--text);
 	}
 	.interm {
 		margin: 0 0 8px;
 		font-size: var(--fs-xs);
 		color: var(--dim);
 		text-align: center;
-	}
-	button.agent {
-		border: none;
-		background: none;
-		padding: 0;
-		cursor: pointer;
-	}
-	button.agent:hover {
-		color: var(--text);
-	}
-	.agent-msg {
-		color: var(--dim2);
-		max-width: 360px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
 	}
 
 	.edge-blur {

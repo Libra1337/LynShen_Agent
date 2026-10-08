@@ -7,6 +7,10 @@
 	import Markdown from '$lib/Markdown.svelte';
 	import Collapse from '$lib/ui/Collapse.svelte';
 	import ToolCard from '$lib/ToolCard.svelte';
+	import SubagentCard from '$lib/agents/SubagentCard.svelte';
+	import PlanCard, { type PlanAction } from '$lib/PlanCard.svelte';
+	import type { ApprovalMode } from '$lib/approval';
+	import { SPAWN_TOOLS, WAIT_TOOLS, type AgentRow } from '$lib/agentProgress';
 	import DeliveryNotice from '$lib/DeliveryNotice.svelte';
 	import { parseDelivery } from '$lib/delivery';
 	import { parseToolOutput, toolIcon, toolTarget, toolVerb } from '$lib/toolSummary';
@@ -48,6 +52,10 @@
 		provider = '',
 		onErrorAction,
 		traceOf,
+		agents,
+		onOpenAgent,
+		onPlan,
+		planMode = 'edits',
 		loadImage,
 		mark = $bindable(-1)
 	}: {
@@ -86,6 +94,15 @@
 		onErrorAction?: (action: ErrorAction) => void;
 		/** A tool call whose run the agent trace shows (claude's Agent / Workflow). */
 		traceOf?: (m: Msg) => { label: string; run: () => void } | null;
+		/** The conversation's subagents: spawn and wait calls render as their
+		 *  cards (absent: plain tool rows). */
+		agents?: AgentRow[];
+		/** Shows a subagent's own conversation. */
+		onOpenAgent?: (row: AgentRow) => void;
+		/** Approves or revises a proposed plan (absent: plans have no actions). */
+		onPlan?: (id: string, action: PlanAction) => void;
+		/** The mode a plan's approval offers first. */
+		planMode?: ApprovalMode;
 		/** Reads a sent image where the desktop can't open its path (the remote page). */
 		loadImage?: (path: string) => Promise<string>;
 		/** Ordinal of the user message in view: at or above the upper third. */
@@ -381,6 +398,7 @@
 		// Meta/status notices render in the collapsible status strip, not inline.
 		if (m.kind === 'system') return false;
 		if (m.kind === 'tool') return !!(m.name || m.output);
+		if (m.kind === 'plan') return !!(m.title || m.text);
 		return !!m.text && m.text.trim().length > 0;
 	}
 
@@ -402,13 +420,19 @@
 		};
 		for (const m of messages) {
 			if (!hasContent(m)) continue;
-			if (m.kind === 'tool') run.push(m);
+			if (m.kind === 'tool' && !isAgentCall(m)) run.push(m);
 			else flush();
 		}
 		flush();
 		return { members, headOf };
 	});
 	const openGroups = new SvelteSet<Msg>();
+	// The last message with something to show (a plan's actions show there only).
+	const lastShown = $derived(messages.findLast((m) => hasContent(m)));
+	/** A spawn or wait call that renders as a subagent card. */
+	function isAgentCall(m: Msg): boolean {
+		return !!agents && m.kind === 'tool' && (SPAWN_TOOLS.has(m.name) || WAIT_TOOLS.has(m.name));
+	}
 	function shown(m: Msg): boolean {
 		return hasContent(m) && (!toolGroups.headOf.has(m) || toolGroups.members.has(m));
 	}
@@ -541,9 +565,13 @@
 						{/each}
 					</div>
 				{/if}
+			{:else if agents && isAgentCall(m)}
+				<SubagentCard name={m.name} callId={m.callId} output={m.output} args={m.args} running={m.running} isError={m.isError} rows={agents} onOpen={onOpenAgent} />
 			{:else}
 				<ToolCard name={m.name} output={m.output} running={m.running} isError={m.isError} subagent={m.subagent} trace={traceOf?.(m) ?? undefined} />
 			{/if}
+		{:else if m.kind === 'plan'}
+			<PlanCard id={m.id} title={m.title} text={m.text} status={m.status} actionable={m === lastShown} defaultMode={planMode} onAction={onPlan} />
 		{:else if m.kind === 'error'}
 			<ErrorNotice text={m.text} {backend} {provider} onAction={onErrorAction} onDismiss={onDismiss ? () => onDismiss(m) : undefined} />
 				{/if}
