@@ -280,21 +280,27 @@ describe('gateway model rows', () => {
 			]
 		};
 		const rows = buildModelRows(input);
+		// One row per model; the route line is the chosen Provider's.
 		expect(rows.map((r) => [r.label, r.detail])).toEqual([
 			['deepseek-v4.1-flash', '私有 · 代理'],
-			['deepseek-v4.1-flash', '私有 · 新科研'],
 			['glm-5.3', '私有 · 国模模型组']
 		]);
-		expect(new Set(rows.map((r) => r.id)).size).toBe(3);
 		// Nothing chosen yet: the first Provider (the one the gateway tries first) is checked.
-		expect(rows.filter((r) => r.active).map((r) => r.route)).toEqual(['p-agent']);
-		expect(splitRoute(rows[1].command)).toEqual({ command: '/model deepseek-v4.1-flash', route: 'p-lab' });
-		// One Provider: a single row, no route to pin.
-		expect(rows[2].route).toBeUndefined();
-		expect(rows[2].command).toBe('/model glm-5.3');
+		expect(rows[0].route).toBe('p-agent');
+		expect(rows[0].choices?.map((c) => [c.label, c.active])).toEqual([
+			['代理', true],
+			['新科研', false]
+		]);
+		expect(splitRoute(rows[0].choices![1].command)).toEqual({ command: '/model deepseek-v4.1-flash', route: 'p-lab' });
+		// One Provider: a single row, no route to pin, no route page.
+		expect(rows[1].route).toBeUndefined();
+		expect(rows[1].choices).toBeUndefined();
+		expect(rows[1].command).toBe('/model glm-5.3');
 
 		const chosen = buildModelRows({ ...input, routes: { 'deepseek-v4.1-flash': 'p-lab' } });
-		expect(chosen.filter((r) => r.active).map((r) => r.route)).toEqual(['p-lab']);
+		expect(chosen[0].route).toBe('p-lab');
+		expect(chosen[0].detail).toBe('私有 · 新科研');
+		expect(chosen[0].choices?.filter((c) => c.active).map((c) => c.id)).toEqual(['p-lab']);
 	});
 
 	it('keeps a pick without a route and an effort after the model', () => {

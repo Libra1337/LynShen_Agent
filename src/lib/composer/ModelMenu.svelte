@@ -18,7 +18,9 @@
 	import { stripGroupSuffix, type ModelRow } from './modelRows';
 	import { defaultEffort, effortLabel } from './effort';
 	import EffortSlider from './EffortSlider.svelte';
-	import GroupPicker, { type ToolProvider } from './GroupPicker.svelte';
+	import GroupPicker, { loadGroups, type ToolProvider } from './GroupPicker.svelte';
+	import { readConfig, writeConfig, type LynShenGroup } from '$lib/protocol';
+	import { toast } from '$lib/ui/toast.svelte';
 	import { modelColor, isTopEffort } from '$lib/modelColor';
 	import { modelSetup } from '$lib/modelSetupState.svelte';
 
@@ -135,7 +137,50 @@
 		}
 	}
 
-	let page = $state<'main' | 'models'>('main');
+	let page = $state<'main' | 'models' | 'routes'>('main');
+	/** The model whose lines the route page lists. */
+	let routeRow = $state<ModelRow | null>(null);
+	// A LynShen model several groups serve: its groups, cheapest first, and
+	// the one pinned for it (`lynshen_groups`; '' = auto).
+	let modelGroups = $state<LynShenGroup[]>([]);
+	let pinned = $state('');
+	const rowModel = (row: ModelRow) => row.command.replace(/^\/model\s+/, '').split(/\s+/)[0];
+	function openRow(row: ModelRow) {
+		if (row.choices?.length || row.groupsPage) {
+			routeRow = row;
+			page = 'routes';
+			if (row.groupsPage) {
+				const name = rowModel(row);
+				Promise.all([loadGroups(), readConfig()])
+					.then(([list, cfg]) => {
+						modelGroups = list
+							.filter((g) => g.models?.includes(name))
+							.sort((a, b) => a.rate_multiplier - b.rate_multiplier);
+						pinned = ((cfg.lynshen_groups ?? {}) as Record<string, string>)[name] ?? '';
+					})
+					.catch(() => (modelGroups = []));
+			}
+			return;
+		}
+		onSelect(row.command);
+	}
+	async function pickGroup(row: ModelRow, id: string) {
+		const name = rowModel(row);
+		try {
+			const cfg = await readConfig();
+			const map = { ...((cfg.lynshen_groups ?? {}) as Record<string, string>) };
+			if (id) map[name] = id;
+			else delete map[name];
+			await writeConfig({ lynshen_groups: map });
+		} catch (e) {
+			toast.error(t('chat.groupSaveFailed', { error: String(e) }));
+			return;
+		}
+		onSelect(row.command);
+	}
+	const mult = (n: number) => `×${Number(n.toFixed(3))}`;
+	const billing = (g: LynShenGroup) =>
+		g.billing_source === 'plan_only' ? t('chat.groupPlan') : g.billing_source === 'balance_only' ? t('chat.groupBalance') : '';
 	const activeRow = $derived(rows.find((r) => r.active));
 	const modelName = $derived(rows.find(row => row.active)?.label || stripGroupSuffix(chat.modelLabel || '') || chat.model || BACKEND_LABELS[chat.backendId]);
 	// On the first page the list's keys (arrows, Enter) open the list instead
@@ -234,7 +279,7 @@
 				{/each}
 			</section>
 		{/if}
-	{:else}
+	{:else if page === 'models'}
 		<section class="models">
 			<div class="mhead">
 				<IconButton size="sm" label={t('shell.remote.back')} title={t('shell.remote.back')} onclick={() => (page = 'main')}>
@@ -269,7 +314,7 @@
 						class:sel={i === selIdx}
 						role="option"
 						aria-selected={row.active}
-						onclick={() => onSelect(row.command)}
+						onclick={() => openRow(row)}
 						onmouseenter={() => (selIdx = i)}
 					>
 						<span class="pop-ico"><Vendor model={row.vendor ?? row.label} size={16} /></span>
@@ -277,13 +322,59 @@
 							<span class="pop-label">{row.label || t('shell.empty')}</span>
 							{#if row.detail}<span class="pop-desc route" title={row.detail}>{row.detail}</span>{/if}
 						</span>
+						{#if row.choices?.length}
+							<span class="routes-n">{t('chat.routeCount', { n: row.choices.length })}</span>
+						{/if}
 						<span class="pop-check" class:off={!row.active}><CheckIcon size={16} /></span>
+						{#if row.choices?.length || row.groupsPage}<span class="pop-ico caret"><CaretRightIcon size={14} /></span>{/if}
 					</button>
 				{/each}
 				{#if rows.length === 0}
 					<div class="empty">{query.trim() ? t('shell.noMatch') : t('shell.noOptions')}</div>
 				{/if}
 			</div>
+		</section>
+	{:else if routeRow}
+		<section class="models routes">
+			<div class="mhead">
+				<IconButton size="sm" label={t('shell.remote.back')} title={t('shell.remote.back')} onclick={() => (page = 'models')}>
+					<CaretLeftIcon size={14} />
+				</IconButton>
+				<span class="mtitle">{t('chat.routeTitle', { model: routeRow.label })}</span>
+			</div>
+			<div class="list" role="listbox" aria-label={t('chat.routeTitle', { model: routeRow.label })}>
+				{#if routeRow.groupsPage}
+					{@const row = routeRow}
+					<button class="pop-row" role="option" aria-selected={!pinned} onclick={() => pickGroup(row, '')}>
+						<span class="pop-txt">
+							<span class="pop-label">{t('chat.groupAuto')}</span>
+							<span class="pop-desc">{t('chat.groupAutoDesc')}</span>
+						</span>
+						<span class="pop-check" class:off={!!pinned}><CheckIcon size={16} /></span>
+					</button>
+					{#each modelGroups as g (g.id)}
+						{@const desc = [billing(g), g.description].filter(Boolean).join(' · ')}
+						<button class="pop-row" role="option" aria-selected={pinned === g.id} onclick={() => pickGroup(row, g.id)}>
+							<span class="pop-txt">
+								<span class="pop-label">{g.name}</span>
+								{#if desc}<span class="pop-desc" title={desc}>{desc}</span>{/if}
+							</span>
+							<span class="routes-n">{mult(g.rate_multiplier)}</span>
+							<span class="pop-check" class:off={pinned !== g.id}><CheckIcon size={16} /></span>
+						</button>
+					{/each}
+				{/if}
+				{#each routeRow.choices ?? [] as c (c.id)}
+					<button class="pop-row" role="option" aria-selected={c.active} onclick={() => onSelect(c.command)}>
+						<span class="pop-txt">
+							<span class="pop-label">{c.label}</span>
+							{#if c.detail}<span class="pop-desc" title={c.detail}>{c.detail}</span>{/if}
+						</span>
+						<span class="pop-check" class:off={!c.active}><CheckIcon size={16} /></span>
+					</button>
+				{/each}
+			</div>
+			<p class="routes-note">{routeRow.groupsPage ? t('chat.groupRouteNote') : t('chat.routeNote')}</p>
 		</section>
 	{/if}
 </div>
@@ -318,6 +409,20 @@
 		margin-top: 6px;
 		padding-top: 8px;
 		border-top: 1px solid var(--hairline);
+	}
+	.routes-n {
+		flex-shrink: 0;
+		color: var(--dim2);
+		font-size: var(--fs-xs);
+	}
+	.routes .pop-label {
+		font-weight: 600;
+	}
+	.routes-note {
+		margin: 4px 8px 2px;
+		color: var(--dim2);
+		font-size: var(--fs-xs);
+		line-height: 1.5;
 	}
 	.current .pop-row {
 		font-weight: 500;

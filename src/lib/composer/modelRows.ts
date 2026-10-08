@@ -16,6 +16,20 @@ export interface ModelRow {
 	group?: string;
 	/** The gateway Provider this row pins the model to (`monoize_providers`). */
 	route?: string;
+	/** Several gateway Providers serve the model: the row opens a page to
+	 *  pick one; `command` runs the chosen (or first) one. */
+	choices?: RouteChoice[];
+	/** A LynShen model several groups serve: the row opens the group page. */
+	groupsPage?: boolean;
+}
+
+/** One line a model can run through, on the model's route page. */
+export interface RouteChoice {
+	id: string;
+	label: string;
+	detail: string;
+	active: boolean;
+	command: string;
 }
 
 export interface EngineModel {
@@ -289,20 +303,13 @@ export function buildModelRows(input: {
 			depth: undefined,
 			group: activeGroup
 		};
-		// A gateway model several Providers serve: one row each, "私有 · 新科研".
+		// A gateway model several Providers serve: one row, its route page lists them.
 		const choices = entry?.routes ?? [];
 		// One Provider: the same "私有 · 国模模型组" line, nothing to pin.
 		if (choices.length === 1) return [{ ...row, detail: routeLine(choices[0]) }];
-		if (choices.length < 2) return [row];
+		if (choices.length < 2) return [cur === 'lynshen' && (entry?.groups?.length ?? 0) > 1 ? { ...row, groupsPage: true } : row];
 		const chosen = choices.some((r) => r.id === routes[m.model]) ? routes[m.model] : choices[0].id;
-		return choices.map((route) => ({
-			...row,
-			id: `${row.id}::${route.id}`,
-			detail: routeLine(route),
-			active: m.active && route.id === chosen,
-			command: `${row.command} ${ROUTE_MARK}${route.id}`,
-			route: route.id
-		}));
+		return [withChoices(row, choices, chosen, m.active)];
 	});
 	const otherRows: ModelRow[] = (backendId !== 'lynshen' ? [] : providersList)
 		.filter((pv) => pv.id !== cur && configured.includes(pv.id))
@@ -321,15 +328,34 @@ export function buildModelRows(input: {
 				const choices = m.routes ?? [];
 				if (choices.length === 1) return [{ ...row, detail: routeLine(choices[0]) }];
 				if (choices.length < 2) return [row];
-				return choices.map((route) => ({
-					...row,
-					id: `${row.id}::${route.id}`,
-					detail: routeLine(route),
-					command: `${row.command} ${ROUTE_MARK}${route.id}`,
-					route: route.id
-				}));
+				return [withChoices(row, choices, choices[0].id, false)];
 			})
 		);
+	/** One row for a model several Providers serve; its line is the chosen one. */
+	function withChoices(row: ModelRow, choices: ModelRoute[], chosen: string, active: boolean): ModelRow {
+		const pick = choices.find((r) => r.id === chosen) ?? choices[0];
+		const routeDetail = (route: ModelRoute) =>
+			[
+				route.account_class && groups.accountClass ? groups.accountClass(route.account_class) : '',
+				route.group && groups.routeGroup ? groups.routeGroup(route.group) : ''
+			]
+				.filter(Boolean)
+				.join(' · ');
+		return {
+			...row,
+			detail: routeLine(pick),
+			active,
+			command: `${row.command} ${ROUTE_MARK}${pick.id}`,
+			route: pick.id,
+			choices: choices.map((route) => ({
+				id: route.id,
+				label: route.name,
+				detail: routeDetail(route),
+				active: active && route.id === pick.id,
+				command: `${row.command} ${ROUTE_MARK}${route.id}`
+			}))
+		};
+	}
 	const order = [groups.lynshen, groups.byok];
 	return [...activeRows, ...otherRows].sort(
 		(a, b) => order.indexOf(a.group ?? '') - order.indexOf(b.group ?? '')

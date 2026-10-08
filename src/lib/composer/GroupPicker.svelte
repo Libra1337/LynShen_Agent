@@ -3,7 +3,7 @@
 
 	// Groups change rarely; fetch once per app run, again after a failure.
 	let cached: Promise<LynShenGroup[]> | null = null;
-	function loadGroups(): Promise<LynShenGroup[]> {
+	export function loadGroups(): Promise<LynShenGroup[]> {
 		cached ??= fetchLynShenGroups().catch((e) => {
 			cached = null;
 			throw e;
