@@ -579,7 +579,7 @@
 					{#if home}
 						<button class="head-act" onclick={() => onHistory(home)} aria-label={t('shell.history')} title={t('shell.history')}><ClockCounterClockwiseIcon size={16} /></button>
 					{/if}
-					<button class="head-act" onclick={onNewChat} aria-label={t('shell.newChat')} title={t('shell.newChat')}><PlusIcon size={16} /></button>
+					<button class="head-act" onclick={() => onNewChat()} aria-label={t('shell.newChat')} title={t('shell.newChat')}><PlusIcon size={16} /></button>
 				</div>
 				{#each showAllRecent || query ? shownRecent : shownRecent.slice(0, RECENT_LIMIT) as x (x.s.id)}
 					{@render sessRow(x.s, false, false, x.p.home ? x.p : undefined, x.p.home ? undefined : x.p.name)}
