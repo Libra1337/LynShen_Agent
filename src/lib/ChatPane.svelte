@@ -78,6 +78,7 @@
 	import type { SessionSwitch } from '$lib/composer/SessionSwitches.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
+	import { isImageModel } from '$lib/providers/monoize';
 	import Picker from '$lib/shell/Picker.svelte';
 	import Segmented from '$lib/ui/Segmented.svelte';
 	import type { SectionKey } from '$lib/settings/nav';
@@ -849,6 +850,16 @@
 		// A Provider row: pin the model to it (`monoize_providers`, sent as
 		// X-Monoize-Provider from the next request), then pick the model.
 		const { command, route } = splitRoute(picked);
+		// An image model cannot chat: picking one makes it the model the agent
+		// draws with (generate_image), and the chat keeps its model.
+		const drawWith = command.startsWith('/model ') ? command.slice('/model '.length).trim().split(/\s+/)[0] : '';
+		if (drawWith && isImageModel(drawWith)) {
+			chat.closePicker();
+			writeConfig({ image_model: drawWith })
+				.then(() => toast.success(t('chat.imageModelSet', { name: drawWith })))
+				.catch((e) => toast.error(String(e)));
+			return;
+		}
 		if (route) void pinRoute(command, route);
 		// A draft only records the model; it is applied when the first message
 		// starts the engine.

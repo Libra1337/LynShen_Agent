@@ -28,6 +28,9 @@ function catalogModel(id: string): CatalogModel | undefined {
 	return models.find((m) => m.name === id) ?? models.find((m) => m.name.toLowerCase() === id.toLowerCase());
 }
 
+/** A model that draws images and cannot chat (gpt-image-2, grok-imagine-image…). */
+export const isImageModel = (name: string) => /image/i.test(name);
+
 /** The window older versions stored for any model the gateway had none for. */
 const OLD_GUESS = 128_000;
 
@@ -129,7 +132,12 @@ export function pickedMonoizeModels(
 	if (cfg.provider === 'monoize') {
 		const shown = picked.length ? picked.map((m) => live.get(String(m.name))!) : models;
 		patch.models = shown;
-		if (shown.length && !shown.some((m) => m.name === cfg.model)) patch.model = shown[0].name;
+		// An image model cannot chat: one left as the chat model draws images
+		// instead, and the chat takes the first model that can.
+		const chats = shown.filter((m) => !isImageModel(m.name));
+		const current = String(cfg.model ?? '');
+		if (isImageModel(current) && !cfg.image_model) patch.image_model = current;
+		if (chats.length && (isImageModel(current) || !shown.some((m) => m.name === current))) patch.model = chats[0].name;
 	}
 	return patch;
 }

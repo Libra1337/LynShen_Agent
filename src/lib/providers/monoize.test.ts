@@ -106,4 +106,11 @@ describe('pickedMonoizeModels', () => {
 		const patch = pickedMonoizeModels(withAuto, { provider: 'monoize', model: 'glm-5.3', lynshen_models: [{ name: 'glm-5.3' }] });
 		expect((patch.lynshen_models as { name: string }[]).map((m) => m.name)).toEqual(['glm-5.3', 'LS-Auto']);
 	});
+
+	it('moves an image model off the chat model to the image model', () => {
+		const models = monoizeEntries([{ id: 'gpt-image-2' }, { id: 'glm-5.3' }]);
+		const patch = pickedMonoizeModels(models, { provider: 'monoize', model: 'gpt-image-2', lynshen_models: [] });
+		expect(patch.image_model).toBe('gpt-image-2');
+		expect(patch.model).toBe('glm-5.3');
+	});
 });
