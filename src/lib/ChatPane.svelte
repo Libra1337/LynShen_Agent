@@ -202,41 +202,15 @@
 	let mark = $state(-1);
 	const marks = $derived(chat.messages.flatMap((m) => (m.kind === 'user' && !parseDelivery(m.text) ? [m.text] : [])));
 
-	// The conversation column's width: dragging either edge resizes it about
-	// the centre; the width is kept once the drag ends.
-	// Narrow enough to read, wide enough for the composer's bar on one line.
-	const CHAT_MIN = 640;
-	const EDGE = 10; // px from the text to the drag strip's centre
+	// The conversation column has one fixed width (as in ChatGPT and Claude):
+	// narrow enough to read, wide enough for the composer's bar on one line.
+	const CHAT_W = 768;
 	let wrapW = $state(0);
-	let dragW = $state<number | null>(null);
-	let hot = $state<{ edge: string; y: number } | null>(null);
-	const chatW = $derived(Math.max(CHAT_MIN, dragW ?? prefs.chatWidth));
+	const chatW = CHAT_W;
 	// The least room beside the column (more with the rail at the left edge),
 	// and the room it has: main's padding-inline.
 	const chatPad = $derived(marks.length > 1 ? 56 : 32);
 	const pad = $derived(Math.max(chatPad, (wrapW - chatW) / 2));
-	function startResize(e: PointerEvent) {
-		e.preventDefault();
-		const el = e.currentTarget as HTMLElement;
-		const box = el.parentElement!.getBoundingClientRect();
-		const centre = box.left + box.width / 2;
-		el.setPointerCapture(e.pointerId);
-		const move = (ev: PointerEvent) => {
-			dragW = Math.max(CHAT_MIN, Math.min(box.width - 2 * chatPad, 2 * (Math.abs(ev.clientX - centre) - EDGE)));
-		};
-		const end = () => {
-			if (dragW !== null) prefs.setChatWidth(dragW);
-			dragW = null;
-			el.removeEventListener('pointermove', move);
-		};
-		el.addEventListener('pointermove', move);
-		el.addEventListener('pointerup', end, { once: true });
-		el.addEventListener('pointercancel', end, { once: true });
-	}
-	function trackEdge(edge: string, e: PointerEvent) {
-		const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-		hot = { edge, y: e.clientY - box.top };
-	}
 
 	// In-conversation find (⌘F). The raw input updates per keystroke; the actual
 	// scan (findHits) keys off the debounced `findQuery` so the O(n) message scan
@@ -1249,7 +1223,7 @@
 		/>
 	{/if}
 
-	<div class="mainwrap" class:resizing={dragW !== null} bind:clientWidth={wrapW}>
+	<div class="mainwrap" bind:clientWidth={wrapW}>
 	<ProgressCard {chat} sessionId={session.id} rows={turnAgents} onOpen={traceable ? openAgent : undefined} />
 	<main bind:this={scroller} onscroll={onScroll} onwheel={onWheel}>
 		<div bind:this={contentEl}>
@@ -1284,21 +1258,6 @@
 	{#if marks.length > 1}
 		<TurnRail {marks} current={mark} onJump={(n) => messageList?.jumpToMark(n)} />
 	{/if}
-	{#each ['left', 'right'] as edge (edge)}
-		<div
-				class="edge"
-				class:active={dragW !== null}
-				style:left={edge === 'left' ? `${pad - EDGE}px` : `${wrapW - pad + EDGE}px`}
-				role="separator"
-				aria-orientation="vertical"
-				aria-label={t('chat.resizeColumn')}
-				onpointerdown={startResize}
-				onpointermove={(e) => trackEdge(edge, e)}
-				onpointerleave={() => dragW === null && (hot = null)}
-			>
-				{#if hot?.edge === edge}<span style:top="{hot.y}px"></span>{/if}
-			</div>
-	{/each}
 	</div>
 	{#if !atBottom}
 		<button class="jump" style:bottom="{bottomH + 14}px" onclick={jumpToBottom} aria-label={t('chat.jumpToBottom')}><CaretDownIcon size={18} /></button>
@@ -1643,7 +1602,9 @@
 		mask-image: linear-gradient(to bottom, #000 calc((6 - var(--n)) * 100% / 6), transparent calc((7 - var(--n)) * 100% / 6));
 		-webkit-mask-image: linear-gradient(to bottom, #000 calc((6 - var(--n)) * 100% / 6), transparent calc((7 - var(--n)) * 100% / 6));
 	}
-	:global(:root[data-glass]) .edge-blur {
+	/* macOS only: WebView2 (Windows) can paint stacked masked backdrop
+	   filters over a scroller as an opaque layer, blanking the transcript. */
+	:global(:root[data-glass][data-os='macos']) .edge-blur {
 		display: block;
 	}
 	.mainwrap {
@@ -1664,34 +1625,6 @@
 		/* Full width, so the scrollbar sits at the pane's edge; the padding
 		   centres the column. */
 		padding-inline: max(var(--chat-pad), calc((100% - var(--chat-w)) / 2));
-	}
-	/* The column's edge: hovering shows a short bar at the pointer, dragging
-	   resizes the column. */
-	.edge {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		width: 12px;
-		transform: translateX(-50%);
-		cursor: col-resize;
-		z-index: 4;
-	}
-	.edge span {
-		position: absolute;
-		left: 5px;
-		width: 2px;
-		height: 120px;
-		border-radius: 1px;
-		transform: translateY(-50%);
-		background: linear-gradient(transparent, var(--dim), transparent);
-		pointer-events: none;
-	}
-	.edge.active span {
-		background: linear-gradient(transparent, var(--text), transparent);
-	}
-	.resizing {
-		cursor: col-resize;
-		user-select: none;
 	}
 	.welcome {
 		margin: auto;

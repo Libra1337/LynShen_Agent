@@ -102,6 +102,8 @@ const shell = {
 		// header / navigator
 		toggleSidebar: '收起或展开侧栏',
 		chatGone: '该对话已关闭',
+		paneError: '这个对话显示出错了，已记录到日志。',
+		paneErrorRetry: '重新显示',
 
 		// workspaces
 		workspace: { default: '默认工作区' },
@@ -1022,6 +1024,8 @@ const shell = {
 		// header / navigator
 		toggleSidebar: 'Collapse or expand sidebar',
 		chatGone: 'This conversation is closed',
+		paneError: 'This conversation failed to display; it was logged.',
+		paneErrorRetry: 'Show again',
 
 		// workspaces
 		workspace: { default: 'Default workspace' },

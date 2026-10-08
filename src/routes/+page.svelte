@@ -924,6 +924,13 @@
 		store.removeProject(p);
 	}
 
+	/** A pane's render error: logged with the session for the logs folder. */
+	function reportUiError(error: unknown, sid: string) {
+		telemetry.track('error:pane');
+		const text = error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error);
+		invoke('log_ui_error', { message: `pane ${sid}: ${text}` }).catch(() => {});
+	}
+
 	async function removeSession(id: string) {
 		const s = sessionMap.get(id);
 		// A draft that never started has nothing to lose.
@@ -1096,7 +1103,13 @@
 				duration: 15000,
 				action: { label: t('settings.help.noticeAction'), run: () => openSettings('general') }
 			});
-		const onUiError = () => telemetry.track('error:ui');
+		const onUiError = (e: Event) => {
+			// (window-level errors; a pane's own are caught by its boundary)
+			telemetry.track('error:ui');
+			const err = e instanceof ErrorEvent ? e.error ?? e.message : (e as PromiseRejectionEvent).reason;
+			const text = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err);
+			invoke('log_ui_error', { message: text }).catch(() => {});
+		};
 		window.addEventListener('error', onUiError);
 		window.addEventListener('unhandledrejection', onUiError);
 		const cleanups: Array<() => void> = [];
@@ -1476,19 +1489,30 @@
 											/>
 											{/if}
 										{:else}
-											<ChatPane
-												session={sess}
-												{store}
-												{providers}
-												{providersList}
-												isActive={sid === activeId}
-												onRegister={registerPane}
-												onUnregister={unregisterPane}
-												onOpenSettings={openSettings}
-												onOpenAgent={openDesk}
-												onOpenRequirement={openRequirements}
-												onOpenTrace={() => openPanelTile('agents')}
-											/>
+											<!-- A render error in one conversation must not blank the
+											     pane silently: it shows, is logged, and can be retried. -->
+											<svelte:boundary onerror={(e) => reportUiError(e, sid)}>
+												<ChatPane
+													session={sess}
+													{store}
+													{providers}
+													{providersList}
+													isActive={sid === activeId}
+													onRegister={registerPane}
+													onUnregister={unregisterPane}
+													onOpenSettings={openSettings}
+													onOpenAgent={openDesk}
+													onOpenRequirement={openRequirements}
+													onOpenTrace={() => openPanelTile('agents')}
+												/>
+												{#snippet failed(error, reset)}
+													<div class="pane-error">
+														<p>{t('shell.paneError')}</p>
+														<code>{String((error as Error)?.message ?? error).slice(0, 300)}</code>
+														<button onclick={reset}>{t('shell.paneErrorRetry')}</button>
+													</div>
+												{/snippet}
+											</svelte:boundary>
 										{/if}
 									{:else}
 										<!-- A tile whose session went away is closed by the effect
@@ -1885,5 +1909,31 @@
 	.tui-pick-item:hover {
 		border-color: var(--accent);
 		background: var(--surface2);
+	}
+	.pane-error {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		height: 100%;
+		padding: 24px;
+		color: var(--dim);
+		text-align: center;
+	}
+	.pane-error code {
+		max-width: 560px;
+		color: var(--dim2);
+		font-size: var(--fs-xs);
+		word-break: break-word;
+	}
+	.pane-error button {
+		padding: 6px 14px;
+		border: 1px solid var(--border);
+		border-radius: var(--r-md);
+		background: var(--panel);
+		color: var(--text);
+		font: inherit;
+		cursor: pointer;
 	}
 </style>
