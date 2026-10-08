@@ -10,6 +10,7 @@
 	import SessionMark from '$lib/SessionMark.svelte';
 	import { sessionStatus } from '$lib/sessionStatus';
 	import { joinPath, parseFileHref, pathExt } from '$lib/fileRefs';
+	import { PROVIDER_CATALOG } from '$lib/providers/catalog';
 	import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 	import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
 	import TargetIcon from 'phosphor-svelte/lib/TargetIcon';
@@ -375,7 +376,13 @@
 					custom = [];
 				}
 				providersList = [
-					...bs.map((b) => ({ id: b.id, base_url: b.base_url, format: b.protocol, models: b.models })),
+					...bs.map((b) => ({
+						id: b.id,
+						name: PROVIDER_CATALOG.providers.find((p) => p.id === b.id)?.name ?? b.id,
+						base_url: b.base_url,
+						format: b.protocol,
+						models: b.models
+					})),
 					...custom
 				];
 			})

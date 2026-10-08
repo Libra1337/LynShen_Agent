@@ -138,8 +138,8 @@ describe('buildModelRows', () => {
 			models: [{ model: 'byok-model', active: true }],
 			providersList: [{ id: 'lynshen', models: [{ name: 'gpt-5.5' }] }]
 		});
-		// LynShen built-in group comes before Custom/BYOK.
-		expect(rows.map((r) => r.group)).toEqual(['LynShen', 'BYOK']);
+		// LynShen comes first; every other provider is a heading of its own.
+		expect(rows.map((r) => r.group)).toEqual(['LynShen', 'custom']);
 	});
 
 	// Claude Code / Codex: one list of this machine's catalog and the gateway's.
@@ -313,5 +313,24 @@ describe('gateway model rows', () => {
 		expect(stripGroupSuffix('claude-opus-4-6（海外）')).toBe('claude-opus-4-6');
 		expect(stripGroupSuffix('gpt-5.5 (default) / gpt-5.5 (test)')).toBe('gpt-5.5');
 		expect(stripGroupSuffix('Claude Opus 4.8')).toBe('Claude Opus 4.8');
+	});
+
+	it('heads each provider by its name and hides the old login beside the gateway', () => {
+		const rows = buildModelRows({
+			...base,
+			backendId: 'lynshen',
+			provider: 'monoize',
+			configured: ['monoize', 'lynshen', 'deepseek'],
+			models: [{ model: 'glm-5.3', active: true }],
+			providersList: [
+				{ id: 'lynshen', models: [{ name: 'gpt-5.5' }] },
+				{ id: 'monoize', name: 'LynShen Console', models: [{ name: 'glm-5.3' }] },
+				{ id: 'deepseek', name: 'DeepSeek', models: [{ name: 'deepseek-chat' }] }
+			]
+		});
+		expect(rows.map((r) => [r.group, r.id])).toEqual([
+			['LynShen', 'monoize::glm-5.3'],
+			['DeepSeek', 'deepseek::deepseek-chat']
+		]);
 	});
 });

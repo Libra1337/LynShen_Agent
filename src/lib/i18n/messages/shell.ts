@@ -36,7 +36,7 @@ const shell = {
 			checkpoint: '回退到历史回合'
 		},
 		modelGroup: {
-			lynshen: 'LynShen 内置',
+			lynshen: 'LynShen',
 			byok: '自定义 / BYOK'
 		},
 		toolSwitch: {
@@ -960,7 +960,7 @@ const shell = {
 			checkpoint: 'Rewind to a turn'
 		},
 		modelGroup: {
-			lynshen: 'LynShen built-in',
+			lynshen: 'LynShen',
 			byok: 'Custom / BYOK'
 		},
 		toolSwitch: {

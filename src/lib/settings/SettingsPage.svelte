@@ -300,13 +300,18 @@
 	const effortOpts = $derived(efforts.map((e) => ({ value: e, label: cap(e) })));
 	// All providers' models in one list (provider-qualified), so the default-model
 	// picker isn't limited to whichever provider is currently the default.
+	// Only providers that can run (a login or a key), and the LynShen gateway
+	// once: monoize is it, the old lynshen login a second copy.
+	const hasGateway = $derived(allProviders.some((p) => p.id === 'monoize' && usable(p)));
 	const allModelOpts = $derived(
-		allProviders.flatMap((p) =>
+		allProviders
+			.filter((p) => usable(p) && !(p.id === 'lynshen' && hasGateway))
+			.flatMap((p) =>
 			p.models.map((m) => ({
 				value: `${p.id}::${m.name}`,
 				label: m.display_name || m.name,
 				provider: p.id,
-				group: p.id === 'lynshen' ? t('settings.behavior.groupLynShen') : t('settings.behavior.groupByok'),
+				group: p.id === 'lynshen' || p.id === 'monoize' ? t('settings.behavior.groupLynShen') : p.name || p.id,
 				context_window: m.context_window,
 				authed: usable(p)
 			}))

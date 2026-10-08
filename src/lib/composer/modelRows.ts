@@ -52,6 +52,8 @@ export interface ModelRoute {
 
 export interface CatalogProvider {
 	id: string;
+	/** Shown as the provider's heading in the model menu. */
+	name?: string;
 	models: {
 		name: string;
 		display_name?: string | null;
@@ -272,7 +274,12 @@ export function buildModelRows(input: {
 			depth: undefined
 		}));
 	}
-	const activeGroup = cur === 'lynshen' ? groups.lynshen : groups.byok;
+	// One heading per provider: the LynShen gateway (monoize, or the old lynshen
+	// login) under LynShen, every other provider under its own name.
+	const isGateway = (id: string) => id === 'lynshen' || id === 'monoize';
+	const groupOf = (id: string) =>
+		isGateway(id) ? groups.lynshen : providersList.find((p) => p.id === id)?.name || id;
+	const activeGroup = groupOf(cur);
 	/** A gateway model (lynshen, monoize) names its route; others their provider. */
 	const lineTwo = (provider: string, groupsOf: string[] | undefined, ctx: number | undefined, byok: boolean) => {
 		if (provider === 'lynshen' || provider === 'monoize')
@@ -297,7 +304,7 @@ export function buildModelRows(input: {
 			id: `${cur}::${m.model}`,
 			label: stripGroupSuffix(entry?.display_name || m.label || m.model),
 			vendor: m.vendor || m.model,
-			detail: lineTwo(cur, entry?.groups, m.context_window, activeGroup === groups.byok),
+			detail: lineTwo(cur, entry?.groups, m.context_window, !isGateway(cur)),
 			active: m.active,
 			command: `/model ${m.model}`,
 			depth: undefined,
@@ -313,6 +320,8 @@ export function buildModelRows(input: {
 	});
 	const otherRows: ModelRow[] = (backendId !== 'lynshen' ? [] : providersList)
 		.filter((pv) => pv.id !== cur && configured.includes(pv.id))
+		// The live gateway (monoize) makes the old lynshen login a second copy.
+		.filter((pv) => !(pv.id === 'lynshen' && (cur === 'monoize' || configured.includes('monoize'))))
 		.flatMap((pv) =>
 			pv.models.flatMap((m) => {
 				const row: ModelRow = {
@@ -323,7 +332,7 @@ export function buildModelRows(input: {
 					active: false,
 					command: `@switch ${pv.id} ${m.name}`,
 					depth: undefined,
-					group: pv.id === 'lynshen' ? groups.lynshen : groups.byok
+					group: groupOf(pv.id)
 				};
 				const choices = m.routes ?? [];
 				if (choices.length === 1) return [{ ...row, detail: routeLine(choices[0]) }];
@@ -356,8 +365,15 @@ export function buildModelRows(input: {
 			}))
 		};
 	}
-	const order = [groups.lynshen, groups.byok];
-	return [...activeRows, ...otherRows].sort(
-		(a, b) => order.indexOf(a.group ?? '') - order.indexOf(b.group ?? '')
-	);
+	// LynShen first, then the session's provider, then the rest in list order.
+	const order = [
+		groups.lynshen,
+		activeGroup,
+		...providersList.filter((p) => !isGateway(p.id)).map((p) => p.name || p.id)
+	];
+	const rank = (row: ModelRow) => {
+		const at = order.indexOf(row.group ?? '');
+		return at < 0 ? order.length : at;
+	};
+	return [...activeRows, ...otherRows].sort((a, b) => rank(a) - rank(b));
 }
