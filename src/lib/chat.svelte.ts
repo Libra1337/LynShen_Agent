@@ -84,6 +84,9 @@ export type Msg =
 			isError: boolean;
 			/** The Task subagent that made this call (claude). */
 			subagent?: string;
+			/** A subagent call's arguments as the engine showed them before its
+			 *  output replaced them (the agent's name and task). */
+			args?: string;
 	  }
 	| { kind: 'system'; text: string }
 	| { kind: 'error'; text: string }
@@ -190,6 +193,9 @@ export interface SubagentInfo {
 
 /** The lifecycle words of an agent that has stopped for good. */
 const FINAL_AGENT = ['completed', 'done', 'failed', 'errored', 'stopped', 'interrupted', 'closed', 'killed', 'cancelled'];
+
+/** Calls that start a subagent: their arguments name it. */
+const SUBAGENT_CALLS = new Set(['spawn_agent', 'Task', 'Agent']);
 
 /** A proposed plan's status as the engine words it. */
 const PLAN_STATUS = ['pending', 'approved', 'revising'];
@@ -1188,7 +1194,10 @@ export class ChatState {
 				break;
 			case 'tool_update': {
 				const t = this.#tool(str(ev.call_id));
-				if (t) t.output = str(ev.output);
+				if (t) {
+					t.output = str(ev.output);
+					if (SUBAGENT_CALLS.has(t.name)) t.args = t.output;
+				}
 				break;
 			}
 			case 'tool_output': {
