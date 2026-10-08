@@ -1,4 +1,5 @@
 import { fetchMonoizeModels, readConfig, writeConfig, type MonoizeModel, type MonoizeRoute } from '$lib/protocol';
+import { newlyOffered } from '$lib/lynshenModels';
 import { PROVIDER_CATALOG } from './catalog';
 
 /** A gateway model as the picker and config.json hold it. */
@@ -83,6 +84,18 @@ export async function refreshMonoizeCatalog() {
 	}
 }
 
+/** A gateway model as `lynshen_models` keeps it (what the engines read). */
+function monoizeSaved(m: MonoizeModelEntry): Record<string, unknown> {
+	return {
+		name: m.name,
+		...(m.display_name && m.display_name !== m.name ? { display_name: m.display_name } : {}),
+		context_window: m.context_window ?? 0,
+		max_context_window: m.context_window ?? 0,
+		max_output_tokens: m.max_output_tokens ?? 0,
+		reasoning_efforts: m.reasoning_efforts?.length ? m.reasoning_efforts : ['none']
+	};
+}
+
 /** What config.json keeps of the gateway list: the models chosen to show
  *  (`lynshen_models`) that the key can still reach — one whose group was
  *  taken away is dropped — and, on the gateway, the engine's model list:
@@ -93,9 +106,16 @@ export function pickedMonoizeModels(
 ): Record<string, unknown> {
 	const live = new Map(models.map((m) => [m.name, m]));
 	const saved = Array.isArray(cfg.lynshen_models) ? (cfg.lynshen_models as { name?: unknown }[]) : [];
-	const picked = saved.filter((m) => live.has(String(m.name)));
+	const kept = saved.filter((m) => live.has(String(m.name)));
+	// Put on sale since the last look: shown at once (see newlyOffered).
+	const offer = newlyOffered(models.map((m) => m.name), cfg);
+	const fresh = kept.length
+		? offer.fresh.filter((name) => !kept.some((m) => m.name === name)).map((name) => monoizeSaved(live.get(name)!))
+		: [];
+	const picked = [...kept, ...fresh];
 	const patch: Record<string, unknown> = {};
 	if (picked.length !== saved.length) patch.lynshen_models = picked;
+	if (JSON.stringify(offer.seen) !== JSON.stringify(cfg.lynshen_models_seen)) patch.lynshen_models_seen = offer.seen;
 	// A Provider pinned for a model that no longer serves it would be refused
 	// (provider_unavailable): the gateway picks again once the pin is gone.
 	const pins = (cfg.monoize_providers ?? {}) as Record<string, string>;

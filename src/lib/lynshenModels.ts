@@ -6,6 +6,20 @@
 import { fetchLynShenModels, readConfig, writeConfig, type LynShenModel } from './protocol';
 import { DEFAULT_MODELS } from './defaultModels';
 
+/** Models the account is offered that it was not offered before: shown at
+ *  once (put on sale since the last look). `lynshen_models_seen` remembers
+ *  every id offered, so a model the user unchecked stays hidden. Without a
+ *  record yet (an older config), only an Auto model counts as new: that is
+ *  the one put on sale with this version. Returns the new ids and the
+ *  record to save. */
+export function newlyOffered(ids: string[], cfg: Record<string, unknown>): { fresh: string[]; seen: string[] } {
+	const isAuto = (id: string) => /(^|[-_])auto$/i.test(id);
+	const recorded = Array.isArray(cfg.lynshen_models_seen)
+		? new Set((cfg.lynshen_models_seen as unknown[]).map(String))
+		: new Set(ids.filter((id) => !isAuto(id)));
+	return { fresh: ids.filter((id) => !recorded.has(id)), seen: ids };
+}
+
 /** One saved entry. Explicit unknowns (0 / ["none"]), as the engine's own
  *  login writes them: a missing field would read back as a default. */
 export function savedModel(m: LynShenModel): Record<string, unknown> {
@@ -40,14 +54,13 @@ export async function refreshLynShenModels(): Promise<boolean> {
 	// A model the gateway newly lists (put on sale since the last look) is
 	// shown at once: only the user's own unchecking hides a model. `seen`
 	// holds every id the account was offered, so a hidden one stays hidden.
-	const seen = Array.isArray(cfg.lynshen_models_seen) ? new Set((cfg.lynshen_models_seen as unknown[]).map(String)) : null;
-	const fresh = seen ? live.filter((m) => !seen.has(m.id)).map(savedModel) : [];
+	const offer = newlyOffered(live.map((m) => m.id), cfg);
+	const fresh = live.filter((m) => offer.fresh.includes(m.id)).map(savedModel);
 	const base = kept.length ? kept : recommended.length ? recommended : live.slice(0, 6).map(savedModel);
 	const next = [...base, ...fresh.filter((m) => !base.some((b) => b.name === m.name))];
 	const patch: Record<string, unknown> = {};
 	if (JSON.stringify(next) !== JSON.stringify(saved)) patch.lynshen_models = next;
-	const offered = live.map((m) => m.id);
-	if (JSON.stringify(offered) !== JSON.stringify(cfg.lynshen_models_seen)) patch.lynshen_models_seen = offered;
+	if (JSON.stringify(offer.seen) !== JSON.stringify(cfg.lynshen_models_seen)) patch.lynshen_models_seen = offer.seen;
 	if (cfg.provider === 'lynshen') {
 		if (JSON.stringify(cfg.models) !== JSON.stringify(next)) patch.models = next;
 		if (!next.some((model) => model.name === cfg.model)) {

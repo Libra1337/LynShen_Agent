@@ -71,6 +71,35 @@ describe('pickedMonoizeModels', () => {
 
 	it('shows every model when nothing was picked, and leaves another provider alone', () => {
 		expect((pickedMonoizeModels(live, { provider: 'monoize', model: 'glm-5.3' }).models as unknown[]).length).toBe(2);
-		expect(pickedMonoizeModels(live, { provider: 'deepseek', lynshen_models: [{ name: 'glm-5.3' }] })).toEqual({});
+		expect(
+			pickedMonoizeModels(live, { provider: 'deepseek', lynshen_models: [{ name: 'glm-5.3' }], lynshen_models_seen: ['glm-5.3', 'kimi-k3'] })
+		).toEqual({});
+	});
+
+	it('shows a model put on sale since the last look, keeping a hidden one hidden', () => {
+		const withAuto = monoizeEntries([
+			{ id: 'glm-5.3', groups: ['国模'], providers: [] },
+			{ id: 'kimi-k3', groups: ['代理'], providers: [] },
+			{ id: 'LS-Auto', groups: ['海外'], providers: [] }
+		]);
+		const patch = pickedMonoizeModels(withAuto, {
+			provider: 'monoize',
+			model: 'glm-5.3',
+			lynshen_models: [{ name: 'glm-5.3' }],
+			lynshen_models_seen: ['glm-5.3', 'kimi-k3']
+		});
+		expect((patch.lynshen_models as { name: string }[]).map((m) => m.name)).toEqual(['glm-5.3', 'LS-Auto']);
+		expect((patch.models as { name: string }[]).map((m) => m.name)).toEqual(['glm-5.3', 'LS-Auto']);
+		expect(patch.lynshen_models_seen).toEqual(['glm-5.3', 'kimi-k3', 'LS-Auto']);
+	});
+
+	it('without a record yet, counts only an Auto model as new', () => {
+		const withAuto = monoizeEntries([
+			{ id: 'glm-5.3', groups: [], providers: [] },
+			{ id: 'kimi-k3', groups: [], providers: [] },
+			{ id: 'LS-Auto', groups: [], providers: [] }
+		]);
+		const patch = pickedMonoizeModels(withAuto, { provider: 'monoize', model: 'glm-5.3', lynshen_models: [{ name: 'glm-5.3' }] });
+		expect((patch.lynshen_models as { name: string }[]).map((m) => m.name)).toEqual(['glm-5.3', 'LS-Auto']);
 	});
 });
