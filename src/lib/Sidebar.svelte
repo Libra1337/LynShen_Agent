@@ -24,6 +24,7 @@
 	import mark from '$lib/lynshen-mark.svg?raw';
 	import { SIDEBAR_RAIL_WIDTH } from '$lib/shell/sidebarState';
 	import { rowIn } from '$lib/ui/motion';
+	import Collapse from '$lib/ui/Collapse.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import { t } from '$lib/i18n';
 	import { shownTitle } from '$lib/chat.svelte';
@@ -640,7 +641,7 @@
 							{/if}
 							<button class="act" class:always={p.stale} onclick={() => onCloseProject(p)} aria-label={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')} title={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')}><XIcon size={16} /></button>
 						</div>
-						{#if open}
+						<Collapse {open}>
 							{#each showAll[p.id] || query ? active : firstSessions(active) as s (s.id)}{@render sessRow(s, true, false, p)}{/each}
 							{#if active.length > SHOW_LIMIT && !query}
 								<button class="more nested" onclick={() => (showAll[p.id] = !showAll[p.id])}>{showAll[p.id] ? t('shell.showLess') : t('shell.showMore')}</button>
@@ -649,7 +650,7 @@
 								<button class="sess ghost nested" onclick={() => onNewSession(p)}><span class="sess-title">{t('shell.newChat')}</span></button>
 							{/if}
 							{@render archived(p, arch, true)}
-						{/if}
+						</Collapse>
 					</div>
 				{/if}
 			{/each}
@@ -1218,7 +1219,7 @@
 		color: var(--text);
 	}
 	.caret :global(svg) {
-		transition: transform var(--t-fast) var(--ease-out);
+		transition: transform var(--t-base) var(--ease-base);
 	}
 	.caret.open :global(svg) {
 		transform: rotate(90deg);
