@@ -1277,7 +1277,7 @@
 		{#if chat.pendingApproval && !chat.pendingApproval.questions?.length}
 			<div class="approval-wrap">
 				{#key chat.pendingApproval.callId}
-					<ApprovalCard approval={chat.pendingApproval} onRespond={respondApproval} ruleScopes={caps(chat).ruleScopes} />
+					<ApprovalCard approval={chat.pendingApproval} onRespond={respondApproval} ruleScopes={caps(chat).ruleScopes} keys={isActive} />
 				{/key}
 			</div>
 		{/if}

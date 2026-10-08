@@ -1125,6 +1125,8 @@
 				const s = sessionMap.get(sessionId);
 				if (!s) return;
 				const wasBusy = s.chat.busy;
+				const hadApproval = s.chat.pendingApproval?.callId ?? null;
+				const hadPlan = s.chat.messages.findLast((m) => m.kind === 'plan' && m.status === 'pending');
 				// Capture the raw frame for the diagnostics trace so a mis-parsed or
 				// dropped tool frame is inspectable after the fact.
 				s.chat.captureFrame(data);
@@ -1176,6 +1178,16 @@
 				if (wasBusy && !s.chat.busy && s.id !== curActive) {
 					s.chat.unseen = true;
 					notifyDone(s.chat.title);
+				}
+				// Something waits on the user while the window is in the
+				// background: an action to allow, or a plan to approve.
+				if (!document.hasFocus()) {
+					const ask = s.chat.pendingApproval;
+					if (ask && ask.callId !== hadApproval && !ask.questions?.length)
+						void notify(shownTitle(s.chat.title), t('shell.notifyApproval', { what: ask.summary.slice(0, 120) }));
+					const plan = s.chat.messages.findLast((m) => m.kind === 'plan' && m.status === 'pending');
+					if (plan && plan !== hadPlan && plan.kind === 'plan')
+						void notify(shownTitle(s.chat.title), t('shell.notifyPlan', { title: plan.title }));
 				}
 				// This session's tile (if any) sticks to the bottom while streaming.
 				panes.get(s.id)?.scrollToEnd();
