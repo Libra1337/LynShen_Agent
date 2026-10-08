@@ -96,6 +96,9 @@ export interface Project {
 	/** 不属于任何项目的对话：path 为 ~/Documents/LynShen，会话照常以编程模式运行。
 	 *  侧栏不把它列为项目（会话列在「最近」），也不能移除。 */
 	home?: boolean;
+	/** A new conversation outside any project: its own folder under `path`
+	 *  is made from its first message (see SessionStore.#chatFolder). */
+	newFolder?: boolean;
 	/** 承载长期 Agent 会话的隐藏项目（每个 Agent 工作目录一个）：会话只在工作台里显示，
 	 *  不进侧栏和画布，也不保存、不同步给后台服务（随用随建）。 */
 	agents?: boolean;

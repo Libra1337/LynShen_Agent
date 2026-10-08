@@ -1,10 +1,11 @@
 import { AUTO_CONTINUE, ChatState, UNTITLED } from './chat.svelte';
-import { acpAgentsList, closeSession, daemon, hostSession, sessionMeta, sessionHistory, defaultWorkspaceDir, writeConfig, git } from './protocol';
+import { acpAgentsList, closeSession, createChatDir, daemon, hostSession, listDir, sessionMeta, sessionHistory, defaultWorkspaceDir, writeConfig, git, type FsEntry, type HistoryItem } from './protocol';
+import { chatFolderName } from './chatFolder';
 import type { EngineSpec } from './daemon';
 import { canHandOffToTui, isValidResumeSessionId } from './tuiHandoff';
 import { normalizeBackendId, type BackendId } from './backends';
 import { createLynShenAdapter } from './backends/lynshen';
-import { clearDraft, dispatch, dropHeldOps, holdOps, ioFor, markDraft, registerAdapter, startDraft, unregisterAdapter } from './backends/router';
+import { clearDraft, dispatch, dropHeldOps, holdOps, ioFor, markDraft, peekHeldOps, registerAdapter, startDraft, unregisterAdapter } from './backends/router';
 import { buildBackendOpts, defaultBackendFor } from './backends/settings';
 import { toEngineMode } from './approval';
 import { getLocale, t } from '$lib/i18n';
@@ -58,6 +59,8 @@ export interface SavedProject extends SavedTabChrome {
 	chats?: boolean;
 	/** 不属于任何项目的对话（见 Project.home）。 */
 	home?: boolean;
+	/** Its folder is not made yet (see Project.newFolder). */
+	newFolder?: boolean;
 	/** 附加目录（见 Project.dirs）。 */
 	dirs?: string[];
 }
@@ -419,7 +422,8 @@ export class SessionStore {
 			const effort = pick.effort ?? '';
 			dispatch(s.id, { op: 'command', input: effort ? `/model ${model} ${effort}` : `/model ${model}` });
 		};
-		this.#spawn(s, project.path, applyPick)
+		(project.newFolder ? this.#chatFolder(project, s.id) : Promise.resolve())
+			.then(() => this.#spawn(s, project.path, applyPick))
 			.then(() => {
 				// Renamed while a draft, before it had a daemon session.
 				if (s.chat.title !== UNTITLED) this.#share(s, { title: s.chat.title });
@@ -764,17 +768,31 @@ export class SessionStore {
 		return s.id;
 	}
 
-	/** A new conversation outside any project. It runs in
-	 *  `~/Documents/LynShen`, whose group is made on first use. */
+	/** A new conversation outside any project. It gets a folder of its own
+	 *  under `~/Documents/LynShen`, made from its first message, so the files
+	 *  of different conversations never mix. */
 	async newChat(firstMessage?: string) {
-		if (!this.home) {
-			const path = await defaultWorkspaceDir(true);
-			// The folder may already be a project the user added.
-			const known = this.userProjects.find((p) => samePath(p.path, path));
-			if (known) return this.addSession(known, firstMessage);
-			this.projects.unshift({ id: this.uid(), name: t('shell.home.chats'), path, sessions: [], home: true });
+		const path = await defaultWorkspaceDir(true);
+		// The folder may already be a project the user added.
+		const known = this.userProjects.find((p) => !p.home && samePath(p.path, path));
+		if (known) return this.addSession(known, firstMessage);
+		const id = this.uid();
+		this.projects.unshift({ id, name: t('shell.home.chats'), path, sessions: [], home: true, newFolder: true });
+		return this.addSession(this.projects.find((p) => p.id === id)!, firstMessage);
+	}
+
+	/** A new conversation's folder: `<date> <start of its first message>`
+	 *  under the workspace dir. On failure it runs in the workspace dir. */
+	async #chatFolder(project: Project, sessionId: string) {
+		const first = peekHeldOps(sessionId).find((op) => op.op === 'user_message');
+		const text = typeof first?.content === 'string' ? first.content : '';
+		try {
+			project.path = await createChatDir(project.path, chatFolderName(text, new Date()));
+			project.name = base(project.path);
+		} catch (e) {
+			console.error('chat folder', e);
 		}
-		return this.addSession(this.home!, firstMessage);
+		project.newFolder = undefined;
 	}
 
 	/** Create a project from a directory path and seed its first session.
@@ -1118,6 +1136,10 @@ export class SessionStore {
 		dropHeldOps(id);
 		const p = this.projects.find((pr) => pr.sessions.some((s) => s.id === id));
 		if (p) p.sessions = p.sessions.filter((s) => s.id !== id);
+		// A conversation's own folder group goes with its last session (the
+		// folder stays on disk; 历史 still finds it).
+		if (p?.home && !p.sessions.length && this.projects.filter((x) => x.home).length > 1)
+			this.projects = this.projects.filter((x) => x.id !== p.id);
 		if (this.activeId === id) this.activeId = this.shownSessions[0]?.id ?? '';
 	}
 
@@ -1183,10 +1205,25 @@ export class SessionStore {
 		}
 	}
 
-	/** The LynShen conversations saved for the project, as history picker rows. */
+	/** For 历史 of conversations outside projects: the folder each lives in. */
+	#historyDirs = new Map<string, string>();
+
+	/** The LynShen conversations saved for the project, as history picker rows.
+	 *  Outside any project: those of the workspace dir and of every
+	 *  conversation folder in it, newest first. */
 	async historyItems(p: Project, chat: ChatState) {
-		const sessions = (await sessionHistory(p.path)).filter((x) => x.engine === 'lynshen');
-		return sessions.map((x) => ({
+		const dirs = p.home ? await this.#homeDirs() : [p.path];
+		const lists = await Promise.all(
+			dirs.map((dir) =>
+				sessionHistory(dir).then(
+					(list) => list.filter((x) => x.engine === 'lynshen').map((x) => ({ x, dir })),
+					() => [] as { x: HistoryItem; dir: string }[]
+				)
+			)
+		);
+		const rows = lists.flat().sort((a, b) => b.x.updated_at - a.x.updated_at);
+		if (p.home) for (const { x, dir } of rows) this.#historyDirs.set(x.session, dir);
+		return rows.map(({ x }) => ({
 			id: x.session,
 			label: x.title || x.session,
 			detail: new Date(x.updated_at).toLocaleString(),
@@ -1194,8 +1231,32 @@ export class SessionStore {
 		}));
 	}
 
+	/** The workspace dir, then its conversation folders, newest first. */
+	async #homeDirs(): Promise<string[]> {
+		const root = await defaultWorkspaceDir(true);
+		const entries = await listDir(root, root).catch(() => [] as FsEntry[]);
+		const folders = entries
+			.filter((e) => e.is_dir && !e.name.startsWith('.'))
+			.sort((a, b) => b.name.localeCompare(a.name))
+			.slice(0, 80)
+			.map((e) => e.path);
+		return [root, ...folders];
+	}
+
+	/** The group a conversation in `dir` (outside any project) opens in. */
+	#homeFor(dir: string): Project {
+		const open = this.projects.find((p) => p.home && samePath(p.path, dir));
+		if (open) return open;
+		const id = this.uid();
+		this.projects.unshift({ id, name: base(dir), path: dir, sessions: [], home: true });
+		return this.projects.find((p) => p.id === id)!;
+	}
+
 	/** Open a saved conversation from a history picker in a new tab. */
 	openSaved(project: Project, sid: string, title: string, backend: BackendId) {
+		// Outside any project, a conversation opens in the folder it ran in.
+		const dir = project.home ? this.#historyDirs.get(sid) : undefined;
+		if (dir && !samePath(dir, project.path)) project = this.#homeFor(dir);
 		// Already open: switch to it (a second engine on the same conversation
 		// would fight over it).
 		const open = this.allSessions.find((s) => s.backendId === backend && s.chat.sessionId === sid);
@@ -1255,6 +1316,7 @@ export class SessionStore {
 			...(p.worktree ? { worktree: p.worktree } : {}),
 			...(p.chats ? { chats: true } : {}),
 			...(p.home ? { home: true } : {}),
+			...(p.newFolder ? { newFolder: true } : {}),
 			...(p.dirs?.length ? { dirs: p.dirs } : {}),
 			...(p.lastBackend && p.lastBackend !== 'lynshen' ? { lastBackend: p.lastBackend } : {}),
 			...(p.lastBackend === 'acp' && p.lastAcpAgent ? { lastAcpAgent: p.lastAcpAgent } : {}),
@@ -1352,7 +1414,11 @@ export class SessionStore {
 			for (const p of saved) {
 				// The same project twice (a file an older version wrote while a
 				// daemon list raced the restore): one entry, both entries' tabs.
-				const known = this.userProjects.find((x) => x.id === p.id || samePath(x.path, p.path));
+				// A conversation still waiting for its folder shares the workspace
+				// dir's path with others; only its id matches it.
+				const known = this.userProjects.find(
+					(x) => x.id === p.id || (!p.newFolder && !x.newFolder && samePath(x.path, p.path))
+				);
 				if (known) {
 					if (known.stale) this.#staleTabs.set(known.id, [...(this.#staleTabs.get(known.id) ?? []), ...(p.tabs ?? [])]);
 					else this.#restoreTabs(known, p.tabs ?? []);
@@ -1361,6 +1427,7 @@ export class SessionStore {
 				const proj: Project = { id: p.id, name: p.name, path: p.path, sessions: [] };
 				if (p.chats === true) proj.chats = true;
 				if (p.home === true) proj.home = true;
+				if (p.newFolder === true) proj.newFolder = true;
 				this.setProjectDirs(proj, p.dirs);
 				this.setProjectChrome(proj, p);
 				if (p.lastBackend) proj.lastBackend = normalizeBackendId(p.lastBackend);

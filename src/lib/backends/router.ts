@@ -54,6 +54,11 @@ export function releaseOps(sessionId: string): void {
 	for (const op of ops ?? []) dispatch(sessionId, op);
 }
 
+/** What a draft holds so far, without releasing it. */
+export function peekHeldOps(sessionId: string): readonly Op[] {
+	return held.get(sessionId) ?? [];
+}
+
 /** Stop holding and return what was held, undelivered (the engine is not
  *  coming back). */
 export function dropHeldOps(sessionId: string): Op[] {

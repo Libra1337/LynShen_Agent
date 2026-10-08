@@ -167,6 +167,8 @@
 	// list under 对话 with the latest of every project, newest first; the
 	// projects list their own below.
 	const home = $derived(projects.find((p) => p.home));
+	// Each conversation outside a project has a folder (and group) of its own.
+	const homes = $derived(projects.filter((p) => p.home));
 	const codeProjects = $derived(projects.filter((p) => !p.chats && !p.home));
 	const RECENT_LIMIT = 8;
 	const recent = $derived.by(() => {
@@ -587,7 +589,7 @@
 				{#if shownRecent.length > RECENT_LIMIT && !query}
 					<button class="more" onclick={() => (showAllRecent = !showAllRecent)}>{showAllRecent ? t('shell.showLess') : t('shell.showMore')}</button>
 				{/if}
-				{#if home}{@render archived(home, home.sessions.filter((s) => s.archived && sessionMatches(home, s)), false)}{/if}
+				{#if home}{@render archived(home, homes.flatMap((h) => h.sessions.filter((s) => s.archived && sessionMatches(h, s))), false)}{/if}
 			</section>
 		{/if}
 

@@ -485,6 +485,11 @@ export function projectRoot(): Promise<string> {
 export function defaultWorkspaceDir(create = false): Promise<string> {
 	return invoke('default_workspace_dir', { create });
 }
+/** Makes `<root>/<name>` (or `<name> 2`, …) for a conversation; `root` must be
+ *  the default workspace dir. Returns the folder made. */
+export function createChatDir(root: string, name: string): Promise<string> {
+	return invoke('create_chat_dir', { root, name });
+}
 export interface FsEntry {
 	name: string;
 	path: string;

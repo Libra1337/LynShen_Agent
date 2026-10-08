@@ -13,6 +13,8 @@ vi.mock('./protocol', () => ({
 	projectRoot: vi.fn(() => Promise.resolve('/tmp/demo')),
 	chatsDir: vi.fn(() => Promise.resolve('/home/u/.lynshen/chats')),
 	defaultWorkspaceDir: vi.fn(() => Promise.resolve('/home/u/Documents/LynShen')),
+	createChatDir: vi.fn((root: string, name: string) => Promise.resolve(`${root}/${name}`)),
+	listDir: vi.fn(() => Promise.resolve([{ name: '2026-10-01 old', path: '/home/u/Documents/LynShen/2026-10-01 old', is_dir: true }])),
 	writeConfig: vi.fn(() => Promise.resolve()),
 	git: vi.fn(() => Promise.resolve('')),
 	sessionHistory: vi.fn(() =>
@@ -952,21 +954,29 @@ describe('hidden chats', () => {
 });
 
 describe('SessionStore conversations outside a project', () => {
-	it('newChat starts in ~/Documents/LynShen, a group made once and never listed as a project', async () => {
+	it('newChat runs each conversation in a folder of its own, made from its first message', async () => {
 		const store = new SessionStore();
 		store.projects.push(proj());
 		const id = await store.newChat();
-		const home = store.home!;
+		const home = store.projects.find((p) => p.sessions.some((s) => s.id === id))!;
+		expect(home.home).toBe(true);
 		expect(home.path).toBe('/home/u/Documents/LynShen');
-		expect(home.sessions.map((s) => s.id)).toEqual([id]);
 		expect(store.codeProjects.map((p) => p.id)).toEqual(['p1']);
 		begin(id);
 		await flush();
-		// A coding session like any other, in that folder.
+		await flush();
+		// A coding session like any other, in a folder named by the day and the message.
+		expect(home.path).toMatch(/^\/home\/u\/Documents\/LynShen\/\d{4}-\d{2}-\d{2} hi$/);
+		expect(home.newFolder).toBeUndefined();
 		expect(hostSession).toHaveBeenCalledWith(id, home.path, undefined, undefined, false, undefined);
-		await store.newChat();
-		expect(store.projects.filter((p) => p.home)).toHaveLength(1);
-		expect(store.home!.sessions).toHaveLength(2);
+		const second = await store.newChat();
+		const other = store.projects.find((p) => p.sessions.some((s) => s.id === second))!;
+		expect(other.id).not.toBe(home.id);
+		expect(store.projects.filter((p) => p.home)).toHaveLength(2);
+		// 历史 lists the conversations of every folder, and one opens where it ran.
+		const items = await store.historyItems(other, other.sessions[0].chat);
+		expect(items.map((x) => x.id)).toContain('s6old');
+		expect(vi.mocked(sessionHistory)).toHaveBeenCalledWith('/home/u/Documents/LynShen/2026-10-01 old');
 	});
 
 	it('the group survives serialize/restore, and 最近 orders sessions by last activity', async () => {

@@ -1500,6 +1500,40 @@ fn default_workspace_dir(app: AppHandle, create: bool) -> Result<String, String>
     Ok(dir.display().to_string())
 }
 
+/// A conversation's own folder under the default workspace dir
+/// (`~/Documents/LynShen/<name>`), made when its first message is sent; a
+/// taken name gets ` 2`, ` 3`, …. Only that dir: `root` names it, not any path.
+#[tauri::command]
+fn create_chat_dir(app: AppHandle, root: String, name: String) -> Result<String, String> {
+    let workspace = PathBuf::from(default_workspace_dir(app, true)?);
+    let same = |a: &Path, b: &Path| match (a.canonicalize(), b.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    };
+    if !same(Path::new(&root), &workspace) {
+        return Err(format!("{root} is not the default workspace folder"));
+    }
+    let name: String = name
+        .chars()
+        .map(|c| if "\\/:*?\"<>|".contains(c) || c.is_control() { ' ' } else { c })
+        .collect::<String>()
+        .trim()
+        .trim_end_matches(['.', ' '])
+        .to_string();
+    if name.is_empty() || name == "." || name == ".." {
+        return Err("empty folder name".to_string());
+    }
+    for n in 1..=999 {
+        let dir = workspace.join(if n == 1 { name.clone() } else { format!("{name} {n}") });
+        match std::fs::create_dir(&dir) {
+            Ok(()) => return Ok(dir.display().to_string()),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(format!("{}: {error}", dir.display())),
+        }
+    }
+    Err(format!("no free folder name for {name}"))
+}
+
 /// The directory chat sessions run in (`~/.lynshen/chats`), created when
 /// missing so the file panel can list it before the first engine starts.
 #[tauri::command]
@@ -3618,6 +3652,7 @@ pub fn run() {
             project_root,
             chats_dir,
             default_workspace_dir,
+            create_chat_dir,
             list_providers,
             list_dir,
             list_files,
