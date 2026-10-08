@@ -1581,7 +1581,7 @@
 		position: absolute;
 		left: 0;
 		right: 12px;
-		height: 48px;
+		height: 28px;
 		z-index: 2;
 		pointer-events: none;
 	}
@@ -1606,6 +1606,13 @@
 	   filters over a scroller as an opaque layer, blanking the transcript. */
 	:global(:root[data-glass][data-os='macos']) .edge-blur {
 		display: block;
+	}
+	/* The transcript ends clear of the bands: scrolled to the bottom (or
+	   top), the last (first) line rests outside the blur; only text passing
+	   under the title bar or the composer dissolves. */
+	:global(:root[data-glass][data-os='macos']) main {
+		padding-top: calc(22px + 28px);
+		padding-bottom: calc(26px + 28px);
 	}
 	.mainwrap {
 		position: relative;

@@ -1081,6 +1081,13 @@ fn fetch_monoize_balance() -> Result<serde_json::Value, String> {
     monoize_auth::gateway_key_get("/user/balance")
 }
 
+/// The account's last minute (RPM / TPM / cache hits) for the account card,
+/// with the desktop device key (GET /api/desktop/oauth/live-usage).
+#[tauri::command(async)]
+fn fetch_monoize_live_usage() -> Result<serde_json::Value, String> {
+    monoize_auth::gateway_key_get("/api/desktop/oauth/live-usage")
+}
+
 /// Monoize 网关当前可调用的模型（GET /v1/models），用于在设置里刷新模型列表。
 #[tauri::command(async)]
 fn fetch_monoize_models() -> Result<serde_json::Value, String> {
@@ -3583,6 +3590,7 @@ pub fn run() {
             fetch_lynshen_groups,
             fetch_deepseek_balance,
             fetch_monoize_balance,
+            fetch_monoize_live_usage,
             fetch_monoize_models,
             monoize_auth::monoize_oauth_start,
             monoize_auth::monoize_oauth_poll,

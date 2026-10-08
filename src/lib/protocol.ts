@@ -408,21 +408,14 @@ export interface LiveUsage {
 	/** cache_read / input tokens, 0–1; null when the window had no input. */
 	cache_hit_rate: number | null;
 }
-/**
- * The account's own requests over the last 60 seconds, for the account card's
- * RPM / TPM / cache-hit tiles; null while there is no source, and the tiles
- * show "—".
- *
- * Not wired yet: the gateway serves this only as GET
- * /api/dashboard/me/live-usage, which needs a dashboard session (cookie or
- * session bearer). The desktop holds only the device key of its browser
- * authorization (src-tauri/src/monoize_auth.rs), which /api/dashboard/*
- * refuses. Once the gateway answers the device key (for example
- * /api/desktop/oauth/live-usage, same body), add a Tauri command that calls it
- * through `gateway_key_get` and return its result here.
- */
+/** The account's own requests over the last 60 seconds, for the account
+ *  card's RPM / TPM / cache-hit tiles (GET /api/desktop/oauth/live-usage with
+ *  the device key); null when unavailable (signed out, an older gateway), and
+ *  the tiles show "—". */
 export async function fetchMonoizeLiveUsage(): Promise<LiveUsage | null> {
-	return null;
+	const v = await invoke<Partial<LiveUsage>>('fetch_monoize_live_usage');
+	if (typeof v?.rpm !== 'number' || typeof v.tpm !== 'number') return null;
+	return { rpm: v.rpm, tpm: v.tpm, cache_hit_rate: typeof v.cache_hit_rate === 'number' ? v.cache_hit_rate : null };
 }
 /** 模型广场：登录用户各分组内可调用的模型（服务端已按分组过滤）。
  *  `groups` 是该模型出现的分组；跨分组同名模型以 `模型@分组` 区分。 */

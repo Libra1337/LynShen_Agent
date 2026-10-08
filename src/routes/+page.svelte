@@ -1354,7 +1354,7 @@
 	</TitleBar>
 	<div class="body">
 		<!-- The content panel: session list + canvas, inset in the window chrome
-		     with a rounded top-left corner. Settings covers it as a page; the
+		     flush with the window edge. Settings covers it as a page; the
 		     session list and canvas stay mounted (hidden) underneath so chats,
 		     terminals and TUI tiles keep their state. -->
 		<div class="panel" class:covered={showSettings || showDesk}>
@@ -1817,7 +1817,9 @@
 		flex: 1;
 		display: flex;
 		min-width: 0;
-		border-top-left-radius: var(--r-lg);
+		/* Flush with the window's left edge (no rail beside it): a rounded
+		   corner there cut a sliver out of the sidebar's top, which showed
+		   the title bar's fill (bright over a background image). */
 		overflow: hidden;
 		position: relative;
 		/* No fill of its own: the sidebar (frosted under vibrancy) and the

@@ -60,8 +60,7 @@
 	const plan = $derived(user?.billing_plan?.name?.trim() || '');
 
 	// The last minute's usage, every 10 s while the card is open (as the
-	// console polls it). fetchMonoizeLiveUsage has no source yet: the tiles
-	// show "—".
+	// console polls it).
 	let live = $state<LiveUsage | null>(null);
 	onMount(() => {
 		if (!loggedIn) return;
