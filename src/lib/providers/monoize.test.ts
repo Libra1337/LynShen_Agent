@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_CONTEXT_WINDOW, monoizeEntries, pickedMonoizeModels } from './monoize';
+import { monoizeEntries, pickedMonoizeModels } from './monoize';
 
 describe('monoizeEntries', () => {
 	it('keeps every model its reasoning efforts, matching the catalog regardless of case', () => {
@@ -29,24 +29,28 @@ describe('monoizeEntries', () => {
 		expect(entries[0]).toMatchObject({ reasoning_efforts: ['low', 'high'], context_window: 400_000 });
 	});
 
-	it('takes the window the gateway registers, and never leaves one unknown', () => {
-		const [registered, stored, catalogOnly, nothing] = monoizeEntries(
+	it('takes the window the gateway registers, and never guesses one', () => {
+		const [registered, stored, catalogOnly, nothing, guessed] = monoizeEntries(
 			[
 				{ id: 'glm-5.3', context_window: 128_000, max_output_tokens: 32_000 },
 				{ id: 'gpt-5.5', context_window: null },
 				{ id: 'DeepSeek-V4.1-Flash', context_window: null },
-				{ id: 'brand-new-model' }
+				{ id: 'brand-new-model' },
+				{ id: 'gemini-9-flash' }
 			],
 			[
 				{ name: 'glm-5.3', context_window: 1_310_720 } as { name: string },
-				{ name: 'gpt-5.5', context_window: 400_000 } as { name: string }
+				{ name: 'gpt-5.5', context_window: 400_000 } as { name: string },
+				{ name: 'gemini-9-flash', context_window: 128_000 } as { name: string }
 			]
 		);
 		// The gateway's registered window wins over a larger stale one.
 		expect(registered).toMatchObject({ context_window: 128_000, max_output_tokens: 32_000 });
 		expect(stored.context_window).toBe(400_000);
 		expect(catalogOnly.context_window).toBe(1_000_000);
-		expect(nothing.context_window).toBe(FALLBACK_CONTEXT_WINDOW);
+		// Unknown stays unknown; the 128K older versions guessed counts as unknown.
+		expect(nothing.context_window).toBe(0);
+		expect(guessed.context_window).toBe(0);
 	});
 });
 

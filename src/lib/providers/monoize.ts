@@ -28,17 +28,18 @@ function catalogModel(id: string): CatalogModel | undefined {
 	return models.find((m) => m.name === id) ?? models.find((m) => m.name.toLowerCase() === id.toLowerCase());
 }
 
-/** The window assumed for a gateway model nobody registered one for: an
- *  engine compacts only against a known window, and none would mean never. */
-export const FALLBACK_CONTEXT_WINDOW = 128_000;
+/** The window older versions stored for any model the gateway had none for. */
+const OLD_GUESS = 128_000;
 
 /**
  * Turns the gateway's model list into picker entries. Metadata comes from what
  * the user already configured for that id, else the bundled catalog, so every
  * model keeps its reasoning efforts (a model with none listed would offer only
- * "none" in the picker). The window is the gateway's registered one when it has
- * one (the engine compacts at a share of it), else the one already stored, else
- * the catalog's, else FALLBACK_CONTEXT_WINDOW.
+ * "none" in the picker). The window is the gateway's registered one, else the
+ * one already stored, else the catalog's, else 0 (unknown: the engine then
+ * compacts when the upstream says a request is too long). A stored 128K is the
+ * guess older versions wrote for every unknown model, which capped 1M models
+ * at 128K: it counts as unknown.
  */
 export function monoizeEntries(list: MonoizeModel[], known: { name: string }[] = []): MonoizeModelEntry[] {
 	const stored = new Map(known.map((m) => [m.name, m]));
@@ -48,7 +49,8 @@ export function monoizeEntries(list: MonoizeModel[], known: { name: string }[] =
 			const previous = stored.get(m.id) as Partial<MonoizeModelEntry> | undefined;
 			const catalog = catalogModel(m.id);
 			const efforts = previous?.reasoning_efforts?.length ? previous.reasoning_efforts : catalog?.reasoning_efforts;
-			const window = m.context_window || previous?.context_window || catalog?.context_window || FALLBACK_CONTEXT_WINDOW;
+			const kept = previous?.context_window === OLD_GUESS ? 0 : previous?.context_window;
+			const window = m.context_window || kept || catalog?.context_window || 0;
 			const output = m.max_output_tokens || previous?.max_output_tokens || catalog?.max_output_tokens;
 			return {
 				...catalog,
@@ -90,7 +92,8 @@ function monoizeSaved(m: MonoizeModelEntry): Record<string, unknown> {
 		name: m.name,
 		...(m.display_name && m.display_name !== m.name ? { display_name: m.display_name } : {}),
 		context_window: m.context_window ?? 0,
-		max_context_window: m.context_window ?? 0,
+		// No maximum: one equal to the window kept an override from raising it.
+		max_context_window: 0,
 		max_output_tokens: m.max_output_tokens ?? 0,
 		reasoning_efforts: m.reasoning_efforts?.length ? m.reasoning_efforts : ['none']
 	};
