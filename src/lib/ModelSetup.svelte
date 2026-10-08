@@ -134,7 +134,12 @@
 			const n = parseWindow(windows[m.id]);
 			if (n > 0) overrides[m.id] = n;
 		}
-		const patch: Record<string, unknown> = { lynshen_models: chosen, context_window_overrides: overrides };
+		const patch: Record<string, unknown> = {
+			lynshen_models: chosen,
+			context_window_overrides: overrides,
+			// Everything listed here has been seen: unchecked ones stay hidden.
+			lynshen_models_seen: models.map((m) => m.id)
+		};
 		if (cfg.provider) {
 			// The checked list becomes the active provider's model list — the
 			// composer menu reads it whatever the provider (lynshen or a keyed

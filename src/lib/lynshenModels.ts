@@ -37,9 +37,17 @@ export async function refreshLynShenModels(): Promise<boolean> {
 		const model = byId.get(String(entry.name));
 		return model ? [savedModel(model)] : [];
 	});
-	const next = kept.length ? kept : recommended.length ? recommended : live.slice(0, 6).map(savedModel);
+	// A model the gateway newly lists (put on sale since the last look) is
+	// shown at once: only the user's own unchecking hides a model. `seen`
+	// holds every id the account was offered, so a hidden one stays hidden.
+	const seen = Array.isArray(cfg.lynshen_models_seen) ? new Set((cfg.lynshen_models_seen as unknown[]).map(String)) : null;
+	const fresh = seen ? live.filter((m) => !seen.has(m.id)).map(savedModel) : [];
+	const base = kept.length ? kept : recommended.length ? recommended : live.slice(0, 6).map(savedModel);
+	const next = [...base, ...fresh.filter((m) => !base.some((b) => b.name === m.name))];
 	const patch: Record<string, unknown> = {};
 	if (JSON.stringify(next) !== JSON.stringify(saved)) patch.lynshen_models = next;
+	const offered = live.map((m) => m.id);
+	if (JSON.stringify(offered) !== JSON.stringify(cfg.lynshen_models_seen)) patch.lynshen_models_seen = offered;
 	if (cfg.provider === 'lynshen') {
 		if (JSON.stringify(cfg.models) !== JSON.stringify(next)) patch.models = next;
 		if (!next.some((model) => model.name === cfg.model)) {

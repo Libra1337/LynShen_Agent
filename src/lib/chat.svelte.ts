@@ -362,6 +362,8 @@ export class ChatState {
 	// Last model catalog seen (from a `model_view`), so the picker popover can open
 	// instantly from cache while a fresh `/model` round-trip refreshes it.
 	modelCatalog = $state<ModelOption[]>([]);
+	/** model_view replies to absorb without opening the menu. */
+	silentModelView = 0;
 	modelCatalogEffort = $state('');
 	// File-checkpoint sha captured just before each user turn (index = turn), so a
 	// rewind can restore the working tree to that turn's state (codex/claude, where
@@ -1318,6 +1320,12 @@ export class ChatState {
 				this.modelCatalog = arr<ModelOption>(ev.models);
 				this.modelCatalogEffort = str(ev.active_effort);
 				this.#remember({ catalog: this.modelCatalog, catalogEffort: this.modelCatalogEffort });
+				// A background refresh (the model list changed) updates the list
+				// without opening the menu.
+				if (this.silentModelView > 0) {
+					this.silentModelView--;
+					break;
+				}
 				this.picker = {
 					kind: 'model',
 					models: arr<ModelOption>(ev.models),

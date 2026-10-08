@@ -1614,6 +1614,13 @@
 			onClose={() => {
 				modelSetup.open = false;
 				loadProviders();
+				// Running LynShen sessions re-read config.json's list (their /model
+				// reload): the menu shows what was just checked, on every platform.
+				for (const s of store.allSessions)
+					if (s.backendId === 'lynshen' && !s.draft && !s.dormant) {
+						s.chat.silentModelView++;
+						dispatch(s.id, { op: 'command', input: '/model' });
+					}
 			}}
 		/>
 	{/if}

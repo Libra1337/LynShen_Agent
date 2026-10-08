@@ -74,7 +74,7 @@
 	import { agentRows, type AgentRow } from '$lib/agentProgress';
 	import { parseToolOutput, toolTarget, toolVerb } from '$lib/toolSummary';
 	import { parseFileHref } from '$lib/fileRefs';
-	import type { Msg } from '$lib/chat.svelte';
+	import type { Msg, ModelOption } from '$lib/chat.svelte';
 	import type { SessionSwitch } from '$lib/composer/SessionSwitches.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
@@ -401,6 +401,30 @@
 		return () => clearInterval(iv);
 	});
 
+	/** config.json's model list as the picker shows it (what the native
+	 *  engine reports for /model), keeping what the last report knew. */
+	function configCatalog(cfg: Record<string, unknown>, known: ModelOption[]): ModelOption[] {
+		const list = Array.isArray(cfg.models) ? (cfg.models as Record<string, unknown>[]) : [];
+		const current = typeof cfg.model === 'string' ? cfg.model : '';
+		return list
+			.filter((m) => typeof m.name === 'string' && m.name)
+			.map((m) => {
+				const name = m.name as string;
+				const prev = known.find((k) => k.model === name);
+				return {
+					...prev,
+					model: name,
+					...(typeof m.display_name === 'string' && m.display_name ? { label: m.display_name } : {}),
+					active: name === current,
+					context_window: typeof m.context_window === 'number' ? m.context_window : (prev?.context_window ?? 0),
+					max_output_tokens: typeof m.max_output_tokens === 'number' ? m.max_output_tokens : (prev?.max_output_tokens ?? 0),
+					reasoning_efforts: Array.isArray(m.reasoning_efforts)
+						? (m.reasoning_efforts as string[])
+						: (prev?.reasoning_efforts ?? [])
+				};
+			});
+	}
+
 	// Open the model picker as a popover. If we already have a cached catalog,
 	// show it instantly and refresh in the background; otherwise fetch first.
 	function openModelPicker() {
@@ -408,10 +432,26 @@
 		// reported last time, marked with the draft's own pick.
 		if (session.draft) {
 			const pick = session.draftPick?.model;
-			const models = chat.modelCatalog.map((m) => ({ ...m, active: pick ? m.model === pick : m.active }));
-			chat.picker = { kind: 'model', models, activeEffort: chat.effort };
-			const act = models.findIndex((m) => m.active);
-			selIdx = act >= 0 ? act : 0;
+			const show = (catalog: ModelOption[]) => {
+				const models = catalog.map((m) => ({ ...m, active: pick ? m.model === pick : m.active }));
+				chat.picker = { kind: 'model', models, activeEffort: chat.effort };
+				const act = models.findIndex((m) => m.active);
+				selIdx = act >= 0 ? act : 0;
+			};
+			show(chat.modelCatalog);
+			// The native engine lists config.json's models: read them now, so a
+			// model checked in 管理模型 (or newly on sale) shows before any
+			// engine has run, not only after one reported its list.
+			if (chat.backendId === 'lynshen')
+				readConfig()
+					.then((cfg) => {
+						const catalog = configCatalog(cfg, chat.modelCatalog);
+						if (catalog.length && chat.picker?.kind === 'model' && session.draft) {
+							chat.modelCatalog = catalog;
+							show(catalog);
+						}
+					})
+					.catch(() => {});
 			return;
 		}
 		// Opened at once, from the last list the engine reported or (none yet:

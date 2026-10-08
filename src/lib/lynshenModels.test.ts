@@ -28,8 +28,25 @@ describe('refreshLynShenModels', () => {
 		expect(patch.models).toBe(patch.lynshen_models);
 	});
 
+	it('shows a model put on sale since the last look, but keeps one the user hid hidden', async () => {
+		readConfig.mockResolvedValue({
+			provider: 'lynshen',
+			lynshen_models: [savedModel({ id: 'a' })],
+			lynshen_models_seen: ['a', 'hidden']
+		});
+		fetchLynShenModels.mockResolvedValue([{ id: 'a' }, { id: 'hidden' }, { id: 'auto' }]);
+		expect(await refreshLynShenModels()).toBe(true);
+		const patch = writeConfig.mock.calls[0][0] as { lynshen_models: { name: string }[]; lynshen_models_seen: string[] };
+		expect(patch.lynshen_models.map((m) => m.name)).toEqual(['a', 'auto']);
+		expect(patch.lynshen_models_seen).toEqual(['a', 'hidden', 'auto']);
+	});
+
 	it('writes nothing when the gateway says the same', async () => {
-		readConfig.mockResolvedValue({ provider: 'deepseek', lynshen_models: [savedModel({ id: 'b', context_window: 200 })] });
+		readConfig.mockResolvedValue({
+			provider: 'deepseek',
+			lynshen_models: [savedModel({ id: 'b', context_window: 200 })],
+			lynshen_models_seen: ['b']
+		});
 		fetchLynShenModels.mockResolvedValue([{ id: 'b', context_window: 200 }]);
 		expect(await refreshLynShenModels()).toBe(false);
 		expect(writeConfig).not.toHaveBeenCalled();
@@ -57,12 +74,21 @@ describe('refreshLynShenModels', () => {
 		readConfig.mockResolvedValue({ provider: 'deepseek', model: 'my-model', models: [{ name: 'my-model' }], lynshen_models: [] });
 		fetchLynShenModels.mockResolvedValue([{ id: 'gpt-6.1-sol' }]);
 		expect(await refreshLynShenModels()).toBe(true);
-		expect(writeConfig.mock.calls[0][0]).toEqual({ lynshen_models: [savedModel({ id: 'gpt-6.1-sol' })] });
+		expect(writeConfig.mock.calls[0][0]).toEqual({
+			lynshen_models: [savedModel({ id: 'gpt-6.1-sol' })],
+			lynshen_models_seen: ['gpt-6.1-sol']
+		});
 	});
 
 	it('does not overwrite an existing single-model user selection', async () => {
 		const saved = [savedModel({ id: 'gpt-5.5' })];
-		readConfig.mockResolvedValue({ provider: 'lynshen', model: 'gpt-5.5', models: saved, lynshen_models: saved });
+		readConfig.mockResolvedValue({
+			provider: 'lynshen',
+			model: 'gpt-5.5',
+			models: saved,
+			lynshen_models: saved,
+			lynshen_models_seen: ['gpt-5.5', 'gpt-6.1-sol']
+		});
 		fetchLynShenModels.mockResolvedValue([{ id: 'gpt-5.5' }, { id: 'gpt-6.1-sol' }]);
 		expect(await refreshLynShenModels()).toBe(false);
 		expect(writeConfig).not.toHaveBeenCalled();
