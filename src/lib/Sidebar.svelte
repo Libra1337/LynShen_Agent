@@ -23,6 +23,7 @@
 	import SidebarSimpleIcon from 'phosphor-svelte/lib/SidebarSimpleIcon';
 	import mark from '$lib/lynshen-mark.svg?raw';
 	import { SIDEBAR_RAIL_WIDTH } from '$lib/shell/sidebarState';
+	import { rowIn } from '$lib/ui/motion';
 	import Button from '$lib/ui/Button.svelte';
 	import { t } from '$lib/i18n';
 	import { shownTitle } from '$lib/chat.svelte';
@@ -386,6 +387,7 @@
 		{@const req = s.chat.sessionId ? reqs.bySession.get(s.chat.sessionId) : undefined}
 		<!-- Listed rows (`p` given) drag within their project and pinned group. -->
 		<button
+			in:rowIn
 			class="sess"
 			class:nested
 			class:on={!selectable && s.id === activeId}

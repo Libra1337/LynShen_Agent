@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { paneOut } from '$lib/ui/motion';
 	// The settings page: covers the content panel (session list + canvas stay
 	// mounted underneath) with a nav column on the left — a flat list of
 	// sections and a search over every row — and the selected section's page
@@ -796,7 +797,7 @@
 	{#if loginError}<div class="notice"><Notice onDismiss={() => (loginError = '')}>{loginError}</Notice></div>{/if}
 {/snippet}
 
-<div class="settings">
+<div class="settings" out:paneOut|global>
 	<nav class="nav" style:width="{navWidth}px" aria-label={t('settings.title')}>
 		<div class="nav-head">
 			<button class="back" title={t('settings.page.back')} aria-label={t('settings.page.back')} onclick={onClose}>
@@ -837,8 +838,11 @@
 		</div>
 	</nav>
 
+	<!-- Sections cross-fade: the leaving one fades out in the same grid cell
+	     while the next rises in. -->
+	<div class="stage">
 	{#key current}
-		<div class="main">
+		<div class="main" out:paneOut>
 			<div class="col">
 				<h1>{t(`settings.section.${current}`)}</h1>
 
@@ -1250,6 +1254,7 @@
 			</div>
 		</div>
 	{/key}
+	</div>
 </div>
 
 {#if editing === '__monoize__'}
@@ -1470,11 +1475,17 @@
 	}
 
 	/* ---------- page ---------- */
-	.main {
+	.stage {
 		flex: 1;
 		min-width: 0;
-		overflow-y: auto;
+		display: grid;
+		grid-template: minmax(0, 1fr) / minmax(0, 1fr);
 		background: var(--bg);
+	}
+	.main {
+		grid-area: 1 / 1;
+		min-width: 0;
+		overflow-y: auto;
 	}
 	/* Left-aligned next to the nav, like the Claude and ChatGPT settings. */
 	.col {
