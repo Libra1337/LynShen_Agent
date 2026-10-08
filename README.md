@@ -47,16 +47,15 @@ LynShen 账号在 [LynShen Console](https://www.lynshen.org)（LynShen 官网）
 
 - 每个会话用一个智能体：LynShen 引擎、Claude Code、Codex，或在「设置 → 外部智能体（ACP）」里添加的 ACP 智能体（例如 `gemini --experimental-acp`）。
 - Claude Code 和 Codex 会话可以用本机已有的登录，也可以走 LynShen 网关，用 LynShen 账号的额度。
-- 不属于任何项目的对话（独立对话）保存在 `~/Documents/LynShen`（文稿/LynShen）。
+- 不属于任何项目的对话（独立对话）各有一个文件夹，在 `~/Documents/LynShen`（文稿/LynShen）下，按日期和第一条消息命名，不同对话的文件不会混在一起。
 - 可以导入 Claude Code 和 Codex 自己保存的历史对话，在 LynShen 里接着聊。导入时应用复制一份，原文件不变。
 - 想用智能体原本的终端界面时，可以在标签页里运行真正的 `lynshen`、`codex` 或 `claude` TUI。从命令面板（`⌘K`）或面板的「+」菜单打开。
-- Agent 是长期存在的智能体，有自己的角色说明、记忆和定时任务，在主页创建。
 
 **审批和计划**
 
 - 审批模式决定智能体改文件、跑命令之前是否先问你。在输入框里用 `Shift+Tab` 切换。
 - 审批卡片的快捷键：`1` 允许一次，`2` 始终允许，`3` 或 `Esc` 拒绝。
-- 计划模式（LynShen、Claude Code、Codex 会话）：智能体先只读调研，再交一份计划。你可以批准并选择执行时的审批模式，也可以让它修改计划。
+- 计划模式（LynShen、Claude Code、Codex 会话）：智能体先只读调研，再交一份计划。计划在对话右侧单独的页面里边写边显示。你可以批准并选择执行时的审批模式，也可以让它修改计划。
 - 窗口在后台时，如果有命令等你批准，或有计划等你确认，应用会发系统通知。
 
 **项目工具**
