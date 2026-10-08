@@ -650,14 +650,19 @@
 		});
 	});
 
-	// Chat tiles of closed (or hidden) sessions disappear with them.
+	// Chat tiles of closed (or hidden) sessions disappear with them, whenever
+	// either side changes (a tile can also arrive with a restored or dragged
+	// layout), and the active session moves to one that is still there.
 	$effect(() => {
 		const ids = new Set(store.shownSessions.map((s) => s.id));
+		const shownTiles = chatSessionsIn(tiles);
 		if (!tilesReady) return;
 		untrack(() => {
 			let next = tiles;
-			for (const sid of chatSessionsIn(next)) if (!ids.has(sid)) next = closeTab(next, chatPanel(sid));
+			for (const sid of shownTiles) if (!ids.has(sid)) next = closeTab(next, chatPanel(sid));
 			applyTiles(next);
+			if (store.activeId && !store.allSessions.some((s) => s.id === store.activeId))
+				store.activeId = store.shownSessions.find((s) => !s.archived)?.id ?? '';
 		});
 	});
 
@@ -1486,7 +1491,9 @@
 											/>
 										{/if}
 									{:else}
-										<div class="gone">{t('shell.chatGone')}</div>
+										<!-- A tile whose session went away is closed by the effect
+										     above on the next tick; nothing to show meanwhile. -->
+										<div class="gone" aria-hidden="true"></div>
 									{/if}
 								{:else if tab.panel === 'plan'}<PlanPanel plan={chat?.plan ?? []} />
 								{:else if tab.panel === 'goal'}<GoalPanel goal={chat?.goal ?? null} />

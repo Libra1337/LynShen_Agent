@@ -356,7 +356,6 @@
 			{:else}
 				<span class="word">LynShen</span>
 				<button class="head-act" onclick={toggleSearch} aria-label={t('shell.searchSessions')} title={t('shell.searchSessions')}><MagnifyingGlassIcon size={18} /></button>
-				<button class="head-act" onclick={onToggleCollapsed} aria-label={t('shell.sidebarCollapse')} title={withShortcut(t('shell.sidebarCollapse'), 'sidebar')}><SidebarSimpleIcon size={18} /></button>
 			{/if}
 		</div>
 	</div>

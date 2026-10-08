@@ -2,7 +2,6 @@
 	import { popOut } from '$lib/ui/motion';
 	import { onMount, tick } from 'svelte';
 	import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
-	import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
 	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
 	import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
@@ -16,12 +15,9 @@
 	import { t } from '$lib/i18n';
 	import type { ChatState } from '$lib/chat.svelte';
 	import { stripGroupSuffix, type ModelRow } from './modelRows';
-	import { defaultEffort, effortLabel } from './effort';
-	import EffortSlider from './EffortSlider.svelte';
 	import GroupPicker, { loadGroups, type ToolProvider } from './GroupPicker.svelte';
 	import { readConfig, writeConfig, type LynShenGroup } from '$lib/protocol';
 	import { toast } from '$lib/ui/toast.svelte';
-	import { modelColor, isTopEffort } from '$lib/modelColor';
 	import { modelSetup } from '$lib/modelSetupState.svelte';
 
 	// The composer's model menu, opened from the model button: everything about
@@ -181,7 +177,6 @@
 	const mult = (n: number) => `×${Number(n.toFixed(3))}`;
 	const billing = (g: LynShenGroup) =>
 		g.billing_source === 'plan_only' ? t('chat.groupPlan') : g.billing_source === 'balance_only' ? t('chat.groupBalance') : '';
-	const activeRow = $derived(rows.find((r) => r.active));
 	const modelName = $derived(rows.find(row => row.active)?.label || stripGroupSuffix(chat.modelLabel || '') || chat.model || BACKEND_LABELS[chat.backendId]);
 	// On the first page the list's keys (arrows, Enter) open the list instead
 	// of picking a row nobody can see. Capture phase, ahead of the pane.
@@ -194,10 +189,6 @@
 		}
 	}
 
-	let shownEffort = $state('');
-	const accent = $derived(modelColor(chat.model));
-	const top = $derived(isTopEffort(shownEffort, chat.efforts));
-	const def = $derived(defaultEffort(chat.efforts));
 	// Group headers only help when the list spans more than one source.
 	const grouped = $derived(new Set(rows.map((r) => r.group)).size > 1);
 </script>
@@ -212,7 +203,6 @@
 					<span class="pop-ico"><Vendor model={chat.model || modelName} size={16} /></span>
 					<span class="pop-txt">
 						<span class="pop-label">{modelName}</span>
-						{#if activeRow?.detail}<span class="pop-desc route" title={activeRow.detail}>{activeRow.detail}</span>{/if}
 					</span>
 					<span class="pop-ico caret"><CaretRightIcon size={14} /></span>
 				</button>
@@ -224,25 +214,6 @@
 			{/if}
 		</section>
 
-		{#if chat.efforts.length}
-			<section class="effort">
-				<div class="ehead">
-					<span class="elabel">{t('chat.effortTitle')}</span>
-					{#key shownEffort}<span class="evalue" class:effort-max={top} style:--effort-accent={accent || 'var(--text)'}>{effortLabel(shownEffort)}</span>{/key}
-					<span class="grow"></span>
-					<IconButton
-						size="sm"
-						label={t('chat.effortReset')}
-						title={t('chat.effortReset')}
-						disabled={effortDisabled || !def || shownEffort === def}
-						onclick={() => onEffort(def)}
-					>
-						<ArrowCounterClockwiseIcon size={14} />
-					</IconButton>
-				</div>
-				<EffortSlider efforts={chat.efforts} effort={chat.effort} disabled={effortDisabled} {onEffort} {accent} bind:current={shownEffort} />
-			</section>
-		{/if}
 
 		<SessionSwitches {chat} {onSwitch} />
 
@@ -320,7 +291,6 @@
 						<span class="pop-ico"><Vendor model={row.vendor ?? row.label} size={16} /></span>
 						<span class="pop-txt">
 							<span class="pop-label">{row.label || t('shell.empty')}</span>
-							{#if row.detail}<span class="pop-desc route" title={row.detail}>{row.detail}</span>{/if}
 						</span>
 						{#if row.choices?.length}
 							<span class="routes-n">{t('chat.routeCount', { n: row.choices.length })}</span>
@@ -501,28 +471,6 @@
 	.agent:disabled {
 		cursor: default;
 	}
-	.effort {
-		padding: 4px 8px 6px;
-	}
-	.ehead {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 10px;
-	}
-	.elabel {
-		color: var(--dim2);
-		font-size: var(--fs-sm);
-	}
-	.evalue {
-		color: var(--text);
-		font-size: var(--fs-sm);
-		font-weight: 500;
-		animation: rise var(--t-fast) var(--ease-out);
-	}
-	.grow {
-		flex: 1;
-	}
 	.models {
 		display: flex;
 		flex-direction: column;
@@ -574,12 +522,6 @@
 		white-space: nowrap;
 	}
 	/* Second line of a model row: group · channel · window. */
-	.route {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-variant-numeric: tabular-nums;
-	}
 	/* Keep the check's column so names and context line up on every row. */
 	.pop-check.off {
 		visibility: hidden;
