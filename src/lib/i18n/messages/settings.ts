@@ -377,7 +377,7 @@ const settings = {
 		},
 		marketplace: {
 			title: '扩展市场',
-			subtitle: '从 LynShen 与 Anthropic 安装技能扩展。',
+			subtitle: '从 Anthropic 和社区仓库（Ikaleio、Superpowers、Composio）安装技能。',
 			search: '搜索扩展…',
 			all: '全部',
 			allTags: '全部标签',
@@ -803,7 +803,7 @@ const settings = {
 		},
 		marketplace: {
 			title: 'Marketplace',
-			subtitle: 'Install skills from LynShen and Anthropic.',
+			subtitle: 'Install skills from Anthropic and community repositories (Ikaleio, Superpowers, Composio).',
 			search: 'Search extensions…',
 			all: 'All',
 			allTags: 'All tags',
