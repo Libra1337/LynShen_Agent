@@ -53,7 +53,7 @@ export function monoizeEntries(list: MonoizeModel[], known: { name: string }[] =
 				...catalog,
 				...previous,
 				name: m.id,
-				display_name: m.id,
+				display_name: m.id === 'auto' ? 'Auto' : m.id,
 				groups: m.groups ?? [],
 				routes: m.providers ?? [],
 				context_window: window,

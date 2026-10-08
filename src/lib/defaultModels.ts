@@ -1,6 +1,8 @@
 // Curated menu defaults, intersected with the account's actual model catalog.
 // This is not an availability list or an onboarding model selection.
 export const DEFAULT_MODELS = [
+	// The gateway's Auto model (an admin points it at any model).
+	'auto',
 	'gpt-6.1-sol',
 	'codex-auto-review',
 	'gpt-6-astra',

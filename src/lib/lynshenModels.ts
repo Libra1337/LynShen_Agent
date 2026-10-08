@@ -15,7 +15,7 @@ export function savedModel(m: LynShenModel): Record<string, unknown> {
 		max_context_window: m.max_context_window ?? m.context_window ?? 0,
 		max_output_tokens: m.max_output_tokens ?? 0,
 		reasoning_efforts: m.reasoning_efforts ?? ['none'],
-		...(m.display_name ? { display_name: m.display_name } : {}),
+		...(m.display_name ? { display_name: m.display_name } : m.id === 'auto' ? { display_name: 'Auto' } : {}),
 		...(m.group_context_windows ? { group_context_windows: m.group_context_windows } : {})
 	};
 }

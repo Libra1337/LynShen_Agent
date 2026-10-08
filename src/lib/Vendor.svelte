@@ -9,13 +9,14 @@
 	let { model, provider, size = 14 }: { model?: string; provider?: string; size?: number } = $props();
 
 	const svg = $derived(provider ? providerBrand(provider) : model ? modelBrand(model) : undefined);
-	const own = $derived(provider === 'lynshen' || provider === 'monoize');
+	// The gateway's Auto model is LynShen's own pick: its mark.
+	const own = $derived(provider === 'lynshen' || provider === 'monoize' || model?.toLowerCase() === 'auto');
 	const initial = $derived(provider?.[0]?.toUpperCase() ?? '');
 </script>
 
 {#if svg}
 	<span class="vendor" style:font-size="{size}px" aria-hidden="true">{@html svg}</span>
-{:else if provider && own}
+{:else if own}
 	<span class="vendor" style:font-size="{size}px" aria-hidden="true">{@html mark}</span>
 {:else if provider}
 	<span class="mono" style:font-size="{size}px" aria-hidden="true">{initial}</span>
