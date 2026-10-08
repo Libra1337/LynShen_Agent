@@ -26,7 +26,6 @@
 		onOpenProject,
 		onAddProject,
 		onOpenAgent,
-		onNewAgent
 	}: {
 		projects: Project[];
 		agents?: AgentView[];
@@ -38,7 +37,6 @@
 		onOpenProject: (p: Project) => void;
 		onAddProject: () => void;
 		onOpenAgent: (agent: AgentView) => void;
-		onNewAgent: () => void;
 	} = $props();
 
 	let text = $state('');
@@ -100,11 +98,10 @@
 			</button>
 		</div>
 
-		{#if agentsOn}
+		{#if agentsOn && agents.length}
 			<section>
 				<div class="head">
 					<h2>{t('shell.home.agents')}</h2>
-					<button class="act" onclick={onNewAgent}><PlusIcon size={14} />{t('shell.home.newAgent')}</button>
 				</div>
 				{#if agents.length}
 					<div class="grid">

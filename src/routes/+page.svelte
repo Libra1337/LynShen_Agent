@@ -99,7 +99,6 @@
 	import { matches } from '$lib/shortcuts';
 	import { readSidebarCollapsed, writeSidebarCollapsed, SIDEBAR_RAIL_WIDTH } from '$lib/shell/sidebarState';
 	import TaskDialog from '$lib/TaskDialog.svelte';
-	import AgentDialog from '$lib/AgentDialog.svelte';
 	import DeskPage from '$lib/DeskPage.svelte';
 	import ProjectPage from '$lib/ProjectPage.svelte';
 	import FeedbackDialog from '$lib/FeedbackDialog.svelte';
@@ -223,7 +222,6 @@
 	let showFeedback = $state(false);
 	// 「新建并行任务」对话框：为哪个（主仓库）项目开任务。
 	let taskDialogFor = $state<Project | null>(null);
-	let showAgentDialog = $state(false);
 	// The workbench page, on the overview, one agent, or one of its sessions
 	// (agent sessions open only there, never on the canvas).
 	let showDesk = $state(false);
@@ -256,11 +254,6 @@
 		showHome = false;
 	});
 	/** The project a new agent is created in ('' for none). */
-	let agentDialogProject = $state('');
-	function newAgent(project = '') {
-		agentDialogProject = project;
-		showAgentDialog = true;
-	}
 	/** The workbench's requirements page: one requirement, or the list. */
 	function openRequirements(id: string | null = null) {
 		openDesk(null);
@@ -1389,7 +1382,6 @@
 				agents={agentDirectory.agents}
 				agentsStatus={agentDirectory.status}
 				onOpenAgent={(a) => openDesk(a.id)}
-				onNewAgent={() => newAgent()}
 				onAgentSession={(a) => store.openAgentSession(a, agentDirectory.latestSession(a.id)?.session)}
 				agentPending={(id) => agentDirectory.pendingFor(id)}
 				pendingCount={agentDirectory.pending}
@@ -1423,7 +1415,6 @@
 						onOpenProject={openProjectPage}
 						onAddProject={addProject}
 						onOpenAgent={(a) => openDesk(a.id)}
-						onNewAgent={() => newAgent()}
 					/>
 				{/if}
 				{#if pageProject}
@@ -1437,7 +1428,6 @@
 							onStartRequirement={startRequirement}
 							onOpenSession={(s) => openDaemonSession(s)}
 							onOpenAgent={(id) => openDesk(id)}
-							onNewAgent={() => newAgent(pageProject.id)}
 						/>
 					{/key}
 				{/if}
@@ -1581,7 +1571,6 @@
 					navWidth={sidebarWidth}
 					onClose={() => (showDesk = false)}
 					onOpenSession={openDaemonSession}
-					onNewAgent={() => newAgent()}
 					onNewSession={(agent) => {
 						deskSession = store.openAgentSession(agent);
 						deskAgent = agent.id;
@@ -1687,18 +1676,6 @@
 		/>
 	{/if}
 
-	{#if showAgentDialog}
-		<AgentDialog
-			defaultDir={store.activeProject?.path ?? ''}
-			projects={workspaceProjects}
-			defaultProject={agentDialogProject}
-			onClose={() => (showAgentDialog = false)}
-			onCreated={(agent) => {
-				showAgentDialog = false;
-				openDesk(agent.id);
-			}}
-		/>
-	{/if}
 
 	{#if sessionChromeFor && chromeSession}
 		<TabChromePopover

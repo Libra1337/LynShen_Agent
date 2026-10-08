@@ -79,18 +79,6 @@ describe('AgentDirectory', () => {
 		dir.stop();
 		expect(dir.status).toBe('off');
 	});
-
-	it('creates an agent through the daemon', async () => {
-		const dir = new AgentDirectory();
-		await dir.create({ id: 'ops', name: 'Ops', cwd: '/w', role: 'keep it green' });
-		expect(daemon.request).toHaveBeenCalledWith({
-			op: 'agent_create',
-			agent: 'ops',
-			name: 'Ops',
-			cwd: '/w',
-			role: 'keep it green'
-		});
-	});
 });
 
 describe('desk state', () => {

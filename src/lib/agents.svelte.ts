@@ -164,19 +164,6 @@ export interface TimerView {
 	body: string;
 }
 
-export interface NewAgent {
-	id: string;
-	name: string;
-	cwd: string;
-	role: string;
-	/** The avatar previewed while creating it; the daemon picks one without. */
-	avatar_seed?: string;
-	/** The workspace it is created in. */
-	workspace?: string;
-	/** The project it belongs to (the daemon runs it in its directory). */
-	project?: string;
-}
-
 /** Reconnect backoff: 1 s, doubling to 30 s; reset by a good connection. */
 const RETRY_MIN_MS = 1000;
 const RETRY_MAX_MS = 30_000;
@@ -461,21 +448,6 @@ export class AgentDirectory {
 				(latest, s) => (!latest || s.created_at > latest.created_at ? s : latest),
 				undefined
 			);
-	}
-
-	async create(agent: NewAgent): Promise<AgentView> {
-		// `id` is the request id on the wire; the agent's id travels as `agent`.
-		const reply = await this.#daemon.request({
-			op: 'agent_create',
-			agent: agent.id,
-			name: agent.name,
-			cwd: agent.cwd,
-			role: agent.role,
-			...(agent.avatar_seed ? { avatar_seed: agent.avatar_seed } : {}),
-			...(agent.workspace ? { workspace: agent.workspace } : {}),
-			...(agent.project ? { project: agent.project } : {})
-		});
-		return reply.agent as AgentView;
 	}
 
 	async refreshSessions() {

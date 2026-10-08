@@ -29,7 +29,6 @@
 		onStartRequirement,
 		onOpenSession,
 		onOpenAgent,
-		onNewAgent
 	}: {
 		project: Project;
 		/** The open workspace's projects. */
@@ -41,7 +40,6 @@
 		onStartRequirement: (r: Requirement, how: StartHow) => void;
 		onOpenSession: (session: string) => void;
 		onOpenAgent: (agent: string) => void;
-		onNewAgent: () => void;
 	} = $props();
 
 	const reqs = useRequirements();
@@ -116,10 +114,10 @@
 				/>
 			</section>
 
+			{#if agents.length}
 			<section>
 				<div class="h3-row">
 					<h3>{t('shell.projectPage.agents')}</h3>
-					<Button size="sm" variant="ghost" onclick={onNewAgent}><PlusIcon size={13} />{t('shell.projectPage.newAgent')}</Button>
 				</div>
 				{#if agents.length}
 					<div class="agents">
@@ -134,10 +132,9 @@
 							</button>
 						{/each}
 					</div>
-				{:else}
-					<p class="hint">{t('shell.projectPage.noAgents')}</p>
 				{/if}
 			</section>
+			{/if}
 		</div>
 	{/if}
 </div>

@@ -39,7 +39,6 @@
 		currentStep,
 		onClose,
 		onOpenSession,
-		onNewAgent,
 		onNewSession,
 		onStartRequirement
 	}: {
@@ -69,7 +68,6 @@
 		onClose: () => void;
 		/** `agent`: whose it is, when the caller knows (the list may lag). */
 		onOpenSession: (session: string, agent?: string) => void;
-		onNewAgent: () => void;
 		/** Open a new, empty session of the agent. */
 		onNewSession: (agent: AgentView) => void;
 		onStartRequirement: (r: Requirement, how: StartHow) => void;
@@ -183,11 +181,11 @@
 				<span class="label">{t('shell.schedule.title')}</span>
 				{#if scheduleCount}<span class="count">{scheduleCount}</span>{/if}
 			</button>
+			{#if listed.length}
 			<div class="group-label">
 				<span>{t('shell.agents.title')}</span>
-				<span class="grow"></span>
-				<button class="add" onclick={onNewAgent} aria-label={t('shell.agents.add')} title={t('shell.agents.add')}><PlusIcon size={14} /></button>
 			</div>
+			{/if}
 			{#each listed as a (a.id)}
 				{@const waiting = agentDirectory.pendingFor(a.id)}
 				<button class="item agent" class:on={shown?.id === a.id && !sessionId} class:off={!a.enabled} onclick={() => openAgent(a.id)}>
@@ -207,8 +205,6 @@
 						</button>
 					{/each}
 				{/if}
-			{:else}
-				<button class="item ghost" onclick={onNewAgent}><PlusIcon size={16} /><span class="label">{t('shell.agents.add')}</span></button>
 			{/each}
 		</div>
 	</nav>
@@ -366,25 +362,6 @@
 		font-size: var(--fs-xs);
 		color: var(--dim2);
 	}
-	.grow {
-		flex: 1;
-	}
-	.add {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 24px;
-		height: 24px;
-		border: none;
-		border-radius: var(--r-sm);
-		background: none;
-		color: var(--dim);
-		cursor: pointer;
-	}
-	.add:hover {
-		background: var(--surface2);
-		color: var(--text);
-	}
 	.item {
 		display: flex;
 		align-items: center;
@@ -420,9 +397,6 @@
 	.item.off .label,
 	.item.off > :global(.avatar) {
 		opacity: 0.55;
-	}
-	.item.ghost {
-		color: var(--dim);
 	}
 	.two {
 		flex: 1;

@@ -71,7 +71,6 @@
 		agents = [],
 		agentsStatus = 'off',
 		onOpenAgent = () => {},
-		onNewAgent = () => {},
 		onAgentSession = () => {},
 		agentPending = () => 0,
 		pendingCount = 0,
@@ -119,7 +118,6 @@
 		agentsStatus?: 'off' | 'connecting' | 'on' | 'unreachable';
 		/** Show the agent on the workbench. */
 		onOpenAgent?: (agent: AgentView) => void;
-		onNewAgent?: () => void;
 		/** Open the agent's latest session. */
 		onAgentSession?: (agent: AgentView) => void;
 		/** Questions and pending actions of one agent. */
@@ -527,15 +525,14 @@
 
 	<div class="list" class:dragging={drag?.live} bind:this={listEl} inert={railed}>
 		<!-- Agents: long-lived workers of the local daemon. -->
+		<!-- Shown only while there are agents: they are no longer created here. -->
+		{#if agents.length}
 		<section>
 			<div class="head">
 				<span>{t('shell.agents.title')}</span>
-				<button class="head-act" onclick={onNewAgent} aria-label={t('shell.agents.add')} title={t('shell.agents.add')}><PlusIcon size={16} /></button>
 			</div>
 			{#if agentsStatus === 'unreachable'}
 				<div class="note">{t('shell.agents.unreachable')}</div>
-			{:else if agentsStatus === 'off' || agents.length === 0}
-				<button class="sess ghost" onclick={onNewAgent}><PlusIcon size={16} /><span class="sess-title">{t('shell.agents.add')}</span></button>
 			{/if}
 			{#each agents as a (a.id)}
 				{@const waiting = agentPending(a.id)}
@@ -570,6 +567,7 @@
 				</button>
 			{/each}
 		</section>
+		{/if}
 
 		<!-- 对话: the latest conversations, in a project or not, newest first. -->
 		{#if shownRecent.length || !query}
