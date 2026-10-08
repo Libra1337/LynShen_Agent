@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { popOut } from '$lib/ui/motion';
 	import { tick, type Snippet } from 'svelte';
 	import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
 	import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
@@ -105,6 +106,7 @@
 <button class="backdrop" aria-label={t('common.close')} onclick={onClose} oncontextmenu={(e) => { e.preventDefault(); onClose(); }}></button>
 <div
 	class="pop"
+	out:popOut|global
 	role="dialog"
 	aria-label={t('shell.chrome.title')}
 	bind:clientWidth={popW}
@@ -242,7 +244,7 @@
 		background: var(--panel);
 		border-radius: var(--r-lg);
 		box-shadow: var(--shadow-pop);
-		animation: pop-in var(--t-med) var(--ease-out);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.field {
 		display: flex;

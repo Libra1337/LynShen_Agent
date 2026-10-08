@@ -1099,7 +1099,7 @@
 			background var(--t-fast) var(--ease-out),
 			color var(--t-fast) var(--ease-out),
 			opacity var(--t-med) var(--ease-out);
-		animation: pop-in var(--t-med) var(--ease-out);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.cact:active:not(:disabled) {
 		transform: scale(0.9);

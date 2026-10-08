@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { popOut } from '$lib/ui/motion';
 	import { onMount } from 'svelte';
 	import ArrowCircleDownIcon from 'phosphor-svelte/lib/ArrowCircleDownIcon';
 	import CoinsIcon from 'phosphor-svelte/lib/CoinsIcon';
@@ -119,6 +120,7 @@
 <div
 	use:portal
 	class="pop acct-card {side}"
+	out:popOut|global
 	role="dialog"
 	aria-label={t('shell.account.title')}
 	tabindex="-1"
@@ -230,22 +232,19 @@
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		user-select: text;
-		animation: card-in var(--t-med) var(--ease-standard);
+		transform-origin: bottom left;
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
-	/* Out of its anchor: up from the row, or right from the rail's avatar. */
-	@keyframes card-in {
-		from {
-			opacity: 0;
-			transform: translateY(4px);
-		}
-	}
+	/* Beside the rail's avatar: grows out of it, from the left. */
 	.acct-card.right {
+		transform-origin: bottom left;
 		animation-name: card-in-side;
 	}
 	@keyframes card-in-side {
 		from {
 			opacity: 0;
-			transform: translateX(-4px);
+			transform: translateX(-8px) scale(0.95);
+			filter: blur(4px);
 		}
 	}
 	.head {

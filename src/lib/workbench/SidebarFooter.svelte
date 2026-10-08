@@ -209,7 +209,7 @@
 		border-radius: var(--r-md);
 		transition:
 			background var(--t-fast) var(--ease-out),
-			right var(--t-sidebar) var(--ease-standard);
+			right var(--t-base) var(--ease-base);
 	}
 	.account:hover::before,
 	.account.on::before {
@@ -273,11 +273,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
-		transition: opacity var(--t-sidebar) var(--ease-standard) 60ms;
+		transition: opacity var(--t-base) var(--ease-base) 60ms;
 	}
 	.collapsed .who {
 		opacity: 0;
-		transition: opacity var(--t-fast) var(--ease-standard);
+		transition: opacity var(--t-fast) var(--ease-base);
 	}
 	.name {
 		overflow: hidden;

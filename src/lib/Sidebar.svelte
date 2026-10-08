@@ -672,7 +672,7 @@
 		min-width: 0;
 		overflow: hidden;
 		contain: layout paint;
-		transition: width var(--t-sidebar) var(--ease-standard);
+		transition: width var(--t-base) var(--ease-base);
 	}
 	.sb-inner {
 		display: flex;
@@ -689,14 +689,14 @@
 	.list,
 	.primary .label,
 	.primary .count {
-		transition: opacity var(--t-med) var(--ease-standard) 40ms;
+		transition: opacity var(--t-med) var(--ease-base) 40ms;
 	}
 	.collapsed .brand-rest,
 	.collapsed .list,
 	.collapsed .primary .label,
 	.collapsed .primary .count {
 		opacity: 0;
-		transition: opacity var(--t-fast) var(--ease-standard);
+		transition: opacity var(--t-fast) var(--ease-base);
 	}
 	.collapsed .list {
 		pointer-events: none;
@@ -815,7 +815,7 @@
 		border-radius: var(--r-md);
 		transition:
 			background var(--t-fast) var(--ease-out),
-			right var(--t-sidebar) var(--ease-standard);
+			right var(--t-base) var(--ease-base);
 	}
 	.collapsed .primary .row::before {
 		right: calc(100% - 42px);

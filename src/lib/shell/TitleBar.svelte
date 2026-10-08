@@ -138,7 +138,7 @@
 		min-width: max-content;
 		padding-left: 14px;
 		/* Moves with the sidebar collapsing and expanding (Sidebar.svelte). */
-		transition: width var(--t-sidebar) var(--ease-standard);
+		transition: width var(--t-base) var(--ease-base);
 	}
 	.lead.resizing {
 		transition: none;

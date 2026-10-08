@@ -652,7 +652,7 @@
 		z-index: 50;
 		overflow: hidden;
 		transform-origin: top center;
-		animation: drop-in var(--t-med) var(--ease-out);
+		animation: drop-in var(--t-pop) var(--ease-enter);
 	}
 	.poplist {
 		max-height: 220px;

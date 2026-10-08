@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { popOut } from '$lib/ui/motion';
 	import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
 	import IconButton from '$lib/ui/IconButton.svelte';
 	import { t } from '$lib/i18n';
@@ -29,7 +30,7 @@
 </script>
 
 <button class="eff-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={onClose}></button>
-<div class="pop eff" role="dialog" aria-label={t('chat.effortTitle')}>
+<div class="pop eff" role="dialog" out:popOut|global aria-label={t('chat.effortTitle')}>
 	<div class="ehead">
 		<span class="elabel">{t('chat.effortTitle')}</span>
 		<span class="evalue">{effortLabel(shown)}</span>
@@ -64,7 +65,7 @@
 		width: min(320px, calc(100vw - 32px));
 		padding: 10px 14px 12px;
 		transform-origin: bottom right;
-		animation: pop-in var(--t-med) var(--ease-out);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.ehead {
 		display: flex;
