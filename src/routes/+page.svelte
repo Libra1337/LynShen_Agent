@@ -1615,6 +1615,12 @@
 			configured={providers.length > 0}
 			onRefreshAuth={refreshAuth}
 			onOpenSettings={openSettings}
+			onSignedIn={localStorage.getItem('lynshen-setup-done')
+				? () => {
+						showSetup = false;
+						setupView = undefined;
+					}
+				: undefined}
 			onClose={async (choice) => {
 				// Apply the explicit model choice to the initial draft, not just its menus.
 				if (activeId) {

@@ -41,7 +41,8 @@
 		hidden = false,
 		onRefreshAuth,
 		onOpenSettings,
-		onClose
+		onClose,
+		onSignedIn
 	}: {
 		/** The session the /login runs in, to catch a failed login. */
 		sessionId: string;
@@ -56,7 +57,16 @@
 		onRefreshAuth: () => void;
 		onOpenSettings: (section: SectionKey) => void;
 		onClose: (choice: { backend: BackendId; model: string; effort: string; gateway: boolean }) => Promise<void> | void;
+		/** Set for someone who finished 开始使用 before: signing in (or skipping
+		 *  it) ends here instead of walking the guide again. */
+		onSignedIn?: () => void;
 	} = $props();
+
+	/** Past the sign-in: the guide on a first run, straight back in after. */
+	function afterLogin() {
+		if (onSignedIn) onSignedIn();
+		else view = 'guide';
+	}
 
 
 	let view = $state<'login' | 'guide'>(untrack(() => startAt ?? 'guide'));
@@ -117,7 +127,7 @@
 			monoizeUser = null;
 		}
 		// 已登录的老用户直接进引导，不停在登录页。
-		if (monoizeUser && !mzTouched && view === 'login') view = 'guide';
+		if (monoizeUser && !mzTouched && view === 'login') afterLogin();
 	});
 
 	let legal = $state<LegalDocId | null>(null);
@@ -166,11 +176,11 @@
 				<p class="lede">{t('setup.welcome.login.sub')}</p>
 
 				<div class="actions">
-					<BrowserSignIn onSuccess={(user) => { monoizeUser = user; onRefreshAuth(); view = 'guide'; step = requiredDepsReady(deps.list) ? 'account' : 'env'; }} />
+					<BrowserSignIn onSuccess={(user) => { monoizeUser = user; onRefreshAuth(); step = requiredDepsReady(deps.list) ? 'account' : 'env'; afterLogin(); }} />
 					<Button variant="secondary" onclick={() => openSettings('providers')}><KeyIcon size={15} /> {t('setup.welcome.login.apiKey')}</Button>
 				</div>
 
-				<button class="later" onclick={() => ((mzTouched = true), (view = 'guide'))}>
+				<button class="later" onclick={() => ((mzTouched = true), afterLogin())}>
 					{t('setup.welcome.login.later')} <ArrowRightIcon size={13} />
 				</button>
 			</div>
