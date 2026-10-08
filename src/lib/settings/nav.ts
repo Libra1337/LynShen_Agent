@@ -15,13 +15,14 @@ export type SectionKey =
 	| 'market'
 	| 'agents'
 	| 'acp'
+	| 'import'
 	| 'daemon'
 	| 'updates';
 
 export const GROUPS: { key: string; sections: SectionKey[] }[] = [
 	{ key: 'app', sections: ['general', 'account', 'usage', 'voice'] },
 	{ key: 'models', sections: ['providers', 'models', 'network'] },
-	{ key: 'agents', sections: ['agents', 'acp', 'mcp', 'market'] },
+	{ key: 'agents', sections: ['agents', 'acp', 'mcp', 'market', 'import'] },
 	{ key: 'system', sections: ['daemon', 'updates'] }
 ];
 
@@ -86,6 +87,7 @@ export const ROWS: SearchRow[] = [
 	{ section: 'agents', id: 'backend-list', titleKey: 'settings.section.agents' },
 	{ section: 'agents', id: 'dependencies', titleKey: 'setup.deps.title' },
 	{ section: 'acp', id: 'acp-agents', titleKey: 'settings.section.acp' },
+	{ section: 'import', id: 'import-scan', titleKey: 'settings.import.title', descKey: 'settings.import.intro' },
 	{ section: 'daemon', id: 'relay', titleKey: 'settings.backend.relayToggle', descKey: 'settings.backend.relayHint' },
 	{ section: 'daemon', id: 'devices', titleKey: 'settings.backend.devices' },
 	{ section: 'updates', id: 'app-version', titleKey: 'settings.update.currentVersion' },

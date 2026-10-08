@@ -24,6 +24,7 @@
 	import StorefrontIcon from 'phosphor-svelte/lib/StorefrontIcon';
 	import RobotIcon from 'phosphor-svelte/lib/RobotIcon';
 	import PlugsConnectedIcon from 'phosphor-svelte/lib/PlugsConnectedIcon';
+	import TrayArrowDownIcon from 'phosphor-svelte/lib/TrayArrowDownIcon';
 	import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
 	import DeviceMobileIcon from 'phosphor-svelte/lib/DeviceMobileIcon';
 	import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
@@ -90,6 +91,7 @@
 	import AcpSection from './AcpSection.svelte';
 	import DaemonSection from './DaemonSection.svelte';
 	import McpSection from './McpSection.svelte';
+	import ImportSection from './ImportSection.svelte';
 	import PermissionRulesSection from './PermissionRulesSection.svelte';
 	import UpdateCard from './UpdateCard.svelte';
 	import ThirdPartyNotices from './ThirdPartyNotices.svelte';
@@ -108,7 +110,8 @@
 		onAuthChange,
 		onAccountLogout,
 		onMarket,
-		onFeedback
+		onFeedback,
+		onAddFolders
 	}: {
 		sessionId: string;
 		/** The active session's ChatState — source of the live `mcp_servers` view.
@@ -125,6 +128,8 @@
 		onMarket?: () => void;
 		/** Open 反馈问题. */
 		onFeedback?: () => void;
+		/** Show these folders as projects in the sidebar (导入); how many were new. */
+		onAddFolders?: (paths: string[]) => number;
 	} = $props();
 
 	const ICONS: Record<SectionKey, typeof GearSixIcon> = {
@@ -139,6 +144,7 @@
 		market: StorefrontIcon,
 		agents: RobotIcon,
 		acp: PlugsConnectedIcon,
+		import: TrayArrowDownIcon,
 		daemon: DeviceMobileIcon,
 		updates: InfoIcon
 	};
@@ -1193,6 +1199,8 @@
 					</SettingsSection>
 				{:else if current === 'acp'}
 					<AcpSection />
+				{:else if current === 'import'}
+					<ImportSection {onAddFolders} />
 				{:else if current === 'daemon'}
 					<DaemonSection />
 				{:else if current === 'updates'}
