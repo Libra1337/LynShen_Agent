@@ -87,6 +87,17 @@ const settings = {
 			refreshed: '已同步 {count} 个模型',
 			refreshNeedProvider: '请先添加该 Provider',
 		},
+		accountPage: {
+			topUp: '充值',
+			topUpSub: '在控制台的钱包页充值',
+			squareSub: '你的分组能用的模型和价格',
+			usage: '用量明细',
+			usageSub: '每次请求的花费和令牌数',
+			console: 'LynShen 控制台',
+			granted: '赠送',
+			toppedUp: '充值',
+			payAsYouGo: '按量付费'
+		},
 		monoize: {
             browserLogin: '在浏览器中授权 LynShen',
             browserWaiting: '等待浏览器授权…',
@@ -512,6 +523,17 @@ const settings = {
 			refreshing: 'Fetching…',
 			refreshed: '{count} models',
 			refreshNeedProvider: 'Add the provider first',
+		},
+		accountPage: {
+			topUp: 'Top up',
+			topUpSub: 'On the console wallet page',
+			squareSub: 'Models your groups can use, and their prices',
+			usage: 'Usage',
+			usageSub: 'What each request cost, and its tokens',
+			console: 'LynShen Console',
+			granted: 'Granted',
+			toppedUp: 'Topped up',
+			payAsYouGo: 'Pay as you go'
 		},
 		monoize: {
             browserLogin: 'Authorize LynShen in browser',

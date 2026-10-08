@@ -81,6 +81,7 @@
 	import Checkbox from '$lib/ui/Checkbox.svelte';
 	import Segmented from '$lib/ui/Segmented.svelte';
 	import { shownBalanceText } from '$lib/money';
+	import AccountPage from './AccountPage.svelte';
 	import Notice from '$lib/ui/Notice.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
 	import SettingsSection from './SettingsSection.svelte';
@@ -961,36 +962,21 @@
 					{@render loginNotice()}
 					<!-- 账户区：登录/余额/模型广场全部走 Monoize 网关（LynShen Console），
 					     旧 LynShen 账号 OAuth 已废弃。 -->
-					<SettingsSection>
-						<SettingsRow
-							id="account-login"
-							title={monoizeUser ? monoizeUser.username : t('settings.page.lynshenAccount')}
-							description={monoizeUser ? 'LynShen Console' : t('settings.account.notLoggedIn')}
-						>
-							{#if monoizeUser}
-								<Button size="sm" onclick={() => { editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.account.relogin')}</Button>
-								<Button variant="danger" size="sm" onclick={doMonoizeLogout}><SignOutIcon size={14} /> {t('settings.account.logout')}</Button>
-							{:else}
-								<Button variant="primary" size="sm" onclick={() => { editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.monoize.loginRegister')}</Button>
-							{/if}
-						</SettingsRow>
-						{#if monoizeLogoutError}<p role="alert" class="mferr">{monoizeLogoutError}</p>{/if}
-					</SettingsSection>
 					{#if monoizeUser}
-						<SettingsSection title={t('settings.page.service')}>
-							<SettingsRow id="account-balance" title={t('settings.usage.balance')}>
-								<span class="balance">{monoizeTotal ? shownBalanceText(monoizeTotal.total_balance, monoizeTotal.currency, prefs.balanceCurrency) : '—'}</span>
-								<Segmented
-									value={prefs.balanceCurrency}
-									options={[{ value: 'CNY', label: 'CNY' }, { value: 'USD', label: 'USD' }]}
-									onChange={(v) => prefs.setBalanceCurrency(v as 'CNY' | 'USD')}
-								/>
-							</SettingsRow>
-							<SettingsRow id="account-models" title={t('settings.monoize.square')}>
-								<Button size="sm" onclick={openMonoizeSquare}><ListChecksIcon size={14} /> {t('settings.page.view')}</Button>
-							</SettingsRow>
-							<SettingsRow id="account-provider" title={t('settings.page.apiKey')} description={t('settings.monoize.managedKey')}>
-								<Button size="sm" onclick={() => openProviderCard('monoize')}>{t('settings.page.manage')}</Button>
+						<AccountPage
+							user={monoizeUser}
+							balance={monoizeTotal}
+							logoutError={monoizeLogoutError}
+							onRelogin={() => (editing = '__monoize__')}
+							onLogout={doMonoizeLogout}
+							onSquare={openMonoizeSquare}
+							onApiKey={() => openProviderCard('monoize')}
+							onUsage={() => (section = 'usage')}
+						/>
+					{:else}
+						<SettingsSection>
+							<SettingsRow id="account-login" title={t('settings.page.lynshenAccount')} description={t('settings.account.notLoggedIn')}>
+								<Button variant="primary" size="sm" onclick={() => { editing = '__monoize__'; }}><SignInIcon size={14} /> {t('settings.monoize.loginRegister')}</Button>
 							</SettingsRow>
 						</SettingsSection>
 					{/if}
@@ -1577,12 +1563,6 @@
 		opacity: 0.45;
 		cursor: default;
 	}
-	.balance {
-		font-size: var(--fs-sm);
-		font-weight: 500;
-		font-variant-numeric: tabular-nums;
-		color: var(--text);
-	}
 	.bg-thumb {
 		width: 44px;
 		height: 28px;
@@ -1666,13 +1646,6 @@
 	}
 
 	/* Monoize 登录 / 模型广场 */
-	.mferr {
-		margin: 0;
-		padding: 8px 0;
-		font-size: var(--fs-xs);
-		color: var(--err);
-		word-break: break-all;
-	}
 	.mfhint {
 		margin: 0;
 		font-size: var(--fs-xs);
