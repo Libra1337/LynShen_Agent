@@ -46,6 +46,7 @@ export const ROWS: SearchRow[] = [
 	{ section: 'general', id: 'theme', titleKey: 'settings.theme' },
 	{ section: 'general', id: 'background', titleKey: 'settings.behavior.background' },
 	{ section: 'general', id: 'vibrancy', titleKey: 'settings.behavior.vibrancy', descKey: 'settings.behavior.vibrancyHint' },
+	{ section: 'general', id: 'glass', titleKey: 'settings.behavior.glass', descKey: 'settings.behavior.glassHint' },
 	{ section: 'general', id: 'default-surface', titleKey: 'settings.behavior.defaultSurface', descKey: 'settings.behavior.defaultSurfaceHint' },
 	{ section: 'general', id: 'terminal-font', titleKey: 'settings.behavior.terminalFont' },
 	{ section: 'general', id: 'terminal-font-size', titleKey: 'settings.behavior.terminalFontSize' },

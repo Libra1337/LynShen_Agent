@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { paneOut } from '$lib/ui/motion';
 	// The workbench: a page over the content panel, like Settings. The nav
 	// lists the overview, the requirements, the scheduled tasks and every
 	// agent with what it is doing, the shown agent with its sessions under it;
@@ -158,7 +159,7 @@
 
 <svelte:window onkeydown={onKey} />
 
-<div class="desk-page">
+<div class="desk-page" out:paneOut|global>
 	<nav class="nav" style:width="{navWidth}px" aria-label={t('shell.desk.title')}>
 		<div class="nav-head">
 			<button class="back" title={t('shell.desk.back')} aria-label={t('shell.desk.back')} onclick={onClose}>
@@ -306,6 +307,15 @@
 	}
 	:global(:root[data-vibrancy='on']) .nav {
 		background: var(--vibrancy-tint);
+	}
+	/* Over a custom background the image shows through, at --chrome-tint,
+	   blurred when glass is on (app.css, prefs.svelte.ts). */
+	:global(:root[data-canvas-bg]) .nav {
+		background: color-mix(in oklab, var(--sidebar) var(--chrome-tint), transparent);
+	}
+	:global(:root[data-canvas-bg][data-glass]) .nav {
+		-webkit-backdrop-filter: var(--glass-filter);
+		backdrop-filter: var(--glass-filter);
 	}
 	.nav-head {
 		display: flex;

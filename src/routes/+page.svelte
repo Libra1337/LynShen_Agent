@@ -96,6 +96,7 @@
 	import CommandPalette from '$lib/CommandPalette.svelte';
 	import ShortcutsDialog from '$lib/ShortcutsDialog.svelte';
 	import { matches } from '$lib/shortcuts';
+	import { readSidebarCollapsed, writeSidebarCollapsed, SIDEBAR_RAIL_WIDTH } from '$lib/shell/sidebarState';
 	import TaskDialog from '$lib/TaskDialog.svelte';
 	import AgentDialog from '$lib/AgentDialog.svelte';
 	import DeskPage from '$lib/DeskPage.svelte';
@@ -333,6 +334,17 @@
 	}
 	let showQuickOpen = $state(false);
 
+	/** Logged out of the LynShen account (Settings → Account or the account
+	 *  card): back to the welcome page's sign-in. */
+	function afterAccountLogout() {
+		showSettings = false;
+		showDesk = false;
+		showMarket = false;
+		modelSetup.open = false;
+		setupView = 'login';
+		showSetup = true;
+	}
+
 	function refreshAuth() {
 		loadProviders();
 		readAuthProviders()
@@ -392,16 +404,24 @@
 		return { provider: pick.id, baseUrl: pick.base_url, format: pick.format, model };
 	});
 
-	let sidebarWidth = $state(292);
+	const savedSidebarWidth = Number(localStorage.getItem('lynshen-sidebar-width'));
+	/** The expanded navigator's width (the user drags it, 240–460px). */
+	let sidebarWidth = $state(savedSidebarWidth >= 240 && savedSidebarWidth <= 460 ? savedSidebarWidth : 292);
 	/** Width left of the sidebar (none since the workspace rail is gone); the
 	 *  title bar aligns the title past it. */
 	const RAIL_WIDTH = 0;
-	let showSidebar = $state(true);
+	/** The navigator is the narrow icon rail (⌘B, the title bar's toggle).
+	 *  Read before the first render so a collapsed navigator does not
+	 *  animate closed on launch. */
+	let sidebarCollapsed = $state(readSidebarCollapsed(localStorage));
 	let sbResizing = $state(false);
+	/** What the navigator takes up: the rail, or its expanded width. Settings
+	 *  and the workbench page lay out their own nav at the expanded width. */
+	const navShown = $derived(showSettings || showDesk || !sidebarCollapsed ? sidebarWidth : SIDEBAR_RAIL_WIDTH);
 
 	function toggleSidebar() {
-		showSidebar = !showSidebar;
-		localStorage.setItem('lynshen-sidebar-visible', showSidebar ? '1' : '0');
+		sidebarCollapsed = !sidebarCollapsed;
+		writeSidebarCollapsed(localStorage, sidebarCollapsed);
 	}
 
 	function startSidebarResize(e: PointerEvent) {
@@ -1074,9 +1094,6 @@
 		const onUiError = () => telemetry.track('error:ui');
 		window.addEventListener('error', onUiError);
 		window.addEventListener('unhandledrejection', onUiError);
-		const savedSb = Number(localStorage.getItem('lynshen-sidebar-width'));
-		if (savedSb >= 240 && savedSb <= 460) sidebarWidth = savedSb;
-		if (localStorage.getItem('lynshen-sidebar-visible') === '0') showSidebar = false;
 		const cleanups: Array<() => void> = [];
 		let disposed = false;
 		(async () => {
@@ -1277,9 +1294,9 @@
 	<!-- TOP: one title bar across the window (traffic lights, sidebar toggle,
 	     the title of what is in front aligned with the canvas, panel actions). -->
 	<TitleBar
-		leftWidth={RAIL_WIDTH + (showSettings || showDesk || showSidebar ? sidebarWidth : 0)}
+		leftWidth={RAIL_WIDTH + navShown}
 		resizing={sbResizing}
-		sidebarOpen={showSidebar}
+		sidebarOpen={!sidebarCollapsed}
 		onToggleSidebar={toggleSidebar}
 		showToggle={!showSetup}
 		title={showSettings ? t('settings.title') : showDesk ? t('shell.desk.title') : showSetup ? 'LynShen' : pageProject ? pageProject.name : showHome || !active ? t('shell.home.title') : shownTitle(active.chat.title)}
@@ -1316,7 +1333,9 @@
 			<Sidebar
 				projects={store.userProjects}
 				activeId={showHome ? '' : activeId}
-				width={showSidebar ? sidebarWidth : 0}
+				width={sidebarWidth}
+				collapsed={sidebarCollapsed}
+				onToggleCollapsed={toggleSidebar}
 				resizing={sbResizing}
 				onSelect={(id) => ((store.activeId = id), (projectPageId = null), (showHome = false))}
 				onOpenProject={openProjectPage}
@@ -1349,13 +1368,16 @@
 				footer={{
 					loggedIn: providers.includes('monoize') || providers.includes('lynshen'),
 					updateAvailable: updater.available,
-					settingsOpen: showSettings,
 					onManageAccount: () => openSettings('account'),
-					onSettings: () => (showSettings ? closeSettings() : openSettings()),
-					onUpdate: () => openSettings('updates')
+					onSettings: () => showSettings || openSettings(),
+					onUpdate: () => openSettings('updates'),
+					onLoggedOut: () => {
+						refreshAuth();
+						afterAccountLogout();
+					}
 				}}
 			/>
-			<div class="resizer side" class:hidden={!showSidebar} role="separator" aria-label={t('shell.remote.resizeSidebar')} onpointerdown={startSidebarResize}></div>
+			<div class="resizer side" class:hidden={sidebarCollapsed} role="separator" aria-label={t('shell.remote.resizeSidebar')} onpointerdown={startSidebarResize}></div>
 
 			<!-- THE CANVAS: workspace tabs on top, one mosaic for chats, tool panels,
 			     TUI and audit tiles below. -->
@@ -1491,14 +1513,7 @@
 					bind:section={settingsSection}
 					navWidth={sidebarWidth}
 					onAuthChange={refreshAuth}
-					onAccountLogout={() => {
-						showSettings = false;
-						showDesk = false;
-						showMarket = false;
-						modelSetup.open = false;
-						setupView = 'login';
-						showSetup = true;
-					}}
+					onAccountLogout={afterAccountLogout}
 					onMarket={() => {
 						closeSettings();
 						showMarket = true;
@@ -1737,6 +1752,11 @@
 	}
 	:global(:root[data-vibrancy='on']) .app {
 		background: var(--vibrancy-chrome);
+	}
+	/* A custom background covers the whole window, under the title bar and
+	   the sidebar too; they lay their tints over it (app.css). */
+	:global(:root[data-canvas-bg]) .app {
+		background: var(--rail) var(--canvas-image) center / cover no-repeat;
 	}
 	.body {
 		flex: 1;

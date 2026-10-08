@@ -1,102 +1,174 @@
 <script lang="ts">
-	import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
-	import GearIcon from 'phosphor-svelte/lib/GearIcon';
 	import ArrowCircleDownIcon from 'phosphor-svelte/lib/ArrowCircleDownIcon';
+	import CoinsIcon from 'phosphor-svelte/lib/CoinsIcon';
+	import UserIcon from 'phosphor-svelte/lib/UserIcon';
 	import { t } from '$lib/i18n';
-	import { withShortcut } from '$lib/shortcuts';
+	import { fetchMonoizeBalance, monoizeSession, type MonoizeUser } from '$lib/protocol';
+	import { shownBalanceText } from '$lib/money';
+	import { prefs } from '$lib/prefs.svelte';
+	import { avatarInitial } from '$lib/account';
 	import AccountCard from './AccountCard.svelte';
 
-	// The bottom of the sidebar, as in Claude and ChatGPT: the account (hover
-	// shows its card), the update notice and settings.
+	// The bottom of the sidebar, as in the LynShen Console: the account row
+	// (avatar, name, balance) opens the account card, which holds settings,
+	// the currency and theme switches and logging out. Collapsed, only the
+	// avatar shows.
 	let {
 		loggedIn,
+		collapsed = false,
 		updateAvailable = false,
-		settingsOpen = false,
 		onManageAccount,
 		onSettings,
-		onUpdate
+		onUpdate,
+		onLoggedOut
 	}: {
 		/** Signed in to the LynShen account (not tied to any one chat). */
 		loggedIn: boolean;
+		/** The sidebar is the narrow icon rail. */
+		collapsed?: boolean;
 		updateAvailable?: boolean;
-		/** The settings page is in front: the gear shows as selected. */
-		settingsOpen?: boolean;
-		/** Settings → Account: the card's sign-in / manage row. */
+		/** Settings → Account: the card's sign-in button. */
 		onManageAccount: () => void;
 		onSettings: () => void;
 		/** Open settings at the update section. */
 		onUpdate: () => void;
+		/** The card logged the account out: refresh what depends on it. */
+		onLoggedOut: () => void;
 	} = $props();
 
-	// Account card: hover opens it and leaving closes it after a short grace (so
-	// the pointer can cross the gap); a click pins it until Esc or a click outside.
-	let accountBtn = $state<HTMLButtonElement | null>(null);
-	let card = $state<{ left: number; bottom: number } | null>(null);
-	let pinned = $state(false);
-	let closeTimer: ReturnType<typeof setTimeout> | undefined;
-	function showCard() {
-		clearTimeout(closeTimer);
-		if (card || !accountBtn) return;
-		const r = accountBtn.getBoundingClientRect();
-		card = { left: r.left, bottom: window.innerHeight - r.top + 8 };
+	let user = $state<MonoizeUser | null>(null);
+	let raw = $state<{ total_balance: string; currency: string } | null>(null);
+	let failed = $state(false);
+	const balance = $derived(
+		user?.balance_unlimited
+			? t('shell.account.unlimited')
+			: raw
+				? shownBalanceText(raw.total_balance, raw.currency, prefs.balanceCurrency)
+				: null
+	);
+	const name = $derived(user?.username ?? (loggedIn ? 'LynShen' : t('shell.notLoggedIn')));
+
+	// Who is signed in and the balance; again on each open of the card, since
+	// the balance moves with every call.
+	let generation = 0;
+	function load() {
+		const g = ++generation;
+		Promise.all([monoizeSession(), fetchMonoizeBalance().catch(() => null)])
+			.then(([s, b]) => {
+				if (g !== generation) return;
+				user = s.logged_in && s.session ? s.session.user : null;
+				raw = b?.balance_infos?.[0] ?? null;
+				failed = false;
+			})
+			.catch(() => {
+				if (g === generation) failed = true;
+			});
 	}
-	function hideCardSoon() {
-		clearTimeout(closeTimer);
-		if (!pinned) closeTimer = setTimeout(() => (card = null), 160);
+	$effect(() => {
+		if (loggedIn) load();
+		else {
+			generation++;
+			user = null;
+			raw = null;
+			failed = false;
+		}
+	});
+
+	// The card: a click opens it beside the row (above it, or right of the
+	// rail's avatar); a click outside, Escape or a window resize closes it.
+	let accountBtn = $state<HTMLButtonElement | null>(null);
+	let avatarSlot = $state<HTMLElement | null>(null);
+	let card = $state<{ left: number; bottom: number; width: number; side: 'top' | 'right' } | null>(null);
+	function openCard() {
+		if (!accountBtn || !avatarSlot) return;
+		// The row keeps its expanded width under the rail (clipped): place a
+		// collapsed card by the avatar, which is what shows.
+		const r = accountBtn.getBoundingClientRect();
+		const a = avatarSlot.getBoundingClientRect();
+		card = collapsed
+			? { left: a.right + 18, bottom: window.innerHeight - r.bottom, width: 292, side: 'right' }
+			: { left: r.left, bottom: window.innerHeight - r.top + 8, width: Math.min(320, Math.max(272, r.width)), side: 'top' };
+		if (loggedIn) load();
 	}
 	function closeCard() {
-		clearTimeout(closeTimer);
 		card = null;
-		pinned = false;
-	}
-	function toggleCard() {
-		if (card && pinned) return closeCard();
-		showCard();
-		pinned = true;
 	}
 	function outsideDown(e: PointerEvent) {
 		const el = e.target as Element;
 		if (card && !accountBtn?.contains(el) && !el.closest?.('.acct-card')) closeCard();
 	}
+	// A collapse or expand moves the row away from the card.
+	$effect(() => {
+		void collapsed;
+		closeCard();
+	});
 </script>
 
-<div class="sb-foot">
+<div class="sb-foot" class:collapsed>
 	<button
 		bind:this={accountBtn}
-		class="foot-btn account"
+		class="account"
 		class:on={!!card}
 		aria-label={t('shell.account.title')}
 		aria-haspopup="dialog"
 		aria-expanded={!!card}
-		onmouseenter={showCard}
-		onmouseleave={hideCardSoon}
-		onclick={toggleCard}
+		data-tip={collapsed && !card ? (balance ? `${name} · ${balance}` : name) : undefined}
+		data-tip-side="right"
+		onclick={() => (card ? closeCard() : openCard())}
 	>
-		<UserCircleIcon size={18} weight={card ? 'fill' : 'regular'} />
-		<span>{t('shell.account.title')}</span>
+		<span class="ico" bind:this={avatarSlot}>
+			<span class="avatar" class:anon={!loggedIn}>
+				{#if loggedIn && user}{avatarInitial(user.username)}{:else}<UserIcon size={15} />{/if}
+			</span>
+			{#if updateAvailable}<span class="dot" aria-hidden="true"></span>{/if}
+		</span>
+		<span class="who">
+			<span class="name">{name}</span>
+			{#if loggedIn}
+				<span class="bal">
+					<CoinsIcon size={12} />
+					<span class="num">{balance ?? (failed ? '—' : '…')}</span>
+				</span>
+			{:else}
+				<span class="bal">{t('shell.account.signIn')}</span>
+			{/if}
+		</span>
 	</button>
 	{#if updateAvailable}
-		<button class="foot-btn icon" title={t('shell.updateAvailable')} aria-label={t('shell.updateAvailable')} onclick={onUpdate}>
+		<button class="upd" inert={collapsed} title={t('shell.updateAvailable')} aria-label={t('shell.updateAvailable')} onclick={onUpdate}>
 			<ArrowCircleDownIcon size={18} />
 		</button>
 	{/if}
-	<button class="foot-btn icon" class:on={settingsOpen} title={withShortcut(t('shell.settings'), 'settings')} aria-label={t('shell.settings')} aria-pressed={settingsOpen} onclick={onSettings}>
-		<GearIcon size={18} weight={settingsOpen ? 'fill' : 'regular'} />
-	</button>
 </div>
 
-<svelte:window onpointerdown={outsideDown} onkeydown={(e) => e.key === 'Escape' && card && closeCard()} />
+<svelte:window onpointerdown={outsideDown} onkeydown={(e) => e.key === 'Escape' && card && closeCard()} onresize={() => card && closeCard()} />
 
 {#if card}
 	<AccountCard
 		{loggedIn}
+		{user}
+		{balance}
+		balanceFailed={failed}
+		{updateAvailable}
 		left={card.left}
 		bottom={card.bottom}
-		onEnter={() => clearTimeout(closeTimer)}
-		onLeave={hideCardSoon}
-		onManage={() => {
+		width={card.width}
+		side={card.side}
+		onSignIn={() => {
 			closeCard();
 			onManageAccount();
+		}}
+		onSettings={() => {
+			closeCard();
+			onSettings();
+		}}
+		onUpdate={() => {
+			closeCard();
+			onUpdate();
+		}}
+		onLoggedOut={() => {
+			closeCard();
+			onLoggedOut();
 		}}
 	/>
 {/if}
@@ -110,38 +182,146 @@
 		border-top: 1px solid var(--hairline);
 		flex-shrink: 0;
 	}
-	.foot-btn {
+	/* The row keeps its width while the sidebar collapses (the sidebar clips
+	   it); its fill shrinks to the avatar, in step with the sidebar. */
+	.account {
+		position: relative;
+		isolation: isolate;
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		min-height: 48px;
+		padding: 0 10px 0 0;
+		border: none;
+		border-radius: var(--r-md);
+		background: none;
+		color: var(--text);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.account::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		border-radius: var(--r-md);
+		transition:
+			background var(--t-fast) var(--ease-out),
+			right var(--t-base) var(--ease-base);
+	}
+	.account:hover::before,
+	.account.on::before {
+		background: var(--surface2);
+	}
+	.account:focus-visible {
+		outline: none;
+	}
+	.account:focus-visible::before {
+		outline: 2px solid var(--brand-bright);
+		outline-offset: -2px;
+	}
+	.collapsed .account::before {
+		right: calc(100% - 42px);
+	}
+	.ico {
+		position: relative;
 		display: inline-flex;
 		align-items: center;
-		gap: 10px;
-		min-height: 36px;
-		padding: 0 10px;
+		justify-content: center;
+		width: 42px;
+		height: 48px;
+		flex-shrink: 0;
+	}
+	.avatar {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: var(--r-full);
+		background: var(--surface2);
+		box-shadow: inset 0 0 0 1px var(--hairline);
+		color: var(--text);
+		font-size: var(--fs-xs);
+		font-weight: 600;
+		line-height: 1;
+	}
+	.avatar.anon {
+		color: var(--dim);
+	}
+	/* An update waits: a dot on the avatar while the rail hides the button. */
+	.dot {
+		position: absolute;
+		top: 10px;
+		right: 7px;
+		width: 8px;
+		height: 8px;
+		border-radius: var(--r-full);
+		background: var(--accent);
+		box-shadow: 0 0 0 2px var(--sidebar);
+		opacity: 0;
+		transition: opacity var(--t-fast) var(--ease-out);
+	}
+	.collapsed .dot {
+		opacity: 1;
+	}
+	.who {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		transition: opacity var(--t-base) var(--ease-base) 60ms;
+	}
+	.collapsed .who {
+		opacity: 0;
+		transition: opacity var(--t-fast) var(--ease-base);
+	}
+	.name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: var(--fs-sm);
+		font-weight: 500;
+	}
+	.bal {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		color: var(--dim);
+		font-size: var(--fs-xs);
+		white-space: nowrap;
+	}
+	.bal > :global(svg) {
+		flex-shrink: 0;
+		color: var(--warn);
+	}
+	.num {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+	}
+	.upd {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		flex-shrink: 0;
 		border: none;
 		border-radius: var(--r-md);
 		background: none;
 		color: var(--dim);
-		font: inherit;
-		font-size: var(--fs-sm);
 		cursor: pointer;
 		transition:
 			background var(--t-fast) var(--ease-out),
 			color var(--t-fast) var(--ease-out);
 	}
-	.foot-btn.account {
-		flex: 1;
-		min-width: 0;
-		color: var(--text);
-	}
-	.foot-btn.account > :global(svg) {
-		color: var(--dim);
-	}
-	.foot-btn.icon {
-		justify-content: center;
-		width: 36px;
-		padding: 0;
-	}
-	.foot-btn:hover,
-	.foot-btn.on {
+	.upd:hover {
 		background: var(--surface2);
 		color: var(--text);
 	}

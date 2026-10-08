@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { popOut } from '$lib/ui/motion';
 	import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
 	import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 	import type { Snippet } from 'svelte';
@@ -43,7 +44,7 @@
 	</button>
 	{#if open}
 		<button class="backdrop" aria-label={t('common.close')} onclick={() => (open = false)}></button>
-		<div class="menu">
+		<div class="menu" out:popOut|global>
 			{#each options as o, i (o.value)}
 				{#if o.group && (i === 0 || options[i - 1]?.group !== o.group)}
 					<div class="opt-group">{o.group}</div>
@@ -127,7 +128,7 @@
 		border-radius: var(--r-lg);
 		box-shadow: var(--shadow-pop);
 		transform-origin: bottom left;
-		animation: pop-in var(--t-med) var(--ease-spring);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.opt {
 		display: flex;

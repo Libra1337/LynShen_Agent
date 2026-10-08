@@ -26,7 +26,7 @@ Conflict order: user facts and requirements → accessibility and keyboard use �
 ### Window frame (all page types)
 - Title bar 48px across the full width. It shows the front object's title, then its context in `--dim2` (session title + project name). [SHOULD]
 - Workspace rail 68px on the far left, chrome color `--rail`. Account and settings sit at its bottom. [SHOULD]
-- Navigator column 240–460px (default 292px), `--sidebar` fill, collapsible with ⌘B. [SHOULD]
+- Navigator column 240–460px (default 292px), `--sidebar` fill. ⌘B and the title bar's panel button collapse it to a 62px icon rail (logo, primary nav as icons with tooltips, the account avatar); full-panel pages keep the expanded width. The account row (avatar, name, balance) sits at its bottom and opens the account card (settings, currency, theme, log out). [SHOULD]
 - The content panel has one rounded top-left corner (`--r-lg`) and uses `--bg`. [SHOULD]
 
 ### Workbench canvas (conversation + tools)

@@ -41,6 +41,10 @@ type PrefsShape = {
 	/** Bumped on each pick: the stored file keeps its name, so the image URL
 	 *  needs a new query to reload. */
 	backgroundStamp: number;
+	/** How much the large chrome surfaces (sidebar, title bar, composer,
+	 *  menus, floating cards) let through, 0–100: 0 is solid, higher is
+	 *  clearer glass with more blur. */
+	glass: number;
 };
 
 export const BACKGROUND_STRENGTHS = ['faint', 'medium', 'strong'] as const;
@@ -62,8 +66,38 @@ const DEFAULTS: PrefsShape = {
 	balanceCurrency: 'CNY',
 	backgroundImage: '',
 	backgroundStrength: 'medium',
-	backgroundStamp: 0
+	backgroundStamp: 0,
+	glass: 40
 };
+
+/** A glass level within 0–100 (whole numbers); anything else is the default. */
+const glassLevel = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(100, Math.max(0, v))) : DEFAULTS.glass);
+
+/** How opaque the chrome (sidebar, title bar) stays over a custom background
+ *  without glass: the canvas's veil for that strength (app.css --canvas-veil). */
+const CHROME_OVER_IMAGE: Record<BackgroundStrength, number> = { faint: 90, medium: 80, strong: 62 };
+
+/**
+ * The CSS the glass level and the background resolve to. `glass` is 0–100;
+ * `blur` is false where the webview cannot blur (or the user asked for less
+ * transparency), and the surfaces then stay solid.
+ */
+export function glassStyle(glass: number, background: BackgroundStrength | null, blur: boolean) {
+	const g = blur ? glassLevel(glass) / 100 : 0;
+	// Glass thins the chrome over the image toward 50%, where the blur keeps
+	// its secondary text readable; without an image the chrome stays solid.
+	const chrome = background ? CHROME_OVER_IMAGE[background] - (CHROME_OVER_IMAGE[background] - 50) * g : 100;
+	return {
+		on: g > 0,
+		vars: {
+			'--chrome-tint': `${Math.round(chrome)}%`,
+			'--float-tint': `${Math.round(100 - 40 * g)}%`,
+			'--glass-filter': g > 0 ? `blur(${Math.round(8 + 42 * g)}px) saturate(${Math.round(100 + 50 * g)}%)` : 'none',
+			'--glass-rim-dark': `rgba(255, 255, 255, ${(0.04 + 0.12 * g).toFixed(3)})`,
+			'--glass-rim-light': `rgba(255, 255, 255, ${(0.3 + 0.4 * g).toFixed(3)})`
+		}
+	};
+}
 
 /** A terminal font size within 8–32 px; anything else is the default. */
 const fontSize = (v: unknown) => (typeof v === 'number' && v >= 8 && v <= 32 ? v : DEFAULTS.terminalFontSize);
@@ -119,6 +153,7 @@ class PrefsStore {
 	backgroundImage = $state(DEFAULTS.backgroundImage);
 	backgroundStrength = $state<BackgroundStrength>(DEFAULTS.backgroundStrength);
 	backgroundStamp = $state(DEFAULTS.backgroundStamp);
+	glass = $state(DEFAULTS.glass);
 
 	init() {
 		const p = load();
@@ -137,8 +172,12 @@ class PrefsStore {
 		this.backgroundImage = typeof p.backgroundImage === 'string' ? p.backgroundImage : '';
 		this.backgroundStrength = BACKGROUND_STRENGTHS.includes(p.backgroundStrength) ? p.backgroundStrength : DEFAULTS.backgroundStrength;
 		this.backgroundStamp = Number.isFinite(p.backgroundStamp) ? p.backgroundStamp : 0;
+		this.glass = glassLevel(p.glass);
 		this.#applyVibrancy();
 		this.#applyBackground();
+		// Asking the system for less transparency turns the glass solid.
+		if (typeof window !== 'undefined')
+			window.matchMedia('(prefers-reduced-transparency: reduce)').addEventListener('change', () => this.#applyGlass());
 		if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
 			invoke<string | null>('window_effect')
 				.then((effect) => {
@@ -166,7 +205,8 @@ class PrefsStore {
 					balanceCurrency: this.balanceCurrency,
 					backgroundImage: this.backgroundImage,
 					backgroundStrength: this.backgroundStrength,
-					backgroundStamp: this.backgroundStamp
+					backgroundStamp: this.backgroundStamp,
+					glass: this.glass
 				})
 			);
 		} catch {
@@ -199,6 +239,28 @@ class PrefsStore {
 			root.style.removeProperty('--canvas-image');
 			delete root.dataset.canvasBg;
 		}
+		this.#applyGlass();
+	}
+
+	/** Reflect the glass level onto the root: the fills and blur as custom
+	 *  properties, and `data-glass` while there is glass to show (app.css). */
+	#applyGlass() {
+		if (typeof document === 'undefined') return;
+		const root = document.documentElement;
+		const canBlur =
+			typeof CSS !== 'undefined' &&
+			(CSS.supports('backdrop-filter', 'blur(1px)') || CSS.supports('-webkit-backdrop-filter', 'blur(1px)')) &&
+			!window.matchMedia('(prefers-reduced-transparency: reduce)').matches;
+		const style = glassStyle(this.glass, root.dataset.canvasBg ? this.backgroundStrength : null, canBlur);
+		for (const [k, v] of Object.entries(style.vars)) root.style.setProperty(k, v);
+		if (style.on) root.dataset.glass = '';
+		else delete root.dataset.glass;
+	}
+
+	setGlass(v: number) {
+		this.glass = glassLevel(v);
+		this.#applyGlass();
+		this.#save();
 	}
 
 	/** `path`: the stored copy (set_background_image), or '' for none. */

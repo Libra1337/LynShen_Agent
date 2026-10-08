@@ -31,6 +31,7 @@
 		leftWidth: number;
 		/** The sidebar is being dragged: follow it without easing. */
 		resizing?: boolean;
+		/** The sidebar is expanded (not the icon rail). */
 		sidebarOpen: boolean;
 		onToggleSidebar: () => void;
 		/** Hide the toggle on full-window surfaces (the welcome screen). */
@@ -70,9 +71,9 @@
 		{#if showToggle}
 			<button
 				class="tb-btn"
-				title={withShortcut(t('shell.toggleSidebar'), 'sidebar')}
-				aria-label={t('shell.toggleSidebar')}
-				aria-pressed={sidebarOpen}
+				title={withShortcut(t(sidebarOpen ? 'shell.sidebarCollapse' : 'shell.sidebarExpand'), 'sidebar')}
+				aria-label={t(sidebarOpen ? 'shell.sidebarCollapse' : 'shell.sidebarExpand')}
+				aria-expanded={sidebarOpen}
 				onclick={onToggleSidebar}><SidebarSimpleIcon size={18} /></button
 			>
 		{/if}
@@ -136,11 +137,30 @@
 		flex-shrink: 0;
 		min-width: max-content;
 		padding-left: 14px;
-		/* Moves with the sidebar opening and closing (Sidebar.svelte). */
-		transition: width var(--t-med) var(--ease-out);
+		/* Moves with the sidebar collapsing and expanding (Sidebar.svelte). */
+		transition: width var(--t-base) var(--ease-base);
 	}
 	.lead.resizing {
 		transition: none;
+	}
+	/* Over a custom background the image shows through, at --chrome-tint,
+	   blurred when glass is on (app.css, prefs.svelte.ts). */
+	/* On a layer behind the bar: on the bar itself the blur would make it
+	   the box its menus' fixed click-away backdrops fill. */
+	:global(:root[data-canvas-bg]) .titlebar {
+		isolation: isolate;
+	}
+	:global(:root[data-canvas-bg]) .titlebar::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		background: color-mix(in oklab, var(--rail) var(--chrome-tint), transparent);
+		pointer-events: none;
+	}
+	:global(:root[data-canvas-bg][data-glass]) .titlebar::before {
+		-webkit-backdrop-filter: var(--glass-filter);
+		backdrop-filter: var(--glass-filter);
 	}
 	:global(:root[data-os='macos']) .lead {
 		padding-left: 84px;

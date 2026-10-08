@@ -66,14 +66,28 @@
 	--r-2xl: 26px;
 	--r-full: 999px;
 
-	/* Motion: one deceleration curve for everything that moves, a gentle
-	   spring for things that pop in, three durations. */
+	/* Motion, after hark.com's web app: one base curve for size, colour and
+	   opacity (--ease-base, --t-base); things coming in decelerate
+	   (--ease-enter), things going away are shorter and accelerate
+	   (--ease-exit); hover and press take --t-fast. --time-scale stretches
+	   every duration (1 = as designed; ui/motion.ts reads it too). */
+	--time-scale: 1;
+	--ease-base: cubic-bezier(0.24, 0.42, 0.42, 0.92);
+	--ease-enter: cubic-bezier(0, 0, 0.2, 1);
+	--ease-exit: cubic-bezier(0.4, 0, 1, 1);
 	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 	--ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-	--ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
-	--t-fast: 0.14s;
-	--t-med: 0.22s;
-	--t-slow: 0.32s;
+	/* Small controls only (switch knobs, chevrons): at most ~10% overshoot. */
+	--ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.08);
+	--t-fast: calc(0.12s * var(--time-scale));
+	--t-med: calc(0.22s * var(--time-scale));
+	--t-base: calc(0.24s * var(--time-scale));
+	--t-slow: calc(0.32s * var(--time-scale));
+	/* Menus, popovers and tooltips: open in --t-pop, close in --t-exit. */
+	--t-pop: calc(0.15s * var(--time-scale));
+	--t-exit: calc(0.1s * var(--time-scale));
+	/* A new message or card. */
+	--t-enter: calc(0.4s * var(--time-scale));
 
 	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
 	/* Surfaces that float on the content layer (composer, cards): depth, no outline. */
@@ -82,7 +96,7 @@
 	--shadow-canvas: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 28px rgba(0, 0, 0, 0.45);
 	--shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.07);
 	--shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.07);
-	--scrim: rgba(0, 0, 0, 0.55);
+	--scrim: rgba(0, 0, 0, 0.6);
 	/* Frosted dialog sheet (ui/Modal.svelte): a translucent fill over a blur
 	   of what is behind. Menus, pickers and toasts stay opaque. */
 	--glass-strong: color-mix(in oklab, var(--panel) 88%, transparent);
@@ -309,18 +323,23 @@ body {
 	}
 }
 /* ---------- Motion system ----------
-   One set of entrances for the whole app, all on the --t-* durations and the
-   --ease-* curves above:
-     scrim-in   backdrops behind modals                 --t-fast  --ease-out
-     sheet-in   modals and sheets (settings, desk, …)   --t-med   --ease-spring
-     pop-in     popovers that open upward from an anchor (composer)  --t-med --ease-spring
-     drop-in    menus that open downward from an anchor (title bar)  --t-med --ease-spring
-     pane-in    a session or panel coming into view      --t-med   --ease-out
+   One set of entrances for the whole app, on the --t-* durations and the
+   --ease-* curves above. Pages and panes only fade and move a few pixels;
+   menus, popovers and tooltips also grow from 95% and unblur:
+     scrim-in   backdrops behind modals                 --t-fast  --ease-enter
+     sheet-in   modals and sheets                       --t-med   --ease-enter
+     pop-in     popovers that open upward from an anchor --t-pop  --ease-enter
+     drop-in    menus that open downward from an anchor  --t-pop  --ease-enter
+     pane-in    a session, panel or page coming into view --t-med --ease-enter
+     msg-in     a new message or card                    --t-enter --ease-enter
      rise/fade  small in-flow reveals (tray, labels)     --t-fast/med --ease-out
      spin       loading icons (class .spin)              0.8s linear, infinite
      pulse      live / recording indicators (class .pulse) 1.2s, infinite
-   Exit animations (modals, toasts) use the Svelte transitions in ui/motion.ts.
-   Reduced motion collapses all of them (see the media query at the end). */
+   Size changes (the sidebar's width, ui/Collapse) take --t-base / --ease-base.
+   Exits (menus, pages, settings sections, modals, toasts) and sidebar rows
+   arriving use the Svelte transitions in ui/motion.ts. Reduced motion
+   collapses all of them (see the media query at the end); a window being
+   resized runs no transitions (.win-resizing, +layout.svelte). */
 .pulse {
 	animation: pulse 1.2s var(--ease-in-out) infinite;
 }
@@ -332,13 +351,21 @@ body {
 @keyframes sheet-in {
 	from {
 		opacity: 0;
-		transform: translateY(10px) scale(0.985);
+		transform: translateY(8px) scale(0.96);
 	}
 }
 @keyframes drop-in {
 	from {
 		opacity: 0;
-		transform: translateY(-6px) scale(0.97);
+		transform: translateY(-8px) scale(0.95);
+		filter: blur(4px);
+	}
+}
+@keyframes msg-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+		filter: blur(4px);
 	}
 }
 @keyframes pane-in {
@@ -432,15 +459,20 @@ body {
 @keyframes pop-in {
 	from {
 		opacity: 0;
-		transform: translateY(6px) scale(0.97);
-	}
-	to {
-		opacity: 1;
-		transform: none;
+		transform: translateY(8px) scale(0.95);
+		filter: blur(4px);
 	}
 }
 .spin {
 	animation: spin 0.8s linear infinite;
+}
+
+/* While the window is resized (or zoomed), layout jumps to its new size:
+   nothing transitions along with it. */
+:root.win-resizing *,
+:root.win-resizing *::before,
+:root.win-resizing *::after {
+	transition: none !important;
 }
 
 /* Respect users who prefer reduced motion: drop animations/transitions and
@@ -467,14 +499,15 @@ input[type='number'] {
 	appearance: textfield;
 }
 
-/* Custom canvas background (Settings → 通用 → 背景). prefs.svelte.ts sets
+/* Custom background (Settings → 通用 → 背景). prefs.svelte.ts sets
    `--canvas-image` and `data-canvas-bg` (its strength) on the root. The image
-   fills the canvas (`.canvas`, right of the sidebar) under a veil of the
-   theme's --bg; the veil's opacity keeps text readable in both themes. The
-   surfaces in between (mosaic, leaves, chat pane) turn transparent so the
-   veiled image shows; floating surfaces (composer, cards, menus) keep their
-   own fills; a maximized leaf, which covers the others, repaints the
-   veiled image. The sidebar is outside .canvas and stays as it is. */
+   covers the whole window, title bar and sidebar included (+page.svelte
+   .app). The chrome (title bar strip, sidebar, settings and workbench navs)
+   lets it through at --chrome-tint (their own styles); the canvas lays a veil of the theme's
+   --bg over it (--canvas-veil), which keeps text readable in both themes.
+   The surfaces in between (mosaic, leaves, chat pane, pages) turn
+   transparent; floating surfaces (composer, cards, menus) keep their fills;
+   a maximized leaf, which covers the others, repaints the veil. */
 :root[data-canvas-bg] {
 	--canvas-veil: 80%;
 }
@@ -485,17 +518,80 @@ input[type='number'] {
 	--canvas-veil: 62%;
 }
 :root[data-canvas-bg] .canvas,
-:root[data-canvas-bg] .canvas .leaf.maxed {
-	background-color: var(--bg);
-	background-image:
-		linear-gradient(color-mix(in oklab, var(--bg) var(--canvas-veil), transparent), color-mix(in oklab, var(--bg) var(--canvas-veil), transparent)),
-		var(--canvas-image);
-	background-size: cover;
-	background-position: center;
-	background-repeat: no-repeat;
+:root[data-canvas-bg] .canvas .leaf.maxed,
+:root[data-canvas-bg] .settings .stage,
+:root[data-canvas-bg] .desk-page .main {
+	background: color-mix(in oklab, var(--bg) var(--canvas-veil), transparent);
 }
 :root[data-canvas-bg] .canvas .mosaic,
 :root[data-canvas-bg] .canvas .leaf:not(.maxed),
-:root[data-canvas-bg] .canvas .chatpane {
+:root[data-canvas-bg] .canvas .chatpane,
+:root[data-canvas-bg] .canvas .home-page,
+:root[data-canvas-bg] .canvas .project-page {
 	background: transparent;
+}
+
+/* ---------- Glass (Settings → 通用 → 玻璃透明度) ----------
+   prefs.svelte.ts sets the level's fills and blur on the root, and
+   `data-glass` while there is glass to show (level above 0, a webview that
+   can blur, no request for reduced transparency). Only the large chrome
+   surfaces take it: the sidebar and the settings / workbench navs, the
+   title bar, the composer, the floating cards and every menu and popover.
+   Never rows, messages or anything inside a scrolling list; the blur never
+   animates. The rim is a 1px light edge with a brighter top line, as on
+   Apple's Liquid Glass. */
+:root {
+	--chrome-tint: 100%;
+	--float-tint: 100%;
+	--glass-filter: none;
+	--glass-rim-dark: rgba(255, 255, 255, 0.04);
+	--glass-rim-light: rgba(255, 255, 255, 0.3);
+	--glass-rim: var(--glass-rim-dark);
+}
+[data-theme='light'] {
+	--glass-rim: var(--glass-rim-light);
+}
+/* The chrome (sidebar, settings and workbench navs, title bar) is glass
+   only over a background image (nothing else is behind it); each component
+   paints its own, after its vibrancy rule. */
+/* Floating surfaces: the panel fill thins out, the rim catches the light. */
+:root[data-glass] .composer,
+:root[data-glass] .pop,
+:root[data-glass] .toast:not(.error) {
+	background: color-mix(in oklab, var(--panel) var(--float-tint), transparent);
+	-webkit-backdrop-filter: var(--glass-filter);
+	backdrop-filter: var(--glass-filter);
+	box-shadow:
+		inset 0 1px 0 var(--glass-rim),
+		inset 0 0 0 1px color-mix(in oklab, var(--glass-rim) 60%, transparent),
+		var(--shadow-pop);
+}
+:root[data-glass] .composer {
+	box-shadow:
+		inset 0 1px 0 var(--glass-rim),
+		inset 0 0 0 1px color-mix(in oklab, var(--glass-rim) 60%, transparent),
+		var(--shadow-float);
+}
+/* An approval card holds menus whose click-away backdrops are fixed: its
+   glass sits on a layer behind it, not on the card. */
+:root[data-glass] .approval {
+	position: relative;
+	isolation: isolate;
+	background: none;
+	border-color: transparent;
+	box-shadow:
+		inset 0 1px 0 var(--glass-rim),
+		inset 0 0 0 1px color-mix(in oklab, var(--glass-rim) 60%, transparent),
+		var(--shadow-float);
+}
+:root[data-glass] .approval::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
+	background: color-mix(in oklab, var(--panel) var(--float-tint), transparent);
+	-webkit-backdrop-filter: var(--glass-filter);
+	backdrop-filter: var(--glass-filter);
+	pointer-events: none;
 }

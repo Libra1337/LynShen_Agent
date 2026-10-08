@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { paneOut } from '$lib/ui/motion';
 	// The home page, as in Codex: a box to start a new conversation, then the
 	// agents, the projects and the most recent conversations (in a project or
 	// not). It covers the canvas; the sidebar stays.
@@ -83,7 +84,7 @@
 	const count = (p: Project) => p.sessions.filter((s: Session) => !s.archived).length;
 </script>
 
-<div class="home-page">
+<div class="home-page" out:paneOut|global>
 	<div class="col">
 		<h1>{t('shell.home.greeting')}</h1>
 		<div class="start">

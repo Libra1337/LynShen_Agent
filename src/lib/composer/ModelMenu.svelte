@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { popOut } from '$lib/ui/motion';
 	import { onMount, tick } from 'svelte';
 	import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 	import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
@@ -158,7 +159,7 @@
 
 <svelte:window onkeydowncapture={onKeyCapture} />
 <button class="mm-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={onClose}></button>
-<div class="pop mm" role="dialog" aria-label={t('chat.switchModel')} bind:this={popEl} style:left="{popLeft}px" style:top="{popTop}px">
+<div class="pop mm" role="dialog" out:popOut|global aria-label={t('chat.switchModel')} bind:this={popEl} style:left="{popLeft}px" style:top="{popTop}px">
 	{#if page === 'main'}
 		<section class="current">
 			{#if canPickModel}
@@ -310,7 +311,7 @@
 		gap: 0;
 		padding: 6px;
 		transform-origin: bottom right;
-		animation: pop-in var(--t-med) var(--ease-spring);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	/* GroupPicker renders its own section, hence :global. */
 	.mm > :global(section + section) {
@@ -480,7 +481,7 @@
 	}
 	/* The check lands on a newly picked model. */
 	.pop-check:not(.off) :global(svg) {
-		animation: pop-in var(--t-med) var(--ease-spring);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.empty {
 		padding: 14px 12px;

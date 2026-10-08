@@ -58,7 +58,8 @@
 	use:portal
 	class="scrim {placement}"
 	role="presentation"
-	transition:scrim|global
+	in:scrim|global
+	out:scrim|global
 	onclick={(e) => e.target === e.currentTarget && dismissible && onClose()}
 	onkeydown={onKey}
 >
@@ -69,7 +70,8 @@
 		aria-label={title ?? label}
 		tabindex="-1"
 		style:width="min({width}px, calc(100vw - 48px))"
-		transition:sheet|global
+		in:sheet|global
+		out:sheet|global
 		use:focusTrap
 	>
 		{#if title}
@@ -111,8 +113,8 @@
 	}
 	.scrim::before {
 		background: var(--scrim);
-		-webkit-backdrop-filter: blur(3px);
-		backdrop-filter: blur(3px);
+		-webkit-backdrop-filter: blur(8px);
+		backdrop-filter: blur(8px);
 	}
 	.sheet::before {
 		background: var(--glass-strong);

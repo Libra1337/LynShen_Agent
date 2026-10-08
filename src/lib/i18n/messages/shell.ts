@@ -53,7 +53,7 @@ const shell = {
 			composer: '输入框',
 			palette: '命令面板',
 			quickOpen: '快速打开文件',
-			sidebar: '显示或隐藏侧栏',
+			sidebar: '收起或展开侧栏',
 			settings: '设置',
 			terminal: '打开终端',
 			shortcuts: '快捷键列表',
@@ -100,7 +100,7 @@ const shell = {
 		pickerFoot: '↑↓ 选择 · Enter 确认 · Esc 关闭',
 
 		// header / navigator
-		toggleSidebar: '会话列表 · ⌘B',
+		toggleSidebar: '收起或展开侧栏',
 		chatGone: '该对话已关闭',
 
 		// workspaces
@@ -805,8 +805,22 @@ const shell = {
 			signIn: '登录 LynShen 账号',
 			signInHint: '登录后可查看余额和套餐额度',
 			manage: '账号设置',
-			expires: '{date} 到期'
+			expires: '{date} 到期',
+			balance: '余额',
+			unlimited: '不限额',
+			plan: '套餐',
+			noPlan: '未分配订阅套餐',
+			liveUsage: '最近 60 秒',
+			rpm: 'RPM',
+			tpm: 'TPM',
+			cacheHit: '缓存命中',
+			currency: '显示货币',
+			theme: '主题',
+			logout: '退出登录',
+			roles: { admin: '管理员', superAdmin: '超级管理员' }
 		},
+		sidebarCollapse: '收起侧栏',
+		sidebarExpand: '展开侧栏',
 		settings: '设置',
 		updateAvailable: '有新版本可用',
 		deepLinkBadPath: '路径不存在或无法访问：{path}',
@@ -860,8 +874,8 @@ const shell = {
 			openPanel: '打开面板：{name}',
 			openPanelHint: '在画布上平铺',
 			openPanelKw: 'panel tile open 面板 平铺 打开',
-			sidebar: '切换会话列表',
-			sidebarKw: 'sidebar sessions navigator 侧边栏 会话 列表',
+			sidebar: '收起或展开侧栏',
+			sidebarKw: 'sidebar sessions navigator collapse rail 侧边栏 会话 列表 收起 展开',
 			theme: '切换主题',
 			themeKw: 'theme dark light 主题'
 		},
@@ -959,7 +973,7 @@ const shell = {
 			composer: 'Composer',
 			palette: 'Command palette',
 			quickOpen: 'Quick open file',
-			sidebar: 'Show or hide sidebar',
+			sidebar: 'Collapse or expand sidebar',
 			settings: 'Settings',
 			terminal: 'Open terminal',
 			shortcuts: 'Keyboard shortcuts',
@@ -1006,7 +1020,7 @@ const shell = {
 		pickerFoot: '↑↓ Navigate · Enter Select · Esc Close',
 
 		// header / navigator
-		toggleSidebar: 'Session list · ⌘B',
+		toggleSidebar: 'Collapse or expand sidebar',
 		chatGone: 'This conversation is closed',
 
 		// workspaces
@@ -1711,8 +1725,22 @@ const shell = {
 			signIn: 'Sign in to LynShen',
 			signInHint: 'Sign in to see your balance and plan quota',
 			manage: 'Account settings',
-			expires: 'Expires {date}'
+			expires: 'Expires {date}',
+			balance: 'Balance',
+			unlimited: 'Unlimited',
+			plan: 'Plan',
+			noPlan: 'No subscription plan',
+			liveUsage: 'Last 60 s',
+			rpm: 'RPM',
+			tpm: 'TPM',
+			cacheHit: 'Cache hit',
+			currency: 'Currency',
+			theme: 'Theme',
+			logout: 'Log out',
+			roles: { admin: 'Admin', superAdmin: 'Super admin' }
 		},
+		sidebarCollapse: 'Collapse sidebar',
+		sidebarExpand: 'Expand sidebar',
 		settings: 'Settings',
 		updateAvailable: 'Update available',
 		deepLinkBadPath: 'Path does not exist or is not accessible: {path}',
@@ -1766,8 +1794,8 @@ const shell = {
 			openPanel: 'Open panel: {name}',
 			openPanelHint: 'as a tile on the canvas',
 			openPanelKw: 'panel tile open',
-			sidebar: 'Toggle session list',
-			sidebarKw: 'sidebar sessions navigator',
+			sidebar: 'Collapse or expand sidebar',
+			sidebarKw: 'sidebar sessions navigator collapse expand rail',
 			theme: 'Toggle theme',
 			themeKw: 'theme dark light'
 		},

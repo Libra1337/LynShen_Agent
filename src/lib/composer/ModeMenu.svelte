@@ -11,6 +11,7 @@
 </script>
 
 <script lang="ts">
+	import { popOut } from '$lib/ui/motion';
 	import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 	import { t } from '$lib/i18n';
 
@@ -64,7 +65,7 @@
 <svelte:window onkeydowncapture={onKey} />
 
 <button class="mode-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={onClose}></button>
-<div class="pop modes" role="menu" aria-label={t('chat.modeTitle')}>
+<div class="pop modes" role="menu" out:popOut|global aria-label={t('chat.modeTitle')}>
 	<div class="pop-head">{t('chat.modeTitle')}</div>
 	{#if note}<div class="note">{note}</div>{/if}
 	{#each items as it, i (it.key)}
@@ -108,7 +109,7 @@
 		z-index: 81;
 		width: min(340px, calc(100vw - 32px));
 		transform-origin: bottom left;
-		animation: pop-in var(--t-med) var(--ease-spring);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.pop-head {
 		padding: 6px 12px 4px;

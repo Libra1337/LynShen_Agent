@@ -20,6 +20,11 @@
 	import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 	import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 	import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
+	import SidebarSimpleIcon from 'phosphor-svelte/lib/SidebarSimpleIcon';
+	import mark from '$lib/lynshen-mark.svg?raw';
+	import { SIDEBAR_RAIL_WIDTH } from '$lib/shell/sidebarState';
+	import { rowIn } from '$lib/ui/motion';
+	import Collapse from '$lib/ui/Collapse.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import { t } from '$lib/i18n';
 	import { shownTitle } from '$lib/chat.svelte';
@@ -42,6 +47,8 @@
 		projects,
 		activeId,
 		width,
+		collapsed: railed = false,
+		onToggleCollapsed = () => {},
 		resizing = false,
 		onSelect,
 		onOpenProject = () => {},
@@ -75,7 +82,11 @@
 	}: {
 		projects: Project[];
 		activeId: string;
+		/** The expanded width (the user's, 240–460px). */
 		width: number;
+		/** The narrow icon rail instead: logo, primary nav as icons, avatar. */
+		collapsed?: boolean;
+		onToggleCollapsed?: () => void;
 		/** True while the user drags the resizer — disables the width transition. */
 		resizing?: boolean;
 		onSelect: (id: string) => void;
@@ -120,8 +131,8 @@
 		onHome?: () => void;
 		/** The home page is in front. */
 		homeOpen?: boolean;
-		/** The account / settings row at the bottom. */
-		footer: ComponentProps<typeof SidebarFooter>;
+		/** The account row at the bottom. */
+		footer: Omit<ComponentProps<typeof SidebarFooter>, 'collapsed'>;
 	} = $props();
 	const reqs = useRequirements();
 
@@ -292,43 +303,81 @@
 		window.addEventListener('pointercancel', end);
 		window.addEventListener('selectstart', noSelect);
 	}
-	// Width the content lays out at; kept while the panel closes.
-	let openWidth = $state(292);
+	// Collapsing closes the session filter (the rail has no room for it).
 	$effect(() => {
-		if (width > 0) openWidth = width;
+		if (railed && searchOpen) {
+			searchQuery = '';
+			searchOpen = false;
+		}
 	});
 </script>
 
-<aside class="sidebar" class:resizing class:closed={width === 0} style:width="{width}px">
-<!-- The content keeps the open width while the panel animates, so it slides
-     out of view instead of re-wrapping at every intermediate width. -->
-<div class="sb-inner" style:width="{openWidth}px">
-	<!-- Header: the wordmark, or the session filter in its place while searching. -->
+<!-- One layout for both states: the content keeps the expanded width and the
+     panel clips it, so the icons stay on the rail's centre line while the
+     width animates and the labels fade instead of re-wrapping. -->
+<aside
+	class="sidebar"
+	class:resizing
+	class:collapsed={railed}
+	style:width="{railed ? SIDEBAR_RAIL_WIDTH : width}px"
+	style:--rail-w="{SIDEBAR_RAIL_WIDTH}px"
+>
+<div class="sb-inner" style:width="{width}px">
+	<!-- Header: the logo and wordmark, or the session filter in its place
+	     while searching. Collapsed, the logo expands the sidebar. -->
 	<div class="brand" data-tauri-drag-region>
-		{#if searchOpen}
-			<MagnifyingGlassIcon size={18} />
-			<input
-				class="filter"
-				bind:this={searchEl}
-				bind:value={searchQuery}
-				placeholder={t('shell.searchSessions')}
-				onkeydown={searchKey}
-				onblur={() => !searchQuery && toggleSearch()}
-			/>
-			<button class="head-act" onclick={toggleSearch} aria-label={t('shell.closeSearch')} title={t('shell.closeSearch')}><XIcon size={18} /></button>
+		{#if railed}
+			<button
+				class="logo expand"
+				onclick={onToggleCollapsed}
+				aria-label={t('shell.sidebarExpand')}
+				data-tip={withShortcut(t('shell.sidebarExpand'), 'sidebar')}
+				data-tip-side="right"
+			>
+				<span class="mark" aria-hidden="true">{@html mark}</span>
+				<span class="mark-alt" aria-hidden="true"><SidebarSimpleIcon size={18} /></span>
+			</button>
+		{:else if searchOpen}
+			<span class="logo-slot"><MagnifyingGlassIcon size={18} /></span>
 		{:else}
-			<span class="word">LynShen</span>
-			<button class="head-act" onclick={toggleSearch} aria-label={t('shell.searchSessions')} title={t('shell.searchSessions')}><MagnifyingGlassIcon size={18} /></button>
+			<span class="logo" aria-hidden="true"><span class="mark">{@html mark}</span></span>
 		{/if}
+		<div class="brand-rest" inert={railed}>
+			{#if searchOpen}
+				<input
+					class="filter"
+					bind:this={searchEl}
+					bind:value={searchQuery}
+					placeholder={t('shell.searchSessions')}
+					onkeydown={searchKey}
+					onblur={() => !searchQuery && toggleSearch()}
+				/>
+				<button class="head-act" onclick={toggleSearch} aria-label={t('shell.closeSearch')} title={t('shell.closeSearch')}><XIcon size={18} /></button>
+			{:else}
+				<span class="word">LynShen</span>
+				<button class="head-act" onclick={toggleSearch} aria-label={t('shell.searchSessions')} title={t('shell.searchSessions')}><MagnifyingGlassIcon size={18} /></button>
+				<button class="head-act" onclick={onToggleCollapsed} aria-label={t('shell.sidebarCollapse')} title={withShortcut(t('shell.sidebarCollapse'), 'sidebar')}><SidebarSimpleIcon size={18} /></button>
+			{/if}
+		</div>
 	</div>
 
 	<nav class="primary">
-		<button class="row" onclick={newHere}><NotePencilIcon size={18} /><span>{t('shell.newChat')}</span></button>
-		<button class="row" class:on={homeOpen} onclick={onHome}><HouseIcon size={18} weight={homeOpen ? 'fill' : 'regular'} /><span>{t('shell.home.title')}</span></button>
+		<button class="row" onclick={newHere} aria-label={t('shell.newChat')} data-tip={railed ? t('shell.newChat') : undefined} data-tip-side="right">
+			<NotePencilIcon size={18} /><span class="label">{t('shell.newChat')}</span>
+		</button>
+		<button class="row" class:on={homeOpen} onclick={onHome} aria-label={t('shell.home.title')} data-tip={railed ? t('shell.home.title') : undefined} data-tip-side="right">
+			<HouseIcon size={18} weight={homeOpen ? 'fill' : 'regular'} /><span class="label">{t('shell.home.title')}</span>
+		</button>
 		{#if agentsStatus !== 'off'}
-			<button class="row" onclick={onDesk}>
-				<TrayIcon size={18} /><span>{t('shell.desk.title')}</span>
-				{#if pendingCount > 0}<span class="count">{pendingCount}</span>{/if}
+			<button
+				class="row"
+				onclick={onDesk}
+				aria-label={pendingCount > 0 ? `${t('shell.desk.title')} · ${pendingCount}` : t('shell.desk.title')}
+				data-tip={railed ? (pendingCount > 0 ? `${t('shell.desk.title')} · ${pendingCount}` : t('shell.desk.title')) : undefined}
+				data-tip-side="right"
+			>
+				<TrayIcon size={18} /><span class="label">{t('shell.desk.title')}</span>
+				{#if pendingCount > 0}<span class="count">{pendingCount}</span><span class="count-dot" aria-hidden="true"></span>{/if}
 			</button>
 		{/if}
 	</nav>
@@ -339,6 +388,7 @@
 		{@const req = s.chat.sessionId ? reqs.bySession.get(s.chat.sessionId) : undefined}
 		<!-- Listed rows (`p` given) drag within their project and pinned group. -->
 		<button
+			in:rowIn
 			class="sess"
 			class:nested
 			class:on={!selectable && s.id === activeId}
@@ -476,7 +526,7 @@
 		{/if}
 	{/snippet}
 
-	<div class="list" class:dragging={drag?.live} bind:this={listEl}>
+	<div class="list" class:dragging={drag?.live} bind:this={listEl} inert={railed}>
 		<!-- Agents: long-lived workers of the local daemon. -->
 		<section>
 			<div class="head">
@@ -591,7 +641,7 @@
 							{/if}
 							<button class="act" class:always={p.stale} onclick={() => onCloseProject(p)} aria-label={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')} title={p.stale ? t('shell.task.staleRemove') : t('shell.closeProject')}><XIcon size={16} /></button>
 						</div>
-						{#if open}
+						<Collapse {open}>
 							{#each showAll[p.id] || query ? active : firstSessions(active) as s (s.id)}{@render sessRow(s, true, false, p)}{/each}
 							{#if active.length > SHOW_LIMIT && !query}
 								<button class="more nested" onclick={() => (showAll[p.id] = !showAll[p.id])}>{showAll[p.id] ? t('shell.showLess') : t('shell.showMore')}</button>
@@ -600,56 +650,137 @@
 								<button class="sess ghost nested" onclick={() => onNewSession(p)}><span class="sess-title">{t('shell.newChat')}</span></button>
 							{/if}
 							{@render archived(p, arch, true)}
-						{/if}
+						</Collapse>
 					</div>
 				{/if}
 			{/each}
 		</section>
 	</div>
-	<SidebarFooter {...footer} />
+	<SidebarFooter {...footer} collapsed={railed} />
 
 </div>
 </aside>
 
 <style>
+	/* Only the panel's width moves (one property, one container); its content
+	   keeps the expanded width, so nothing inside re-lays out while it moves.
+	   Containment keeps the content's layout and paint to itself; the account
+	   card, which is fixed to the window, is portalled out (SidebarFooter). */
 	.sidebar {
 		flex-shrink: 0;
 		display: flex;
 		background: var(--sidebar);
 		min-width: 0;
 		overflow: hidden;
-		transition: width var(--t-med) var(--ease-out);
+		contain: layout paint;
+		transition: width var(--t-base) var(--ease-base);
 	}
 	.sb-inner {
 		display: flex;
 		flex-direction: column;
 		flex-shrink: 0;
 		min-height: 0;
-		transition: opacity var(--t-med) var(--ease-out);
-	}
-	.sidebar.closed .sb-inner {
-		opacity: 0;
 	}
 	.sidebar.resizing {
 		transition: none;
+	}
+	/* What the rail has no room for fades out; it fades back in once the
+	   panel is most of the way open. */
+	.brand-rest,
+	.list,
+	.primary .label,
+	.primary .count {
+		transition: opacity var(--t-med) var(--ease-base) 40ms;
+	}
+	.collapsed .brand-rest,
+	.collapsed .list,
+	.collapsed .primary .label,
+	.collapsed .primary .count {
+		opacity: 0;
+		transition: opacity var(--t-fast) var(--ease-base);
+	}
+	.collapsed .list {
+		pointer-events: none;
 	}
 	/* Under macOS vibrancy the sidebar becomes translucent so the native frost
 	 * shows through; everywhere else it stays fully opaque. */
 	:global(:root[data-vibrancy='on']) .sidebar {
 		background: var(--vibrancy-tint);
 	}
+	/* Over a custom background the image shows through, at --chrome-tint,
+	   blurred when glass is on (app.css, prefs.svelte.ts). */
+	:global(:root[data-canvas-bg]) .sidebar {
+		background: color-mix(in oklab, var(--sidebar) var(--chrome-tint), transparent);
+	}
+	:global(:root[data-canvas-bg][data-glass]) .sidebar {
+		-webkit-backdrop-filter: var(--glass-filter);
+		backdrop-filter: var(--glass-filter);
+	}
+	/* The logo sits in a 42px slot from x = 10, centred on the rail
+	   (--rail-w / 2), as are the nav icons and the avatar. */
 	.brand {
 		display: flex;
 		align-items: center;
-		gap: 8px;
 		height: 40px;
-		margin: 14px 12px 10px;
-		padding: 0 4px 0 10px;
+		margin: 14px 10px 10px;
 		flex-shrink: 0;
 	}
-	.brand > :global(svg) {
-		color: var(--dim);
+	.logo,
+	.logo-slot {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 42px;
+		height: 40px;
 		flex-shrink: 0;
+		padding: 0;
+		border: none;
+		border-radius: var(--r-md);
+		background: none;
+		color: var(--dim);
+	}
+	.mark,
+	.mark-alt {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 30px;
+		height: 30px;
+		border-radius: var(--r-sm);
+		line-height: 0;
+	}
+	.mark {
+		background: var(--text);
+		color: var(--bg);
+	}
+	.mark :global(svg) {
+		width: 100%;
+		height: 100%;
+	}
+	/* Collapsed, the logo is the expand button: the panel icon on hover. */
+	.logo.expand {
+		cursor: pointer;
+	}
+	.mark-alt {
+		position: absolute;
+		inset: 5px 6px;
+		background: var(--surface2);
+		color: var(--text);
+		opacity: 0;
+		transition: opacity var(--t-fast) var(--ease-out);
+	}
+	.logo.expand:hover .mark-alt,
+	.logo.expand:focus-visible .mark-alt {
+		opacity: 1;
+	}
+	.brand-rest {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		padding-left: 6px;
 	}
 	.filter {
 		flex: 1;
@@ -665,17 +796,70 @@
 	}
 	.word {
 		flex: 1;
+		min-width: 0;
 		font-family: var(--font-sans);
-		font-size: var(--fs-xl);
+		font-size: var(--fs-lg);
 		font-weight: 700;
 		letter-spacing: -0.005em;
 		color: var(--text);
+		white-space: nowrap;
 	}
 	.primary {
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
 		padding: 0 10px 8px;
+	}
+	/* Primary rows paint their fill from a layer that shrinks to the icon
+	   when the panel collapses, so the row itself never changes size. */
+	.primary .row {
+		position: relative;
+		isolation: isolate;
+		white-space: nowrap;
+	}
+	.primary .row::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		border-radius: var(--r-md);
+		transition:
+			background var(--t-fast) var(--ease-out),
+			right var(--t-base) var(--ease-base);
+	}
+	.collapsed .primary .row::before {
+		right: calc(100% - 42px);
+	}
+	.primary .row:hover,
+	.primary .row.on {
+		background: none;
+	}
+	.primary .row:hover::before,
+	.primary .row.on::before {
+		background: var(--surface2);
+	}
+	.primary .row:focus-visible {
+		outline: none;
+	}
+	.primary .row:focus-visible::before {
+		outline: 2px solid var(--brand-bright);
+		outline-offset: -2px;
+	}
+	/* Collapsed, the pending count becomes a dot on the icon. */
+	.count-dot {
+		position: absolute;
+		top: 7px;
+		left: 33px;
+		width: 8px;
+		height: 8px;
+		border-radius: var(--r-full);
+		background: var(--accent);
+		box-shadow: 0 0 0 2px var(--sidebar);
+		opacity: 0;
+		transition: opacity var(--t-fast) var(--ease-out);
+	}
+	.collapsed .count-dot {
+		opacity: 1;
 	}
 	.row,
 	.sess,
@@ -1044,7 +1228,7 @@
 		color: var(--text);
 	}
 	.caret :global(svg) {
-		transition: transform var(--t-fast) var(--ease-out);
+		transition: transform var(--t-base) var(--ease-base);
 	}
 	.caret.open :global(svg) {
 		transform: rotate(90deg);

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { popOut } from '$lib/ui/motion';
 	// The remote session's model menu, laid out like the desktop composer's
 	// (composer/ModelMenu.svelte): the current model and the thinking effort
 	// on the first page, the model list on the second. It opens at once from
@@ -134,7 +135,7 @@
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} onresize={position} />
 <div class="mm-layer" use:portal>
 <button class="mm-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={onClose}></button>
-<div class="pop mm" role="dialog" aria-label={t('chat.switchModel')} bind:this={popEl} style:left="{popLeft}px" style:top="{popTop}px">
+<div class="pop mm" role="dialog" out:popOut|global aria-label={t('chat.switchModel')} bind:this={popEl} style:left="{popLeft}px" style:top="{popTop}px">
 	{#if page === 'main'}
 		<section class="current">
 			<button class="pop-row" onclick={() => (page = 'models')} title={t('chat.switchModel')}>
@@ -267,7 +268,7 @@
 		gap: 0;
 		padding: 6px;
 		transform-origin: bottom right;
-		animation: pop-in var(--t-med) var(--ease-spring);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.mm > section + section {
 		margin-top: 6px;
@@ -357,7 +358,7 @@
 		visibility: hidden;
 	}
 	.pop-check:not(.off) :global(svg:not(.spin)) {
-		animation: pop-in var(--t-med) var(--ease-spring);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.empty {
 		display: flex;

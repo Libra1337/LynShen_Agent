@@ -20,6 +20,7 @@
 </script>
 
 <script lang="ts">
+	import { popOut } from '$lib/ui/motion';
 	// The app's list popover: an optional gray question on top, then rows of
 	// icon · label (· gray description) with a check on the current choice.
 	// Anchored to its positioned parent; `placement` says which way it opens.
@@ -46,7 +47,7 @@
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} />
 
 <button class="pm-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={onClose}></button>
-<div class="pop pm {placement}" role="menu">
+<div class="pop pm {placement}" role="menu" out:popOut|global>
 	{#if title}<div class="pop-head">{title}</div>{/if}
 	{#each items as it, i (it.key)}
 		{#if it.group && it.group !== items[i - 1]?.group}
@@ -96,24 +97,24 @@
 		left: 0;
 		bottom: calc(100% + 8px);
 		transform-origin: bottom left;
-		animation: pop-in var(--t-med) var(--ease-spring);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.up-right {
 		right: 0;
 		bottom: calc(100% + 8px);
 		transform-origin: bottom right;
-		animation: pop-in var(--t-med) var(--ease-spring);
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.down-left {
 		left: 0;
 		top: calc(100% + 6px);
 		transform-origin: top left;
-		animation: drop-in var(--t-med) var(--ease-spring);
+		animation: drop-in var(--t-pop) var(--ease-enter);
 	}
 	.down-right {
 		right: 0;
 		top: calc(100% + 6px);
 		transform-origin: top right;
-		animation: drop-in var(--t-med) var(--ease-spring);
+		animation: drop-in var(--t-pop) var(--ease-enter);
 	}
 </style>

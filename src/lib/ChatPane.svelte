@@ -1207,6 +1207,11 @@
 			</div>
 		{/if}
 	</main>
+	<!-- Progressive edge blur: the transcript dissolves at the top and bottom
+	     of the scroller instead of a hard cut. Six bands, each blurring twice
+	     the last; glass only (app.css), never on the rows themselves. -->
+	<div class="edge-blur top" aria-hidden="true">{#each [1, 2, 3, 4, 5, 6] as n (n)}<span style:--n={n} style:--blur="{0.25 * 2 ** n}px"></span>{/each}</div>
+	<div class="edge-blur bottom" aria-hidden="true">{#each [1, 2, 3, 4, 5, 6] as n (n)}<span style:--n={n} style:--blur="{0.25 * 2 ** n}px"></span>{/each}</div>
 	{#if marks.length > 1}
 		<TurnRail {marks} current={mark} onJump={(n) => messageList?.jumpToMark(n)} />
 	{/if}
@@ -1429,7 +1434,7 @@
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 		cursor: pointer;
 		z-index: 10;
-		animation: jump-in var(--t-med) var(--ease-spring);
+		animation: jump-in var(--t-med) var(--ease-out);
 		transition:
 			background var(--t-fast) var(--ease-out),
 			transform var(--t-fast) var(--ease-spring),
@@ -1439,7 +1444,7 @@
 	@keyframes jump-in {
 		from {
 			opacity: 0;
-			transform: translateX(-50%) translateY(6px) scale(0.9);
+			transform: translateX(-50%) translateY(4px);
 		}
 		to {
 			opacity: 1;
@@ -1527,6 +1532,35 @@
 		white-space: nowrap;
 	}
 
+	.edge-blur {
+		display: none;
+		position: absolute;
+		left: 0;
+		right: 12px;
+		height: 48px;
+		z-index: 2;
+		pointer-events: none;
+	}
+	.edge-blur.top {
+		top: 0;
+	}
+	.edge-blur.bottom {
+		bottom: 0;
+		transform: scaleY(-1);
+	}
+	/* Band n covers the top (7 - n) / 6 of the strip, fading out, and blurs
+	   0.25px × 2^n: the edge is the most blurred. */
+	.edge-blur span {
+		position: absolute;
+		inset: 0;
+		-webkit-backdrop-filter: blur(var(--blur));
+		backdrop-filter: blur(var(--blur));
+		mask-image: linear-gradient(to bottom, #000 calc((6 - var(--n)) * 100% / 6), transparent calc((7 - var(--n)) * 100% / 6));
+		-webkit-mask-image: linear-gradient(to bottom, #000 calc((6 - var(--n)) * 100% / 6), transparent calc((7 - var(--n)) * 100% / 6));
+	}
+	:global(:root[data-glass]) .edge-blur {
+		display: block;
+	}
 	.mainwrap {
 		position: relative;
 		flex: 1;
