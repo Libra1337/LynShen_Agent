@@ -455,11 +455,33 @@ pub(crate) fn write_json(path: &std::path::Path, value: &serde_json::Value) -> R
     options
         .open(&temp)
         .and_then(|mut file| std::io::Write::write_all(&mut file, format!("{text}\n").as_bytes()))
-        .and_then(|()| std::fs::rename(&temp, path))
+        .and_then(|()| rename_retrying(&temp, path))
         .map_err(|error| {
             let _ = std::fs::remove_file(&temp);
             error.to_string()
         })
+}
+
+/// Windows refuses to replace a file another process has open (an engine
+/// reading config.json, an antivirus scan) for a moment: retry briefly
+/// instead of losing the write (a picked model that silently did not stick).
+fn rename_retrying(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    let mut attempt = 0;
+    loop {
+        match std::fs::rename(from, to) {
+            Err(error)
+                if attempt < 20
+                    && matches!(
+                        error.kind(),
+                        std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ResourceBusy
+                    ) =>
+            {
+                attempt += 1;
+                std::thread::sleep(std::time::Duration::from_millis(25 * attempt));
+            }
+            result => return result,
+        }
+    }
 }
 
 /// Whether new writes to auth.json encrypt credentials at rest.
