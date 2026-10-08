@@ -876,6 +876,21 @@
 								<Segmented value={prefs.backgroundStrength} options={strengthOpts} onChange={(v) => prefs.setBackgroundStrength(v as (typeof BACKGROUND_STRENGTHS)[number])} />
 							</SettingsRow>
 						{/if}
+						<SettingsRow id="glass" title={t('settings.behavior.glass')} description={t('settings.behavior.glassHint')}>
+							<div class="glass-ctl">
+								<input
+									type="range"
+									min="0"
+									max="100"
+									step="5"
+									value={prefs.glass}
+									aria-label={t('settings.behavior.glass')}
+									style:--fill="{prefs.glass}%"
+									oninput={(e) => prefs.setGlass(Number(e.currentTarget.value))}
+								/>
+								<span class="glass-val">{prefs.glass}</span>
+							</div>
+						</SettingsRow>
 						{#if vibrancySupported()}
 							<SettingsRow id="vibrancy" title={t('settings.behavior.vibrancy')} description={t('settings.behavior.vibrancyHint')}>
 								<Switch checked={prefs.sidebarVibrancy} label={t('settings.behavior.vibrancy')} onChange={(on) => prefs.setSidebarVibrancy(on)} />
@@ -1346,6 +1361,15 @@
 	:global(:root[data-vibrancy='on']) .nav {
 		background: var(--vibrancy-tint);
 	}
+	/* Over a custom background the image shows through, at --chrome-tint,
+	   blurred when glass is on (app.css, prefs.svelte.ts). */
+	:global(:root[data-canvas-bg]) .nav {
+		background: color-mix(in oklab, var(--sidebar) var(--chrome-tint), transparent);
+	}
+	:global(:root[data-canvas-bg][data-glass]) .nav {
+		-webkit-backdrop-filter: var(--glass-filter);
+		backdrop-filter: var(--glass-filter);
+	}
 	.nav-head {
 		display: flex;
 		align-items: center;
@@ -1475,6 +1499,49 @@
 	}
 
 	/* ---------- page ---------- */
+	.glass-ctl {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		width: 240px;
+	}
+	.glass-ctl input {
+		flex: 1;
+		height: 20px;
+		margin: 0;
+		background: none;
+		cursor: pointer;
+		appearance: none;
+		-webkit-appearance: none;
+	}
+	.glass-ctl input::-webkit-slider-runnable-track {
+		height: 4px;
+		border-radius: var(--r-full);
+		background: linear-gradient(to right, var(--accent) var(--fill), var(--surface2) var(--fill));
+	}
+	.glass-ctl input::-webkit-slider-thumb {
+		width: 16px;
+		height: 16px;
+		margin-top: -6px;
+		border-radius: var(--r-full);
+		background: var(--panel);
+		box-shadow:
+			0 0 0 1px var(--border-strong),
+			var(--shadow-sm);
+		-webkit-appearance: none;
+		transition: transform var(--t-fast) var(--ease-out);
+	}
+	.glass-ctl input:active::-webkit-slider-thumb {
+		transform: scale(1.1);
+	}
+	.glass-val {
+		width: 3ch;
+		color: var(--dim);
+		font-family: var(--font-mono);
+		font-size: var(--fs-xs);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
 	.stage {
 		flex: 1;
 		min-width: 0;

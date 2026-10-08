@@ -1753,6 +1753,11 @@
 	:global(:root[data-vibrancy='on']) .app {
 		background: var(--vibrancy-chrome);
 	}
+	/* A custom background covers the whole window, under the title bar and
+	   the sidebar too; they lay their tints over it (app.css). */
+	:global(:root[data-canvas-bg]) .app {
+		background: var(--rail) var(--canvas-image) center / cover no-repeat;
+	}
 	.body {
 		flex: 1;
 		display: flex;

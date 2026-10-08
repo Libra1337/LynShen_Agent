@@ -707,6 +707,15 @@
 	:global(:root[data-vibrancy='on']) .sidebar {
 		background: var(--vibrancy-tint);
 	}
+	/* Over a custom background the image shows through, at --chrome-tint,
+	   blurred when glass is on (app.css, prefs.svelte.ts). */
+	:global(:root[data-canvas-bg]) .sidebar {
+		background: color-mix(in oklab, var(--sidebar) var(--chrome-tint), transparent);
+	}
+	:global(:root[data-canvas-bg][data-glass]) .sidebar {
+		-webkit-backdrop-filter: var(--glass-filter);
+		backdrop-filter: var(--glass-filter);
+	}
 	/* The logo sits in a 42px slot from x = 10, centred on the rail
 	   (--rail-w / 2), as are the nav icons and the avatar. */
 	.brand {

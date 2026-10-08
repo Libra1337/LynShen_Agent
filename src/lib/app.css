@@ -499,14 +499,15 @@ input[type='number'] {
 	appearance: textfield;
 }
 
-/* Custom canvas background (Settings → 通用 → 背景). prefs.svelte.ts sets
+/* Custom background (Settings → 通用 → 背景). prefs.svelte.ts sets
    `--canvas-image` and `data-canvas-bg` (its strength) on the root. The image
-   fills the canvas (`.canvas`, right of the sidebar) under a veil of the
-   theme's --bg; the veil's opacity keeps text readable in both themes. The
-   surfaces in between (mosaic, leaves, chat pane) turn transparent so the
-   veiled image shows; floating surfaces (composer, cards, menus) keep their
-   own fills; a maximized leaf, which covers the others, repaints the
-   veiled image. The sidebar is outside .canvas and stays as it is. */
+   covers the whole window, title bar and sidebar included (+page.svelte
+   .app). The chrome (title bar strip, sidebar, settings and workbench navs)
+   lets it through at --chrome-tint (their own styles); the canvas lays a veil of the theme's
+   --bg over it (--canvas-veil), which keeps text readable in both themes.
+   The surfaces in between (mosaic, leaves, chat pane, pages) turn
+   transparent; floating surfaces (composer, cards, menus) keep their fills;
+   a maximized leaf, which covers the others, repaints the veil. */
 :root[data-canvas-bg] {
 	--canvas-veil: 80%;
 }
@@ -517,17 +518,80 @@ input[type='number'] {
 	--canvas-veil: 62%;
 }
 :root[data-canvas-bg] .canvas,
-:root[data-canvas-bg] .canvas .leaf.maxed {
-	background-color: var(--bg);
-	background-image:
-		linear-gradient(color-mix(in oklab, var(--bg) var(--canvas-veil), transparent), color-mix(in oklab, var(--bg) var(--canvas-veil), transparent)),
-		var(--canvas-image);
-	background-size: cover;
-	background-position: center;
-	background-repeat: no-repeat;
+:root[data-canvas-bg] .canvas .leaf.maxed,
+:root[data-canvas-bg] .settings .stage,
+:root[data-canvas-bg] .desk-page .main {
+	background: color-mix(in oklab, var(--bg) var(--canvas-veil), transparent);
 }
 :root[data-canvas-bg] .canvas .mosaic,
 :root[data-canvas-bg] .canvas .leaf:not(.maxed),
-:root[data-canvas-bg] .canvas .chatpane {
+:root[data-canvas-bg] .canvas .chatpane,
+:root[data-canvas-bg] .canvas .home-page,
+:root[data-canvas-bg] .canvas .project-page {
 	background: transparent;
+}
+
+/* ---------- Glass (Settings → 通用 → 玻璃透明度) ----------
+   prefs.svelte.ts sets the level's fills and blur on the root, and
+   `data-glass` while there is glass to show (level above 0, a webview that
+   can blur, no request for reduced transparency). Only the large chrome
+   surfaces take it: the sidebar and the settings / workbench navs, the
+   title bar, the composer, the floating cards and every menu and popover.
+   Never rows, messages or anything inside a scrolling list; the blur never
+   animates. The rim is a 1px light edge with a brighter top line, as on
+   Apple's Liquid Glass. */
+:root {
+	--chrome-tint: 100%;
+	--float-tint: 100%;
+	--glass-filter: none;
+	--glass-rim-dark: rgba(255, 255, 255, 0.04);
+	--glass-rim-light: rgba(255, 255, 255, 0.3);
+	--glass-rim: var(--glass-rim-dark);
+}
+[data-theme='light'] {
+	--glass-rim: var(--glass-rim-light);
+}
+/* The chrome (sidebar, settings and workbench navs, title bar) is glass
+   only over a background image (nothing else is behind it); each component
+   paints its own, after its vibrancy rule. */
+/* Floating surfaces: the panel fill thins out, the rim catches the light. */
+:root[data-glass] .composer,
+:root[data-glass] .pop,
+:root[data-glass] .toast:not(.error) {
+	background: color-mix(in oklab, var(--panel) var(--float-tint), transparent);
+	-webkit-backdrop-filter: var(--glass-filter);
+	backdrop-filter: var(--glass-filter);
+	box-shadow:
+		inset 0 1px 0 var(--glass-rim),
+		inset 0 0 0 1px color-mix(in oklab, var(--glass-rim) 60%, transparent),
+		var(--shadow-pop);
+}
+:root[data-glass] .composer {
+	box-shadow:
+		inset 0 1px 0 var(--glass-rim),
+		inset 0 0 0 1px color-mix(in oklab, var(--glass-rim) 60%, transparent),
+		var(--shadow-float);
+}
+/* An approval card holds menus whose click-away backdrops are fixed: its
+   glass sits on a layer behind it, not on the card. */
+:root[data-glass] .approval {
+	position: relative;
+	isolation: isolate;
+	background: none;
+	border-color: transparent;
+	box-shadow:
+		inset 0 1px 0 var(--glass-rim),
+		inset 0 0 0 1px color-mix(in oklab, var(--glass-rim) 60%, transparent),
+		var(--shadow-float);
+}
+:root[data-glass] .approval::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
+	background: color-mix(in oklab, var(--panel) var(--float-tint), transparent);
+	-webkit-backdrop-filter: var(--glass-filter);
+	backdrop-filter: var(--glass-filter);
+	pointer-events: none;
 }

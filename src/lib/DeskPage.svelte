@@ -308,6 +308,15 @@
 	:global(:root[data-vibrancy='on']) .nav {
 		background: var(--vibrancy-tint);
 	}
+	/* Over a custom background the image shows through, at --chrome-tint,
+	   blurred when glass is on (app.css, prefs.svelte.ts). */
+	:global(:root[data-canvas-bg]) .nav {
+		background: color-mix(in oklab, var(--sidebar) var(--chrome-tint), transparent);
+	}
+	:global(:root[data-canvas-bg][data-glass]) .nav {
+		-webkit-backdrop-filter: var(--glass-filter);
+		backdrop-filter: var(--glass-filter);
+	}
 	.nav-head {
 		display: flex;
 		align-items: center;
