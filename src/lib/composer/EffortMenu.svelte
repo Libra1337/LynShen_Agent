@@ -64,7 +64,7 @@
 		width: min(320px, calc(100vw - 32px));
 		padding: 10px 14px 12px;
 		transform-origin: bottom right;
-		animation: pop-in var(--t-med) var(--ease-spring);
+		animation: pop-in var(--t-med) var(--ease-out);
 	}
 	.ehead {
 		display: flex;
