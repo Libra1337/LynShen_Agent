@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
 	import ArrowUUpLeftIcon from 'phosphor-svelte/lib/ArrowUUpLeftIcon';
+	import { engineAtLeast, UNQUEUE_SINCE } from '$lib/engineVersion.svelte';
 	import SquareIcon from 'phosphor-svelte/lib/SquareIcon';
 	import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 	import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
@@ -829,7 +830,7 @@
 			{#each chat.pendingMessages as q, i (i)}
 				<span class="qchip" title={q}
 					><span class="qtext">{q}</span
-					>{#if bcaps.unqueue && onUnqueue}<button
+					>{#if bcaps.unqueue && onUnqueue && engineAtLeast(UNQUEUE_SINCE)}<button
 							class="qtake"
 							onclick={() => onUnqueue(i, q)}
 							title={t('chat.unqueueTitle')}

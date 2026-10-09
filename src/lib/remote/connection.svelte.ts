@@ -19,6 +19,7 @@ import { loadLists, saveLists } from './cache';
 import type { AgentView, DaemonSessionView } from '$lib/agents.svelte';
 import type { WorkspaceView } from './store.svelte';
 import type { DispatchView } from './dispatch.svelte';
+import { engine } from '$lib/engineVersion.svelte';
 
 /** A computer's lists as kept on the phone (see cache.ts). */
 type Lists = {
@@ -159,7 +160,8 @@ export class HostConnection {
 		};
 		// Notifications keep reaching this phone after the computer restarts
 		// or the browser renews its subscription.
-		this.daemon.onHello = () => {
+		this.daemon.onHello = (version) => {
+			engine.version = version;
 			resubscribe(this.daemon).catch(() => {});
 		};
 		this.daemon.onDisconnect = () => {

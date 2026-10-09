@@ -3,6 +3,7 @@
 	import { DaemonSync } from '$lib/daemonSync.svelte';
 	import { onMount, untrack } from 'svelte';
 	import { crossfade } from '$lib/ui/viewTransition';
+	import { engine } from '$lib/engineVersion.svelte';
 	import { listen } from '@tauri-apps/api/event';
 	import { invoke } from '@tauri-apps/api/core';
 	import { getCurrentWebview } from '@tauri-apps/api/webview';
@@ -1305,6 +1306,7 @@
 				sync.reset();
 			};
 			daemon.onHello = (version) => {
+				engine.version = version;
 				checkDaemonVersion(version).then((outcome) => {
 					if (outcome.kind === 'restart-when-idle')
 						toast.info(t('shell.daemonUpdate.idle', { version: outcome.version }));

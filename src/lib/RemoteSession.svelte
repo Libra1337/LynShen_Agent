@@ -15,6 +15,7 @@
 	import DesktopIcon from 'phosphor-svelte/lib/DesktopIcon';
 	import FastForwardIcon from 'phosphor-svelte/lib/FastForwardIcon';
 	import ArrowUUpLeftIcon from 'phosphor-svelte/lib/ArrowUUpLeftIcon';
+	import { engineAtLeast, UNQUEUE_SINCE } from '$lib/engineVersion.svelte';
 	import HandIcon from 'phosphor-svelte/lib/HandIcon';
 	import ClipboardTextIcon from 'phosphor-svelte/lib/ClipboardTextIcon';
 	import ShieldCheckIcon from 'phosphor-svelte/lib/ShieldCheckIcon';
@@ -391,10 +392,18 @@
 	/** Takes a queued message back into the message box before it runs. */
 	function unqueue(index: number, message: string) {
 		send({ op: 'unqueue', index, text: message });
-		chat.pendingMessages = chat.pendingMessages.filter((_, i) => i !== index);
-		text = text.trim() ? `${text.replace(/\s+$/, '')}\n${message}` : message;
-		tick().then(autosize);
 	}
+	// The text comes back once the engine took the message (`unqueued`).
+	let unqueuedSeen = chat.unqueued?.seq ?? 0;
+	$effect(() => {
+		const taken = chat.unqueued;
+		if (!taken || taken.seq === unqueuedSeen) return;
+		unqueuedSeen = taken.seq;
+		untrack(() => {
+			text = text.trim() ? `${text.replace(/\s+$/, '')}\n${taken.text}` : taken.text;
+			tick().then(autosize);
+		});
+	});
 
 	// The approval mode, as on the desktop: claude adds plan and auto; an
 	// agent's session follows the agent (changed on its page).
@@ -666,7 +675,7 @@
 					{#each waiting as q, i (i)}
 						<span class="qchip"
 							><span class="qtext">{q}</span
-							>{#if bcaps.unqueue && chat.pendingMessages.length}<button
+							>{#if bcaps.unqueue && chat.pendingMessages.length && engineAtLeast(UNQUEUE_SINCE)}<button
 									type="button"
 									class="qtake"
 									onclick={() => unqueue(i, q)}

@@ -902,14 +902,23 @@
 		imageSeq = 0;
 		if (prefs.scrollOnSend) jumpToBottom();
 	}
-	/** Takes a queued message back before it runs: the engine drops it and
-	 *  its text returns to the message box to edit or send again. */
+	/** Takes a queued message back before it runs. Its text returns to the
+	 *  message box once the engine says it took it (`unqueued`): a message
+	 *  that started meanwhile, or an engine that cannot, changes nothing. */
 	function unqueue(index: number, text: string) {
 		send({ op: 'unqueue', index, text });
-		chat.pendingMessages = chat.pendingMessages.filter((_, i) => i !== index);
-		input = input.trim() ? `${input.replace(/\s+$/, '')}\n${text}` : text;
-		composerEl?.focus();
 	}
+	// Only takes from now on count (the chat may hold an older one).
+	let unqueuedSeen = untrack(() => chat.unqueued?.seq ?? 0);
+	$effect(() => {
+		const taken = chat.unqueued;
+		if (!taken || taken.seq === unqueuedSeen) return;
+		unqueuedSeen = taken.seq;
+		untrack(() => {
+			input = input.trim() ? `${input.replace(/\s+$/, '')}\n${taken.text}` : taken.text;
+			composerEl?.focus();
+		});
+	});
 	function stop() {
 		autoRetry.cancel(chat);
 		send({ op: 'interrupt' });

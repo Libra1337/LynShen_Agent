@@ -572,6 +572,9 @@ export class ChatState {
 	#billingTurns: Record<string, BillingCost> = {};
 	#turnBillingIds: string[] = [];
 	pendingMessages = $state<string[]>([]);
+	/** The last queued message the engine took back (`unqueued`), for the
+	 *  pane to return its text to the message box; `seq` tells repeats apart. */
+	unqueued = $state<{ text: string; seq: number } | null>(null);
 	picker = $state<Picker>(null);
 	/** The daemon names the conversation (and keeps a rename); until then
 	 *  this placeholder. */
@@ -1671,6 +1674,9 @@ export class ChatState {
 			case 'pending_messages':
 				this.pendingMessages = arr<string>(ev.messages);
 				break;
+			case 'unqueued':
+				this.unqueued = { text: str(ev.text), seq: (this.unqueued?.seq ?? 0) + 1 };
+				break;
 			case 'tree_view':
 				this.picker = { kind: 'tree', nodes: arr<TreeNode>(ev.nodes) };
 				break;
@@ -2224,6 +2230,13 @@ export class ChatState {
 						this.stopRequested = {};
 						this.messages.push({ kind: 'system', text: t('chat.team.stopUnsupported') });
 					}
+					break;
+				}
+				// An op this engine does not know yet (the daemon still runs the
+				// previous release): it refused one request, the turn goes on.
+				const unknownOp = /^unknown op: (\w+)$/.exec(str(ev.message));
+				if (unknownOp) {
+					this.messages.push({ kind: 'system', text: t('chat.opUnsupported') });
 					break;
 				}
 				// Agent team v2 switched off: a stop or pick sent just before
