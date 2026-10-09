@@ -320,3 +320,12 @@ describe('agent team v2: settings', () => {
 		expect(validHookList([undefined])).toBe(false);
 	});
 });
+
+describe('hook output in team messages', () => {
+	it('names the hook instead of a path', async () => {
+		const { agentName } = await import('$lib/agents/teamText');
+		expect(agentName('hook:task_completed')).toContain('task_completed');
+		expect(agentName('hook:task_completed')).not.toContain('hook:');
+		expect(agentName('/root/w1')).toBe('w1');
+	});
+});

@@ -9,8 +9,13 @@ import { shortPath, type AgentRow } from '$lib/agentProgress';
 export const roleLabel = (role: string) => ((BUILTIN_ROLES as readonly string[]).includes(role) ? t(`chat.team.role.${role}`) : role);
 
 /** An agent a message names: `parent` (or `/root`, its path) is the main
- *  agent, a path its own name. */
-export const agentName = (path: string) => (path === 'parent' || path === '' || path === '/root' ? t('chat.team.parent') : shortPath(path));
+ *  agent, `hook:<event>` a hook's output, a path its own name. */
+export const agentName = (path: string) =>
+	path === 'parent' || path === '' || path === '/root'
+		? t('chat.team.parent')
+		: path.startsWith('hook:')
+			? t('chat.team.hook', { name: path.slice(5) })
+			: shortPath(path);
 
 /** A line for a state the five run states do not tell: the team's budget
  *  stopped it, or its changes did not merge ('' otherwise). */
