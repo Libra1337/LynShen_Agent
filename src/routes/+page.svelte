@@ -253,6 +253,8 @@
 	// shown there closes it.
 	let projectPageId = $state<string | null>(null);
 	const pageProject = $derived(projectPageId ? store.userProjects.find((p) => p.id === projectPageId) : undefined);
+	// The home page covers the canvas when asked for, and when nothing is open.
+	const homeShown = $derived(showHome || (store.loaded && !store.active && !pageProject));
 	function openProjectPage(p: Project) {
 		showDesk = false;
 		showSettings = false;
@@ -1510,7 +1512,7 @@
 			<!-- THE CANVAS: workspace tabs on top, one mosaic for chats, tool panels,
 			     TUI and audit tiles below. -->
 			<div class="canvas">
-				{#if showHome || (store.loaded && !store.active && !pageProject)}
+				{#if homeShown}
 					<HomePage
 						projects={store.userProjects}
 						agents={agentDirectory.agents}
@@ -1537,7 +1539,7 @@
 					{/key}
 				{/if}
 
-				<div class="stage">
+				<div class="stage" class:covered={homeShown || !!pageProject}>
 					{#if store.loaded && store.shownSessions.length === 0}
 						<!-- The home page covers an empty canvas. -->
 					{:else}
@@ -1979,6 +1981,12 @@
 	}
 	.stage > :global(.mosaic) {
 		flex: 1;
+	}
+	/* Under the home and project pages: hidden but mounted, so chats keep
+	   their state. Over a custom background those pages are transparent
+	   (app.css), and the open chat must not show through them. */
+	.stage.covered {
+		visibility: hidden;
 	}
 	.tile-action {
 		display: inline-flex;
