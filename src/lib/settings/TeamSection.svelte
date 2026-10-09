@@ -1,20 +1,28 @@
 <script lang="ts">
 	// Settings → 工作组: whether the main agent starts subagents
 	// (`agents.fanout`), how many run at once and how deep, the token budget
-	// of a turn, how long unmerged worktrees stay — config.json `agents.*`,
-	// written ~500 ms after a change — and the roles a subagent can take,
-	// read from the role files (built-in, the user's, the project's).
+	// of a turn, how long unmerged worktrees stay, what happens when a
+	// subagent finishes — config.json `agents.*`, written ~500 ms after a
+	// change — the roles a subagent can take, read from the role files
+	// (built-in, the user's, the project's), and the team's shell hooks in
+	// ~/.lynshen/hooks.json (`task_completed`, `agent_idle`).
 	import { onDestroy, onMount } from 'svelte';
 	import { homeDir, join } from '@tauri-apps/api/path';
 	import ArrowsClockwiseIcon from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
-	import { listDir, readConfig, readText, writeConfig, type FsEntry } from '$lib/protocol';
+	import XIcon from 'phosphor-svelte/lib/XIcon';
+	import { listDir, readConfig, readHooks, readText, writeConfig, writeHooks, type FsEntry } from '$lib/protocol';
 	import { t } from '$lib/i18n';
 	import { toast } from '$lib/ui/toast.svelte';
 	import Segmented from '$lib/ui/Segmented.svelte';
 	import TextField from '$lib/ui/TextField.svelte';
+	import Switch from '$lib/ui/Switch.svelte';
+	import Button from '$lib/ui/Button.svelte';
+	import IconButton from '$lib/ui/IconButton.svelte';
+	import Notice from '$lib/ui/Notice.svelte';
 	import { FANOUTS, TEAM_DEFAULTS, readTeamConfig, teamPatch, type Fanout } from '$lib/agents/teamConfig';
 	import { listRoles, parseRole, type RoleInfo, type RoleSource } from '$lib/agents/roles';
+	import { listHooks, TEAM_HOOKS, validHookList, withHook, withoutHook, type TeamHook } from '$lib/agents/teamHooks';
 	import SettingsSection from './SettingsSection.svelte';
 	import SettingsRow from './SettingsRow.svelte';
 
@@ -22,7 +30,15 @@
 	let { project = '' }: { project?: string } = $props();
 
 	type NumberField = number | string | undefined;
-	let form = $state<{ fanout: Fanout; max_live: NumberField; max_depth: NumberField; turn_token_budget: NumberField; keep_worktrees_days: NumberField }>({
+	let form = $state<{
+		fanout: Fanout;
+		max_live: NumberField;
+		max_depth: NumberField;
+		turn_token_budget: NumberField;
+		keep_worktrees_days: NumberField;
+		wake_on_result: boolean;
+		review_on_complete: boolean;
+	}>({
 		...TEAM_DEFAULTS
 	});
 	const fanoutOpts = $derived(FANOUTS.map((v) => ({ value: v, label: t(`settings.team.fanoutOpt.${v}`) })));
@@ -95,11 +111,73 @@
 	});
 	const describe = (r: RoleInfo) =>
 		r.source === 'builtin' ? t(`settings.team.builtin.${r.name}`) : r.description || t('settings.team.noDescription');
+
+	// ---------- hooks ----------
+	// hooks.json as last read; the page changes its two team keys only, each
+	// time on a fresh read of the file (a file that does not parse is left
+	// alone, and the page says so).
+	let hooks = $state<Record<string, unknown>>({});
+	let hooksError = $state('');
+	let hooksBusy = $state(false);
+	let drafts = $state<Record<TeamHook, string>>({ task_completed: '', agent_idle: '' });
+
+	async function loadHooks() {
+		hooksBusy = true;
+		try {
+			hooks = await readHooks();
+			hooksError = '';
+		} catch (e) {
+			hooksError = String(e);
+		} finally {
+			hooksBusy = false;
+		}
+	}
+	onMount(loadHooks);
+
+	/** Reads the file again, applies `change` to its `key`, checks the list
+	 *  and writes that key only. */
+	async function changeHook(key: TeamHook, change: (fresh: Record<string, unknown>) => unknown[] | null): Promise<boolean> {
+		hooksBusy = true;
+		try {
+			const fresh = await readHooks();
+			const next = change(fresh);
+			if (!next || !validHookList(next)) {
+				hooks = fresh;
+				return false;
+			}
+			await writeHooks({ [key]: next });
+			hooks = { ...fresh, [key]: next };
+			hooksError = '';
+			return true;
+		} catch (e) {
+			toast.error(t('settings.team.hooksSaveFailed', { msg: String(e) }));
+			return false;
+		} finally {
+			hooksBusy = false;
+		}
+	}
+	async function addHook(key: TeamHook) {
+		const command = drafts[key].trim();
+		if (!command) return;
+		if (await changeHook(key, (fresh) => withHook(fresh, key, command))) drafts[key] = '';
+	}
+	function removeHook(key: TeamHook, index: number, command: string) {
+		void changeHook(key, (fresh) => withoutHook(fresh, key, index, command));
+	}
 </script>
 
 <SettingsSection>
 	<SettingsRow id="team-fanout" title={t('settings.team.fanout')} description={t(`settings.team.fanoutHint.${form.fanout}`)}>
 		<Segmented bind:value={form.fanout} options={fanoutOpts} />
+	</SettingsRow>
+</SettingsSection>
+
+<SettingsSection title={t('settings.team.flow')}>
+	<SettingsRow id="team-wake" title={t('settings.team.wakeOnResult')} description={t('settings.team.wakeOnResultHint')}>
+		<Switch bind:checked={form.wake_on_result} label={t('settings.team.wakeOnResult')} />
+	</SettingsRow>
+	<SettingsRow id="team-review" title={t('settings.team.reviewOnComplete')} description={t('settings.team.reviewOnCompleteHint')}>
+		<Switch bind:checked={form.review_on_complete} label={t('settings.team.reviewOnComplete')} />
 	</SettingsRow>
 </SettingsSection>
 
@@ -138,6 +216,47 @@
 		</div>
 	{/each}
 	<p class="hint">{t('settings.team.rolesHint')}</p>
+</SettingsSection>
+
+<SettingsSection id="team-hooks" title={t('settings.team.hooks')}>
+	{#snippet action()}
+		<button class="iconbtn" title={t('settings.team.refreshHooks')} aria-label={t('settings.team.refreshHooks')} disabled={hooksBusy} onclick={loadHooks}>
+			{#if hooksBusy}<CircleNotchIcon size={14} class="spin" />{:else}<ArrowsClockwiseIcon size={14} />{/if}
+		</button>
+	{/snippet}
+	{#if hooksError}
+		<div class="notice"><Notice tone="error">{t('settings.team.hooksUnreadable', { msg: hooksError })}</Notice></div>
+	{/if}
+	{#each TEAM_HOOKS as key (key)}
+		<SettingsRow id={`team-hook-${key}`} title={t(`settings.team.hook.${key}`)} description={t(`settings.team.hookHint.${key}`)} stacked>
+			<ul class="cmds">
+				{#each listHooks(hooks, key) as h (h.index)}
+					<li class="cmd">
+						<code>{h.command}</code>
+						{#if h.tools}<span class="ctools">{t('settings.team.onlyTools', { tools: h.tools.join(', ') })}</span>{/if}
+						<span class="cact">
+							<IconButton size="sm" label={t('settings.team.removeCommand')} title={t('settings.team.removeCommand')} disabled={hooksBusy || !!hooksError} onclick={() => removeHook(key, h.index, h.command)}>
+								<XIcon size={13} />
+							</IconButton>
+						</span>
+					</li>
+				{:else}
+					<li class="none">{t('settings.team.noCommands')}</li>
+				{/each}
+			</ul>
+			<form
+				class="add"
+				onsubmit={(e) => {
+					e.preventDefault();
+					void addHook(key);
+				}}
+			>
+				<TextField bind:value={drafts[key]} placeholder={t('settings.team.commandPlaceholder')} mono disabled={!!hooksError} />
+				<Button size="sm" type="submit" disabled={hooksBusy || !!hooksError || !drafts[key].trim()}>{t('settings.team.addCommand')}</Button>
+			</form>
+		</SettingsRow>
+	{/each}
+	<p class="hint">{t('settings.team.hooksHint')}</p>
 </SettingsSection>
 
 <style>
@@ -220,5 +339,56 @@
 	}
 	.hint {
 		padding: 12px 0;
+	}
+	.notice {
+		padding-top: 12px;
+	}
+	.cmds {
+		display: flex;
+		flex-direction: column;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.cmd {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-width: 0;
+		min-height: 32px;
+		padding: 2px 0;
+	}
+	.cmd code {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-family: var(--font-mono);
+		font-size: var(--fs-xs);
+		color: var(--text);
+	}
+	.ctools {
+		flex: none;
+		font-size: var(--fs-2xs);
+		color: var(--dim);
+	}
+	.cact {
+		display: inline-flex;
+		margin-left: auto;
+		opacity: 0;
+		transition: opacity var(--t-fast) var(--ease-out);
+	}
+	.cmd:hover .cact,
+	.cmd:focus-within .cact {
+		opacity: 1;
+	}
+	.none {
+		font-size: var(--fs-xs);
+		color: var(--dim);
+	}
+	.add {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 	}
 </style>

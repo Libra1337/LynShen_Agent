@@ -41,7 +41,19 @@ describe('agent team state', () => {
 		c.handle({ type: 'connecting' });
 		for (const f of [frames.spawnStart, frames.spawnArgs, frames.spawnDone, frames.running]) c.handle(f);
 		expect(c.subagents[W]).toMatchObject({ status: 'running', role: 'worker', model: 'gpt-5.5', toolUseId: 'c1' });
-		expect(c.team[W]).toEqual({ role: 'worker', planStep: '2', workdir: WORKDIR, worktree: true, files: [], pending: null, merge: null });
+		expect(c.team[W]).toEqual({
+			role: 'worker',
+			planStep: '2',
+			workdir: WORKDIR,
+			worktree: true,
+			files: [],
+			pending: null,
+			merge: null,
+			background: false,
+			attemptGroup: null,
+			attempt: null,
+			diff: null
+		});
 		c.handle(frames.done);
 		expect(c.team[W]!.files).toEqual(['src/auth.ts', 'src/auth.test.ts']);
 		// A lifecycle frame without the new fields leaves them as they were.

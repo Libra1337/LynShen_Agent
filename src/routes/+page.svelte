@@ -22,6 +22,7 @@
 	import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
 	import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
 	import TreeStructureIcon from 'phosphor-svelte/lib/TreeStructureIcon';
+	import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 	import Toaster from '$lib/ui/Toaster.svelte';
 	import ModelSetup from '$lib/ModelSetup.svelte';
 	import { modelSetup } from '$lib/modelSetupState.svelte';
@@ -129,6 +130,7 @@
 	import BrowserPanel from '$lib/BrowserPanel.svelte';
 	import DiagnosticsPanel from '$lib/DiagnosticsPanel.svelte';
 	import AgentRunsPanel from '$lib/AgentRunsPanel.svelte';
+	import TeamPanel from '$lib/agents/TeamPanel.svelte';
 	import TuiPanel from '$lib/TuiPanel.svelte';
 	import EditorPane from '$lib/editor/EditorPane.svelte';
 	import QuickOpen from '$lib/editor/QuickOpen.svelte';
@@ -459,7 +461,7 @@
 	let tilesReady = $state(false);
 	let focusedLeaf = $state<string | null>(null);
 
-	const ALL_PANELS = ['plan', 'goal', 'agents', 'changes', 'turns', 'files', 'git', 'term', 'browser', 'diag'] as const;
+	const ALL_PANELS = ['plan', 'goal', 'agents', 'team', 'changes', 'turns', 'files', 'git', 'term', 'browser', 'diag'] as const;
 	// Plan/Goal are engine features. Goal stays gated by the backend cap; the plan
 	// tab also appears whenever there's an actual plan (e.g. claude's TodoWrite),
 	// even on backends that don't advertise goals.
@@ -467,6 +469,8 @@
 		ALL_PANELS.filter((k) => {
 			if (k === 'goal') return caps(chat).goals;
 			if (k === 'agents') return caps(chat).agentTrace;
+			// The agent team is LynShen's (or a session that already has one).
+			if (k === 'team') return !!chat && (chat.backendId === 'lynshen' || chat.taskBoard !== null || chat.agentMessages.length > 0);
 			if (k === 'plan') return caps(chat).goals || (chat?.plan ?? []).length > 0;
 			return true;
 		})
@@ -475,12 +479,12 @@
 	// session (model popup), never at tab creation. Persisted `tui:*` tabs
 	// still render, but TUI tabs are no longer offered as new options.
 	const PANEL_ICONS: Record<(typeof ALL_PANELS)[number], typeof PlusIcon> = {
-		plan: ListChecksIcon, goal: TargetIcon, agents: TreeStructureIcon, changes: GitDiffIcon, turns: ClockCounterClockwiseIcon,
+		plan: ListChecksIcon, goal: TargetIcon, agents: TreeStructureIcon, team: UsersThreeIcon, changes: GitDiffIcon, turns: ClockCounterClockwiseIcon,
 		files: FilesIcon, git: GitBranchIcon, term: TerminalWindowIcon, browser: GlobeIcon, diag: PulseIcon
 	};
 	/** The + menu's sections: the conversation's own views, the code, then tools. */
 	const PANEL_GROUP: Record<(typeof ALL_PANELS)[number], 'session' | 'code' | 'tools'> = {
-		plan: 'session', goal: 'session', agents: 'session', turns: 'session',
+		plan: 'session', goal: 'session', agents: 'session', team: 'session', turns: 'session',
 		changes: 'code', files: 'code', git: 'code',
 		term: 'tools', browser: 'tools', diag: 'tools'
 	};
@@ -1589,6 +1593,7 @@
 													onOpenAgent={openDesk}
 													onOpenRequirement={openRequirements}
 													onOpenTrace={() => openPanelTile('agents')}
+													onOpenTeam={() => openPanelTile('team')}
 												/>
 												{#snippet failed(error, reset)}
 													<div class="pane-error">
@@ -1628,6 +1633,16 @@
 									{/if}
 								{:else if tab.panel === 'goal'}<GoalPanel goal={chat?.goal ?? null} />
 								{:else if tab.panel === 'agents'}{#if chat && activeId}{#key activeId}<AgentRunsPanel {chat} onOp={(op) => activeId && dispatch(activeId, op)} />{/key}{/if}
+								{:else if tab.panel === 'team'}{#if chat && activeId}{#key activeId}<TeamPanel
+											{chat}
+											onOp={(op) => activeId && dispatch(activeId, op)}
+											onOpenAgent={caps(chat).agentTrace
+												? (id) => {
+														chat.agentFocus = id;
+														openPanelTile('agents');
+													}
+												: undefined}
+										/>{/key}{/if}
 								{:else if tab.panel === 'changes'}<ChangesPanel cwd={activeProject?.path ?? ''} files={chat?.changedFiles ?? []} agentDiffs={chat?.agentDiffs ?? {}} onRevert={(p) => chat && (chat.changedFiles = chat.changedFiles.filter((x) => x !== p))} />
 								{:else if tab.panel === 'turns'}<TurnsPanel turns={chat?.turnTimeline ?? []} onOpenFile={openActiveFile} />
 								{:else if tab.panel === 'files'}<FilesPanel rootDir={activeProject?.path ?? ''} />

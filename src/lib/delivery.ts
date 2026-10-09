@@ -1,8 +1,11 @@
 import { t } from '$lib/i18n';
+import { parseSubagentResult } from '$lib/agents/subagentResult';
+import { shortPath } from '$lib/agentProgress';
 
 /** A user turn the daemon or the engine wrote, not the user: an agent's
- *  message, a timer, a scheduled task, a question's answer, a task update or
- *  a deferred action's outcome. Recognised by the header line the CLI puts
+ *  message, a timer, a scheduled task, a question's answer, a task update,
+ *  a deferred action's outcome, or a background subagent's result that
+ *  started a turn (`<subagent_result …>`, see agents/subagentResult.ts). Recognised by the header line the CLI puts
  *  first (`delivery_text` in daemon/src/hub.rs, `decision_message` in
  *  agent-core/src/actions.rs); it is plain text in every engine's transcript,
  *  so it is the one mark a reopened session keeps. */
@@ -22,6 +25,11 @@ const HEADERS: [RegExp, (m: RegExpMatchArray) => string][] = [
 ];
 
 export function parseDelivery(text: string): Delivery | null {
+	const result = parseSubagentResult(text);
+	if (result) {
+		const name = result.paths.map(shortPath).join(t('chat.delivery.and'));
+		return { kind: 'message', label: t(result.failed ? 'chat.delivery.agentFailed' : 'chat.delivery.agentDone', { name }), body: result.body };
+	}
 	if (!text.startsWith('[')) return null;
 	const nl = text.indexOf('\n');
 	const head = nl < 0 ? text : text.slice(0, nl);

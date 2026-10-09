@@ -3,7 +3,7 @@
 // the subagent cards in the message list read them. Pure: the components pass
 // in the chat's state and a clock.
 
-import type { AgentRun, PlanStep, SubagentInfo, TeamAgent, TeamBudget, WorkflowRun } from './chat.svelte';
+import type { AgentRun, BoardTask, PlanStep, SubagentInfo, TaskStatus, TeamAgent, TeamBudget, WorkflowRun } from './chat.svelte';
 import { runState, type RunState } from './agentTrace';
 
 export type StepState = 'pending' | 'active' | 'done' | 'skipped';
@@ -86,6 +86,13 @@ export interface AgentRow {
 	role?: string;
 	/** What the agent team knows of it: plan step, worktree, merge. */
 	team?: TeamAgent;
+	/** It runs in the background: past the end of the turn that started it. */
+	background?: boolean;
+	/** Best-of-N: the group of attempts it belongs to, and its number (1-based). */
+	attemptGroup?: string;
+	attempt?: number;
+	/** A close_agent op was sent for it and it has not stopped yet. */
+	stopping?: boolean;
 }
 
 const firstLine = (s: string) => s.split('\n').find((l) => l.trim())?.trim() ?? '';
@@ -103,12 +110,14 @@ export interface RowInput {
 	since?: number;
 	/** The agent team by agent path (roles, worktrees, merges). */
 	team?: Record<string, TeamAgent>;
+	/** Agents asked to stop, by path (ChatState.stopRequested). */
+	stopping?: Record<string, unknown>;
 }
 
 /** The subagents to show, oldest first: the agent trace's runs (when the engine
  *  sends one), joined with what their lifecycle events say, then the
  *  subagents only the lifecycle (or a spawn call) reports. */
-export function agentRows({ runs, subagents, lastTool, since = 0, team = {} }: RowInput): AgentRow[] {
+export function agentRows({ runs, subagents, lastTool, since = 0, team = {}, stopping = {} }: RowInput): AgentRow[] {
 	const rows: AgentRow[] = [];
 	const seen = new Set<string>();
 	// A few seconds of slack: the engine stamps a run with its own clock.
@@ -148,7 +157,7 @@ export function agentRows({ runs, subagents, lastTool, since = 0, team = {} }: R
 			label: shortPath(label),
 			model: a.model || life?.model || '',
 			state,
-			...teamOf(a.id, team, TEAM_STATUS.has(life?.status ?? '') ? life!.status : a.state || life?.status || '', life?.role),
+			...teamOf(a.id, team, TEAM_STATUS.has(life?.status ?? '') ? life!.status : a.state || life?.status || '', life, state, stopping),
 			startedAt: a.startedAt || life?.startedAt || 0,
 			durationMs: a.durationMs,
 			endedAt: life?.endedAt ?? 0,
@@ -168,7 +177,7 @@ export function agentRows({ runs, subagents, lastTool, since = 0, team = {} }: R
 			label: shortPath(label),
 			model: life.model ?? '',
 			state,
-			...teamOf(id, team, life.status, life.role),
+			...teamOf(id, team, life.status, life, state, stopping),
 			startedAt: life.startedAt ?? 0,
 			durationMs: life.endedAt && life.startedAt ? life.endedAt - life.startedAt : 0,
 			endedAt: life.endedAt ?? 0,
@@ -187,10 +196,40 @@ const TEAM_STATUS = new Set(['conflict', 'merged', 'discarded', 'budget_exhauste
 
 /** What a row says of the agent team: the engine's state word (the
  *  lifecycle's `conflict` / `budget_exhausted` win over the trace's), the
- *  role and the team entry. */
-function teamOf(id: string, team: Record<string, TeamAgent>, status: string, role = ''): Pick<AgentRow, 'status' | 'role' | 'team'> {
+ *  role, the team entry, whether it runs in the background, its attempt and
+ *  whether it is being stopped. */
+function teamOf(
+	id: string,
+	team: Record<string, TeamAgent>,
+	status: string,
+	life: SubagentInfo | undefined,
+	state: RunState,
+	stopping: Record<string, unknown>
+): Pick<AgentRow, 'status' | 'role' | 'team' | 'background' | 'attemptGroup' | 'attempt' | 'stopping'> {
 	const entry = team[id];
-	return { status, role: entry?.role || role, ...(entry ? { team: entry } : {}) };
+	return {
+		status,
+		role: entry?.role || life?.role || '',
+		...(entry ? { team: entry } : {}),
+		...(entry?.background || life?.background ? { background: true } : {}),
+		...(entry?.attemptGroup ? { attemptGroup: entry.attemptGroup, ...(entry.attempt ? { attempt: entry.attempt } : {}) } : {}),
+		...(stopping[id] && (state === 'running' || state === 'queued') ? { stopping: true } : {})
+	};
+}
+
+/** Still at work: running, or queued to run. */
+export const isLive = (row: Pick<AgentRow, 'state'>) => row.state === 'running' || row.state === 'queued';
+
+/** A row with a stop button: one agent (not a Workflow) still at work and
+ *  not being stopped already. */
+export const canStop = (row: Pick<AgentRow, 'state' | 'workflow' | 'stopping'>) => isLive(row) && !row.workflow && !row.stopping;
+
+/** Files a worktree agent changed that are neither merged nor dropped (as
+ *  far as this client knows). */
+export function unmergedFiles(row: Pick<AgentRow, 'team' | 'status'>): number {
+	const a = row.team;
+	if (!a?.worktree || a.merge?.ok || row.status === 'merged' || row.status === 'discarded') return 0;
+	return a.files.length;
 }
 
 /** A LynShen agent path (`/root/scan_auth`) by its own name. */
@@ -220,6 +259,53 @@ export function rowElapsed(row: AgentRow, now: number): number {
 
 /** The subagent a spawn call started (by the call's id). */
 export const agentOfCall = (rows: AgentRow[], callId: string) => (callId ? rows.find((r) => r.toolUseId === callId) : undefined);
+
+/** The subagent a spawn call started: by the call's id, else by the path
+ *  its arguments or output name. */
+export function spawnAgentRow(rows: AgentRow[], callId: string, args: string, output: string): AgentRow | undefined {
+	const row = agentOfCall(rows, callId);
+	if (row) return row;
+	const path = spawnPayload(output).path || spawnPayload(args).path;
+	return path ? rows.find((r) => r.id === path) : undefined;
+}
+
+/** Best-of-N: the agents of each attempt group, by attempt number. */
+export function attemptGroups(rows: AgentRow[]): Map<string, AgentRow[]> {
+	const groups = new Map<string, AgentRow[]>();
+	for (const r of rows) if (r.attemptGroup) groups.set(r.attemptGroup, [...(groups.get(r.attemptGroup) ?? []), r]);
+	for (const list of groups.values())
+		list.sort((a, b) => (a.attempt ?? Number.MAX_SAFE_INTEGER) - (b.attempt ?? Number.MAX_SAFE_INTEGER) || a.startedAt - b.startedAt);
+	return groups;
+}
+
+/** Best-of-N: where one attempt is, as its group card says it: open (no
+ *  pick yet), picked and on its way (`merging` / `discarding`), merged or
+ *  discarded, or a pick that conflicted or failed. */
+export type AttemptState = 'open' | 'merging' | 'discarding' | 'merged' | 'discarded' | 'conflict' | 'failed';
+
+export function attemptState(row: Pick<AgentRow, 'state' | 'status' | 'team'>): AttemptState {
+	const a = row.team;
+	if (a?.pending) return a.pending === 'apply' ? 'merging' : 'discarding';
+	if (a?.merge?.ok) return a.merge.action === 'apply' ? 'merged' : 'discarded';
+	if (row.status === 'merged') return 'merged';
+	if (row.status === 'discarded') return 'discarded';
+	if (a?.merge?.conflicts.length || row.status === 'conflict') return 'conflict';
+	if (a?.merge) return 'failed';
+	return 'open';
+}
+
+/** Lines a `git diff --numstat` adds and removes in all (binary files count none). */
+export function numstatTotals(out: string): { added: number; removed: number } {
+	let added = 0;
+	let removed = 0;
+	for (const line of out.split('\n')) {
+		const m = /^(\d+|-)\t(\d+|-)\t/.exec(line);
+		if (!m) continue;
+		if (m[1] !== '-') added += Number(m[1]);
+		if (m[2] !== '-') removed += Number(m[2]);
+	}
+	return { added, removed };
+}
 
 /** Tool names that start a subagent, and the ones that wait for subagents. */
 export const SPAWN_TOOLS = new Set(['spawn_agent', 'Task', 'Agent']);
@@ -430,4 +516,28 @@ export function porcelainFiles(out: string): string[] {
 		if (path && !files.includes(path)) files.push(path);
 	}
 	return files;
+}
+
+/** The task board's sections in the order the panel shows them: the work
+ *  under way first, then what waits, what failed and what is done. */
+export const BOARD_ORDER: TaskStatus[] = ['claimed', 'blocked', 'pending', 'failed', 'completed'];
+
+/** The board's tasks by state (sections without tasks left out), each in
+ *  the board's own order. */
+export function boardGroups(tasks: BoardTask[]): { status: TaskStatus; tasks: BoardTask[] }[] {
+	return BOARD_ORDER.map((status) => ({ status, tasks: tasks.filter((x) => x.status === status) })).filter((g) => g.tasks.length);
+}
+
+/** The tasks one task still waits for: its dependencies not completed (an id
+ *  the board does not list counts as waiting, by its id). */
+export function waitingOn(task: BoardTask, tasks: BoardTask[]): { id: string; title: string }[] {
+	return task.dependsOn
+		.map((id) => ({ id, dep: tasks.find((x) => x.id === id) }))
+		.filter(({ dep }) => dep?.status !== 'completed')
+		.map(({ id, dep }) => ({ id, title: dep?.title ?? '' }));
+}
+
+/** Tasks done and in all. */
+export function boardProgress(tasks: BoardTask[]): { done: number; total: number } {
+	return { done: tasks.filter((x) => x.status === 'completed').length, total: tasks.length };
 }

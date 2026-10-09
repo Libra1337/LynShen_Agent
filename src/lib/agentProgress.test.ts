@@ -227,6 +227,10 @@ describe('agent team', () => {
 		files: ['a.ts', 'b.ts'],
 		pending: null,
 		merge: null,
+		background: false,
+		attemptGroup: null,
+		attempt: null,
+		diff: null,
 		...over
 	});
 	const row = (over: Partial<AgentRow> = {}) => ({ state: 'done' as const, status: 'completed', team: team(), ...over });

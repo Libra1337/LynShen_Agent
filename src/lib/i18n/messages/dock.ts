@@ -13,7 +13,23 @@ const dock = {
 			term: '终端',
 			browser: '浏览器',
 			diag: '诊断',
-			agents: '智能体'
+			agents: '智能体',
+			team: '工作组'
+		},
+		// The agent team panel: the task board, the subagents, their messages
+		team: {
+			title: '工作组',
+			tasks: '任务',
+			agents: '子智能体',
+			messages: '消息',
+			status: { claimed: '进行中', blocked: '受阻', pending: '待领取', failed: '失败', completed: '已完成' },
+			waitsFor: '等待 {list}',
+			dependsOn: '依赖 {list}',
+			unowned: '未领取',
+			files: '文件',
+			result: '结果',
+			sep: '、',
+			noBoard: '还没有任务板。主智能体把工作拆成任务后，任务会列在这里。'
 		},
 		agents: {
 			title: '智能体追踪',
@@ -227,7 +243,23 @@ const dock = {
 			term: 'Terminal',
 			browser: 'Browser',
 			diag: 'Diagnostics',
-			agents: 'Agents'
+			agents: 'Agents',
+			team: 'Team'
+		},
+		// The agent team panel: the task board, the subagents, their messages
+		team: {
+			title: 'Team',
+			tasks: 'Tasks',
+			agents: 'Subagents',
+			messages: 'Messages',
+			status: { claimed: 'In progress', blocked: 'Blocked', pending: 'Open', failed: 'Failed', completed: 'Done' },
+			waitsFor: 'Waits for {list}',
+			dependsOn: 'Depends on {list}',
+			unowned: 'Not claimed',
+			files: 'Files',
+			result: 'Result',
+			sep: ', ',
+			noBoard: 'No task board yet. Once the main agent splits the work into tasks, they show here.'
 		},
 		agents: {
 			title: 'Agent trace',

@@ -4,7 +4,8 @@
 	// line, its state, time, changed files and latest action — and a wait as
 	// the agents it waits on with theirs. A click shows the agent's own
 	// conversation. An agent that wrote in a worktree of its own offers its
-	// changes: view them, merge them into the project, or drop them.
+	// changes: view them, merge them into the project, or drop them. One
+	// still at work can be stopped; one in the background says so.
 	import RobotIcon from 'phosphor-svelte/lib/RobotIcon';
 	import GitDiffIcon from 'phosphor-svelte/lib/GitDiffIcon';
 	import GitMergeIcon from 'phosphor-svelte/lib/GitMergeIcon';
@@ -14,9 +15,10 @@
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
 	import { t } from '$lib/i18n';
 	import {
-		agentOfCall,
+		canStop,
 		mergeView,
 		shortPath,
+		spawnAgentRow,
 		spawnPayload,
 		WAIT_TOOLS,
 		waitTargets,
@@ -27,6 +29,7 @@
 	import { confirm } from '$lib/ui/confirm.svelte';
 	import StateIcon from './StateIcon.svelte';
 	import Elapsed from './Elapsed.svelte';
+	import StopAgent from './StopAgent.svelte';
 	import { roleLabel, teamNote } from './teamText';
 
 	let {
@@ -39,7 +42,8 @@
 		rows,
 		onOpen,
 		onViewChanges,
-		onMerge
+		onMerge,
+		onStop
 	}: {
 		name: string;
 		callId: string;
@@ -54,17 +58,18 @@
 		onViewChanges?: (row: AgentRow) => void;
 		/** Sends merge_agent for it: `apply` merges, `discard` drops its worktree. */
 		onMerge?: (row: AgentRow, action: 'apply' | 'discard') => void;
+		/** Stops it (close_agent) while it is at work. */
+		onStop?: (row: AgentRow) => void;
 	} = $props();
 
 	const wait = $derived(WAIT_TOOLS.has(name));
-	const row = $derived(wait ? undefined : agentOfCall(rows, callId));
 	const payload = $derived.by(() => {
 		const a = spawnPayload(args);
 		const o = spawnPayload(output);
 		return { name: a.name || o.name, task: a.task || o.task, path: o.path || a.path };
 	});
-	// A spawn whose agent the rows do not know by its call: by its path.
-	const agent = $derived(row ?? (payload.path ? rows.find((r) => r.id === payload.path) : undefined));
+	// The agent it started: by the call, else by the path it names.
+	const agent = $derived(wait ? undefined : spawnAgentRow(rows, callId, args, output));
 	const label = $derived(agent?.label || shortPath(payload.name || payload.path) || t('chat.subagentCard.spawn'));
 	const task = $derived((payload.task || agent?.prompt || '').split('\n').find((l) => l.trim())?.trim() ?? '');
 	const state = $derived(agent?.state ?? (isError ? 'failed' : running ? 'running' : 'unknown'));
@@ -73,6 +78,8 @@
 	// A conflict shows under the card with its files, not in the activity line.
 	const note = $derived(agent && merge?.state !== 'conflict' ? teamNote(agent) : '');
 	const activity = $derived(isError ? errorLine(output) : running && !agent ? t('chat.subagentCard.starting') : note || agent?.activity || '');
+	// A stop button takes the place of the open arrow while it works.
+	const stoppable = $derived(!!agent && !!onStop && (!!agent.stopping || canStop(agent)));
 	const fileCount = $derived(merge && merge.state !== 'none' ? merge.files.length : (agent?.team?.files.length ?? 0));
 	function mergeLabel(m: MergeView): string {
 		switch (m.state) {
@@ -148,23 +155,27 @@
 	</div>
 {:else}
 	<div class="sa box" class:link={!!onOpen && !!agent}>
-		<button class="spawn" disabled={!onOpen || !agent} onclick={() => agent && onOpen?.(agent)} aria-label={t('chat.progress.open', { name: label })}>
-			<span class="ico"><RobotIcon size={15} /></span>
-			<span class="col">
-				<span class="line">
-					<span class="name">{label}</span>
-					{#if agent?.role}<span class="role" title={t('chat.team.roleTitle', { role: agent.role })}>{roleLabel(agent.role)}</span>{/if}
-					{#if agent?.model}<span class="model">{agent.model.replace(/^claude-/, '')}</span>{/if}
-					<span class="grow"></span>
-					{#if fileCount}<span class="files" title={t('chat.team.filesTitle')}>{t('chat.team.filesN', { n: fileCount })}</span>{/if}
-					{#if agent}<Elapsed row={agent} />{/if}
-					<StateIcon state={state} size={14} label={state === 'unknown' ? '' : t(`dock.agents.state.${state}`)} />
+		<div class="top">
+			<button class="spawn" disabled={!onOpen || !agent} onclick={() => agent && onOpen?.(agent)} aria-label={t('chat.progress.open', { name: label })}>
+				<span class="ico"><RobotIcon size={15} /></span>
+				<span class="col">
+					<span class="line">
+						<span class="name">{label}</span>
+						{#if agent?.role}<span class="role" title={t('chat.team.roleTitle', { role: agent.role })}>{roleLabel(agent.role)}</span>{/if}
+						{#if agent?.background}<span class="role" title={t('chat.team.backgroundTitle')}>{t('chat.team.background')}</span>{/if}
+						{#if agent?.model}<span class="model">{agent.model.replace(/^claude-/, '')}</span>{/if}
+						<span class="grow"></span>
+						{#if fileCount}<span class="files" title={t('chat.team.filesTitle')}>{t('chat.team.filesN', { n: fileCount })}</span>{/if}
+						{#if agent}<Elapsed row={agent} />{/if}
+						<StateIcon state={state} size={14} label={state === 'unknown' ? '' : t(`dock.agents.state.${state}`)} />
+					</span>
+					{#if task}<span class="task">{task}</span>{/if}
+					{#if activity}<span class="act" class:err={state === 'failed'} class:warn={!!note}>{activity}</span>{/if}
 				</span>
-				{#if task}<span class="task">{task}</span>{/if}
-				{#if activity}<span class="act" class:err={state === 'failed'} class:warn={!!note}>{activity}</span>{/if}
-			</span>
-			{#if onOpen && agent}<span class="go"><CaretRightIcon size={13} /></span>{/if}
-		</button>
+				{#if onOpen && agent && !stoppable}<span class="go"><CaretRightIcon size={13} /></span>{/if}
+			</button>
+			{#if agent && onStop && stoppable}<span class="stop"><StopAgent row={agent} {onStop} /></span>{/if}
+		</div>
 		{#if agent && merge && merge.state !== 'none'}
 			{@const m = merge}
 			<div class="team">
@@ -216,6 +227,16 @@
 	}
 	.box.link:has(.spawn:hover) {
 		background: var(--surface2);
+	}
+	.top {
+		display: flex;
+		align-items: flex-start;
+		min-width: 0;
+	}
+	.stop {
+		display: inline-flex;
+		flex: none;
+		margin: 8px 8px 0 0;
 	}
 	.spawn {
 		display: flex;

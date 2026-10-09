@@ -20,6 +20,8 @@ import { pendingCost, sumCosts, type BillingCost } from './sessionCost';
 import { CacheWatch } from './cacheMiss';
 import { breakdownTotal, parseBreakdown, type ContextBreakdown } from './composer/contextUsage';
 import { parseMcpServersEvent, type McpServerView } from './mcp';
+import { parseSubagentResult } from './agents/subagentResult';
+import { parseDelivery } from './delivery';
 
 /** Where a sent message is before its reply starts: accepted locally, the
  *  engine is connecting to the model gateway, connected and waiting for the
@@ -202,6 +204,66 @@ export interface TeamAgent {
 	/** The merge_agent op sent and not answered yet. */
 	pending: 'apply' | 'discard' | null;
 	merge: MergeResult | null;
+	/** It runs in the background: past the end of the turn that started it,
+	 *  and its result may start a turn of its own. */
+	background: boolean;
+	/** Best-of-N: the group of attempts at one task it belongs to, and which
+	 *  attempt it is (1-based); null for none. */
+	attemptGroup: string | null;
+	attempt: number | null;
+	/** Lines its worktree changes add and remove (git diff), once read. */
+	diff: { added: number; removed: number } | null;
+}
+
+/** A team agent nothing is known of yet. */
+const blankTeam = (): TeamAgent => ({
+	role: '',
+	planStep: null,
+	workdir: '',
+	worktree: false,
+	files: [],
+	pending: null,
+	merge: null,
+	background: false,
+	attemptGroup: null,
+	attempt: null,
+	diff: null
+});
+
+/** A task of the team's task board (`task_board`), as the engine words it. */
+export type TaskStatus = 'pending' | 'claimed' | 'completed' | 'failed' | 'blocked';
+const TASK_STATUS: TaskStatus[] = ['pending', 'claimed', 'completed', 'failed', 'blocked'];
+
+export interface BoardTask {
+	id: string;
+	title: string;
+	detail: string;
+	status: TaskStatus;
+	/** The agent (path) that claimed it; null for none. */
+	owner: string | null;
+	/** Tasks (ids) that must complete first. */
+	dependsOn: string[];
+	role: string;
+	files: string[];
+	result: string;
+	/** When it last changed (engine clock, ms). */
+	updatedAt: number;
+}
+
+function boardTask(raw: Record<string, unknown>): BoardTask {
+	const strings = (v: unknown) => arr<unknown>(v).filter((x): x is string => typeof x === 'string' && x !== '');
+	return {
+		id: str(raw.id),
+		title: str(raw.title),
+		detail: str(raw.detail),
+		status: TASK_STATUS.includes(raw.status as TaskStatus) ? (raw.status as TaskStatus) : 'pending',
+		owner: str(raw.owner) || null,
+		dependsOn: strings(raw.depends_on),
+		role: str(raw.role),
+		files: strings(raw.files),
+		result: str(raw.result),
+		updatedAt: num(raw.updated_at)
+	};
 }
 
 /** One message between the agents of the team (`agent_message`). */
@@ -257,6 +319,8 @@ export interface SubagentInfo {
 	endedAt?: number;
 	/** Its role (explorer, worker, reviewer or a custom one). */
 	role?: string;
+	/** It runs in the background (see TeamAgent.background). */
+	background?: boolean;
 }
 
 /** The lifecycle words of an agent that has stopped for good (`conflict`:
@@ -538,6 +602,14 @@ export class ChatState {
 	/** The team's token use in the running (or last) turn; null until the
 	 *  engine reports one. */
 	teamBudget = $state<TeamBudget | null>(null);
+	/** The team's task board as the engine last sent it (a whole snapshot
+	 *  each time); null until it sends one. */
+	taskBoard = $state<BoardTask[] | null>(null);
+	/** Agents a close_agent op was sent for, by path (ms), until their
+	 *  lifecycle says they stopped. */
+	stopRequested = $state<Record<string, number>>({});
+	/** Best-of-N: the attempt picked in each group (pick_attempt sent). */
+	attemptPicks = $state<Record<string, string>>({});
 	/** The engine has sent an agent trace (`agent_runs`): it answers the trace ops
 	 *  (an older LynShen engine refuses them). */
 	agentRunsSeen = $state(false);
@@ -702,6 +774,11 @@ export class ChatState {
 	// message array is replaced wholesale (transcript). #tool() falls back to a scan
 	// on a miss (e.g. transcript-restored tools, which carry no call_id).
 	#toolsByCallId = new Map<string, Extract<Msg, { kind: 'tool' }>>();
+	/** The background agents whose results start the next turn (a marked
+	 *  `<subagent_result>` user item), and the ones that ended between turns:
+	 *  they stay listed through the next turn. */
+	#woke = new Set<string>();
+	#endedIdle = new Set<string>();
 
 	constructor() {
 		try {
@@ -902,10 +979,15 @@ export class ChatState {
 		if (this.#turnStart !== null) return;
 		this.#turnStart = Date.now();
 		this.turnStartedAt = this.#turnStart;
-		this.turnEndedAt = 0;
 		// The agents a finished turn ran leave with it (their team entries,
-		// and worktrees still to merge, stay).
-		for (const [id, a] of Object.entries(this.subagents)) if (a.endedAt) delete this.subagents[id];
+		// and worktrees still to merge, stay). A background agent that ended
+		// between turns stays for this one: its result is what this turn
+		// (often one it started itself) takes up.
+		this.turnEndedAt = 0;
+		for (const [id, a] of Object.entries(this.subagents))
+			if (a.endedAt && !this.#woke.has(id) && !(a.background && this.#endedIdle.has(id))) delete this.subagents[id];
+		this.#woke.clear();
+		this.#endedIdle.clear();
 		this.teamBudget = null;
 		this.#segStart = this.#turnStart;
 		this.#firstOutput = null;
@@ -961,10 +1043,12 @@ export class ChatState {
 	}
 
 	/** Per-turn file-change timeline: one entry per user turn that edited files,
-	 *  newest first, with the turn's prompt and its files' ±line counts. */
+	 *  newest first, with the turn's prompt and its files' ±line counts. A
+	 *  turn a subagent's result started is named by its line, not its mark. */
 	get turnTimeline(): TurnDiff[] {
 		const userTexts: string[] = [];
-		for (const m of this.messages) if (m.kind === 'user') userTexts.push(m.text);
+		for (const m of this.messages)
+			if (m.kind === 'user') userTexts.push(parseSubagentResult(m.text) ? (parseDelivery(m.text)?.label ?? m.text) : m.text);
 		const out: TurnDiff[] = [];
 		for (const [key, bucket] of Object.entries(this.turnEdits)) {
 			const index = Number(key);
@@ -1184,7 +1268,8 @@ export class ChatState {
 	}
 
 	/** Records what an event says of a team agent: `role`, `plan_step`,
-	 *  `workdir`, `isolation`, `files_changed` (each only when present). */
+	 *  `workdir`, `isolation`, `files_changed`, `background`, `attempt_group`
+	 *  and `attempt` (each only when present). */
 	#noteTeam(path: string, raw: Record<string, unknown>) {
 		const prev = this.team[path];
 		const role = str(raw.role);
@@ -1194,16 +1279,22 @@ export class ChatState {
 			? arr<unknown>(raw.files_changed).filter((f): f is string => typeof f === 'string' && f !== '')
 			: null;
 		const named = typeof step === 'string' && step.trim() ? step.trim() : typeof step === 'number' ? String(step) : '';
-		if (!prev && !role && !named && !workdir && !files?.length) return;
+		const background = typeof raw.background === 'boolean' ? raw.background : null;
+		const group = str(raw.attempt_group);
+		const attempt = typeof raw.attempt === 'number' && raw.attempt >= 1 ? Math.floor(raw.attempt) : null;
+		if (!prev && !role && !named && !workdir && !files?.length && !background && !group) return;
 		const dir = workdir || prev?.workdir || '';
+		const base = prev ?? blankTeam();
 		this.team[path] = {
-			role: role || prev?.role || '',
-			planStep: named || (step === null ? null : (prev?.planStep ?? null)),
+			...base,
+			role: role || base.role,
+			planStep: named || (step === null ? null : base.planStep),
 			workdir: dir,
-			worktree: prev?.worktree || isWorktree(dir, str(raw.isolation)),
-			files: files ?? prev?.files ?? [],
-			pending: prev?.pending ?? null,
-			merge: prev?.merge ?? null
+			worktree: base.worktree || isWorktree(dir, str(raw.isolation)),
+			files: files ?? base.files,
+			background: background ?? base.background,
+			attemptGroup: group || base.attemptGroup,
+			attempt: attempt ?? base.attempt
 		};
 	}
 
@@ -1213,6 +1304,21 @@ export class ChatState {
 		const a = this.team[target];
 		if (a) a.pending = action;
 		return { op: 'merge_agent', target, action };
+	}
+
+	/** The op that stops one subagent; marks it as stopping until its
+	 *  lifecycle says it ended. */
+	closeAgent(target: string): { op: 'close_agent'; target: string } {
+		this.stopRequested[target] = Date.now();
+		return { op: 'close_agent', target };
+	}
+
+	/** Best-of-N: the op that merges `target`'s attempt and discards the
+	 *  other attempts of `group`; marks each as waiting for its merge_result. */
+	pickAttempt(group: string, target: string): { op: 'pick_attempt'; group: string; target: string } {
+		this.attemptPicks[group] = target;
+		for (const [path, a] of Object.entries(this.team)) if (a.attemptGroup === group) a.pending = path === target ? 'apply' : 'discard';
+		return { op: 'pick_attempt', group, target };
 	}
 
 	/** The messages an agent sent or received, oldest first. */
@@ -1311,6 +1417,11 @@ export class ChatState {
 				this.lastTurnAuto = false;
 				this.autoRetries = 0;
 				this.autoRetry = null;
+				// A background subagent's result starting a turn by itself: it
+				// renders as a line (parseDelivery), and the agents stay listed
+				// through the turn it starts.
+				const woke = parseSubagentResult(text);
+				if (woke && this.#turnStart === null) for (const path of woke.paths) this.#woke.add(path);
 				// No send state: claude echoes after the reply, when it would stick.
 				const images = arr<string>(ev.images).filter((p) => typeof p === 'string');
 				this.messages.push({ kind: 'user', text, ...(images.length ? { images } : {}) });
@@ -1584,6 +1695,8 @@ export class ChatState {
 						return null;
 					})
 					.filter((m): m is Msg => m !== null);
+				// The team's messages, as the panel and the agent's view list them.
+				this.agentMessages = this.messages.flatMap((m) => (m.kind === 'agent_message' ? [{ from: m.from, to: m.to, summary: m.summary, at: 0 }] : []));
 				if (pending !== null) {
 					const last = this.messages.findLast((m) => m.kind === 'user');
 					if (last?.kind === 'user' && last.text === pending) this.#pendingUserEcho = null;
@@ -1738,12 +1851,22 @@ export class ChatState {
 					...((str(ev.model) || prev?.model) ? { model: str(ev.model) || prev?.model } : {}),
 					...((str(ev.tool_use_id) || prev?.toolUseId) ? { toolUseId: str(ev.tool_use_id) || prev?.toolUseId } : {}),
 					...((str(ev.role) || prev?.role) ? { role: str(ev.role) || prev?.role } : {}),
+					...((ev.background === true || (prev?.background && ev.background !== false)) ? { background: true } : {}),
 					startedAt: prev?.startedAt ?? now,
 					...(ended ? { endedAt: prev?.endedAt ?? now } : {})
 				};
+				if (ended) delete this.stopRequested[path];
+				if (ended && !prev?.endedAt && this.#turnStart === null) this.#endedIdle.add(path);
 				this.#noteTeam(path, ev);
 				break;
 			}
+			// The team's task board: a whole snapshot each time (and again on
+			// reconnect), so it replaces what was here.
+			case 'task_board':
+				this.taskBoard = arr<Record<string, unknown>>(ev.tasks)
+					.filter((x) => x && typeof x === 'object' && str(x.id))
+					.map(boardTask);
+				break;
 			// The agent team (工作组): messages between its agents, the answer
 			// to a merge of a worktree, the turn's token budget.
 			case 'agent_message': {
@@ -1760,13 +1883,11 @@ export class ChatState {
 				if (!target) break;
 				const action = ev.action === 'discard' ? 'discard' : 'apply';
 				const files = arr<unknown>(ev.files).filter((f): f is string => typeof f === 'string');
-				const prev = this.team[target];
+				const prev = this.team[target] ?? blankTeam();
 				this.team[target] = {
-					role: prev?.role ?? '',
-					planStep: prev?.planStep ?? null,
-					workdir: prev?.workdir ?? '',
+					...prev,
 					worktree: true,
-					files: files.length ? files : (prev?.files ?? []),
+					files: files.length ? files : prev.files,
 					pending: null,
 					merge: {
 						action,
@@ -1877,7 +1998,12 @@ export class ChatState {
 					})),
 					agents: arr<Record<string, unknown>>(ev.agents).map(agentRun)
 				};
-				for (const a of arr<Record<string, unknown>>(ev.agents)) if (str(a.id)) this.#noteTeam(str(a.id), a);
+				for (const a of arr<Record<string, unknown>>(ev.agents)) {
+					const id = str(a.id);
+					if (!id) continue;
+					this.#noteTeam(id, a);
+					if (this.stopRequested[id] && FINAL_AGENT.includes(str(a.state) || str(a.status))) delete this.stopRequested[id];
+				}
 				break;
 			}
 			case 'subagent_transcript': {
@@ -2007,17 +2133,24 @@ export class ChatState {
 				break;
 			case 'error': {
 				// An engine without the agent trace refuses its ops: nothing failed.
-				const refused = /^unknown op: (agent_runs|subagent_transcript|merge_agent)$/.exec(str(ev.message));
+				const refused = /^unknown op: (agent_runs|subagent_transcript|merge_agent|pick_attempt|close_agent)$/.exec(str(ev.message));
 				if (refused) {
 					if (refused[1] === 'subagent_transcript' && this.agentFocus && !this.subagentTranscripts[this.agentFocus])
 						this.subagentTranscripts[this.agentFocus] = { task: '', messages: [], error: t('dock.agents.noTranscript') };
 					// An engine before the agent team: the merges sent are not coming.
-					if (refused[1] === 'merge_agent')
+					if (refused[1] === 'merge_agent' || refused[1] === 'pick_attempt') {
 						for (const a of Object.values(this.team))
 							if (a.pending) {
 								a.merge = { action: a.pending, ok: false, files: [], conflicts: [], error: t('chat.team.mergeUnsupported') };
 								a.pending = null;
 							}
+						if (refused[1] === 'pick_attempt') this.attemptPicks = {};
+					}
+					// …nor are the stops.
+					if (refused[1] === 'close_agent' && Object.keys(this.stopRequested).length) {
+						this.stopRequested = {};
+						this.messages.push({ kind: 'system', text: t('chat.team.stopUnsupported') });
+					}
 					break;
 				}
 				this.retry = null;

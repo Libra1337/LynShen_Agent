@@ -214,7 +214,10 @@ const chat = {
 			task: '任务进展',
 			approved: '待确认动作已批准并执行',
 			declined: '待确认动作已拒绝：{name}',
-			failed: '执行失败'
+			failed: '执行失败',
+			agentDone: '子智能体 {name} 完成，继续处理',
+			agentFailed: '子智能体 {name} 出错，继续处理',
+			and: '、'
 		},
 		retry: {
 			title: '请求失败，正在重试',
@@ -285,7 +288,9 @@ const chat = {
 			runningAgentsN: '{n} 个子智能体运行中',
 			budget: '{used} / {limit} tokens',
 			budgetTitle: '本轮全部子智能体用掉的 token 和上限',
-			owner: '负责这一步的子智能体：{name}'
+			owner: '负责这一步的子智能体：{name}',
+			tasksDone: '{done}/{total} 个任务完成',
+			openTeam: '打开工作组'
 		},
 		// The agent team (工作组): roles, worktree merges, messages between agents
 		team: {
@@ -310,7 +315,28 @@ const chat = {
 			budgetExhausted: '预算用完，已停止',
 			parent: '主智能体',
 			changesTab: '{name} 的改动',
-			changesGone: '找不到这个子智能体的改动'
+			changesGone: '找不到这个子智能体的改动',
+			background: '后台',
+			backgroundTitle: '在后台运行，回合结束后继续',
+			stop: '停止',
+			stopAgent: '停止 {name}',
+			stopping: '正在停止',
+			stopTitle: '停止 {name}？',
+			stopMessage: '{name} 有 {n} 个文件的改动还没有合并。停止后它不再继续，改动留在它的 worktree 里，之后仍可合并或丢弃。',
+			stopUnsupported: '当前引擎还不能停止单个子智能体，请更新 LynShen 后再试。'
+		},
+		// Best-of-N: several attempts at one task, one of them merged
+		attempts: {
+			title: '{n} 份尝试',
+			attempt: '第 {n} 份',
+			pick: '选这份',
+			pickTitle: '合并这份改动，丢弃其余的尝试',
+			picked: '已选第 {n} 份',
+			merged: '已合并',
+			discarded: '已丢弃',
+			running: '{n} 份进行中',
+			done: '{n} 份完成',
+			noChanges: '没有改动'
 		},
 		subagentCard: {
 			spawn: '子智能体',
@@ -561,7 +587,10 @@ const chat = {
 			task: 'Task update',
 			approved: 'Pending action approved and run',
 			declined: 'Pending action declined: {name}',
-			failed: 'failed'
+			failed: 'failed',
+			agentDone: 'Subagent {name} finished, continuing',
+			agentFailed: 'Subagent {name} failed, continuing',
+			and: ', '
 		},
 		retry: {
 			title: 'Request failed, retrying',
@@ -632,7 +661,9 @@ const chat = {
 			runningAgentsN: '{n} subagents running',
 			budget: '{used} / {limit} tokens',
 			budgetTitle: 'Tokens all subagents used in this turn, and the limit',
-			owner: 'Subagent on this step: {name}'
+			owner: 'Subagent on this step: {name}',
+			tasksDone: '{done}/{total} tasks done',
+			openTeam: 'Open the team'
 		},
 		// The agent team: roles, worktree merges, messages between agents
 		team: {
@@ -657,7 +688,28 @@ const chat = {
 			budgetExhausted: 'Budget used up, stopped',
 			parent: 'Main agent',
 			changesTab: 'Changes of {name}',
-			changesGone: 'The changes of this subagent are gone'
+			changesGone: 'The changes of this subagent are gone',
+			background: 'Background',
+			backgroundTitle: 'Runs in the background, past the end of the turn',
+			stop: 'Stop',
+			stopAgent: 'Stop {name}',
+			stopping: 'Stopping',
+			stopTitle: 'Stop {name}?',
+			stopMessage: '{name} has changes to {n} files that are not merged. It stops working; the changes stay in its worktree, where you can still merge or discard them.',
+			stopUnsupported: 'This engine cannot stop one subagent yet. Update LynShen and try again.'
+		},
+		// Best-of-N: several attempts at one task, one of them merged
+		attempts: {
+			title: '{n} attempts',
+			attempt: 'Attempt {n}',
+			pick: 'Pick this',
+			pickTitle: 'Merge this one and discard the other attempts',
+			picked: 'Picked attempt {n}',
+			merged: 'Merged',
+			discarded: 'Discarded',
+			running: '{n} running',
+			done: '{n} done',
+			noChanges: 'No changes'
 		},
 		subagentCard: {
 			spawn: 'Subagent',

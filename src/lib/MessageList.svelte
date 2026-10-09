@@ -8,10 +8,11 @@
 	import Collapse from '$lib/ui/Collapse.svelte';
 	import ToolCard from '$lib/ToolCard.svelte';
 	import SubagentCard from '$lib/agents/SubagentCard.svelte';
+	import AttemptGroupCard from '$lib/agents/AttemptGroupCard.svelte';
 	import AgentMessageLine from '$lib/agents/AgentMessageLine.svelte';
 	import PlanCard, { type PlanAction } from '$lib/PlanCard.svelte';
 	import type { ApprovalMode } from '$lib/approval';
-	import { SPAWN_TOOLS, WAIT_TOOLS, type AgentRow } from '$lib/agentProgress';
+	import { attemptGroups, SPAWN_TOOLS, spawnAgentRow, WAIT_TOOLS, type AgentRow } from '$lib/agentProgress';
 	import DeliveryNotice from '$lib/DeliveryNotice.svelte';
 	import { parseDelivery } from '$lib/delivery';
 	import { parseToolOutput, toolIcon, toolTarget, toolVerb } from '$lib/toolSummary';
@@ -57,6 +58,9 @@
 		onOpenAgent,
 		onAgentChanges,
 		onMergeAgent,
+		onStopAgent,
+		onPickAttempt,
+		attemptPicks = {},
 		onPlan,
 		onOpenPlan,
 		planMode = 'edits',
@@ -107,6 +111,12 @@
 		onAgentChanges?: (row: AgentRow) => void;
 		/** Merges a worktree subagent's changes into the project, or drops them. */
 		onMergeAgent?: (row: AgentRow, action: 'apply' | 'discard') => void;
+		/** Stops a subagent still at work (close_agent). */
+		onStopAgent?: (row: AgentRow) => void;
+		/** Best-of-N: merges the attempt picked, discards the others. */
+		onPickAttempt?: (group: string, row: AgentRow) => void;
+		/** The attempt picked in each group (ChatState.attemptPicks). */
+		attemptPicks?: Record<string, string>;
 		/** Approves or revises a proposed plan (absent: plans have no actions). */
 		onPlan?: (id: string, action: PlanAction) => void;
 		/** The mode a plan's approval offers first. */
@@ -472,8 +482,29 @@
 		return !!agents && m.kind === 'tool' && (SPAWN_TOOLS.has(m.name) || WAIT_TOOLS.has(m.name));
 	}
 	function shown(m: Msg): boolean {
-		return hasContent(m) && (!toolGroups.headOf.has(m) || toolGroups.members.has(m));
+		return hasContent(m) && (!toolGroups.headOf.has(m) || toolGroups.members.has(m)) && !attempts.hidden.has(m);
 	}
+	// Best-of-N: the spawns of one attempt group render as one card, on the
+	// group's first spawn; the others render nothing.
+	const attempts = $derived.by(() => {
+		const lead = new Map<Msg, { group: string; rows: AgentRow[] }>();
+		const hidden = new Set<Msg>();
+		if (!agents) return { lead, hidden };
+		const groups = attemptGroups(agents);
+		if (!groups.size) return { lead, hidden };
+		const seen = new Set<string>();
+		for (const m of messages) {
+			if (m.kind !== 'tool' || !SPAWN_TOOLS.has(m.name)) continue;
+			const group = spawnAgentRow(agents, m.callId, m.args ?? '', m.output)?.attemptGroup;
+			if (!group) continue;
+			if (seen.has(group)) hidden.add(m);
+			else {
+				seen.add(group);
+				lead.set(m, { group, rows: groups.get(group) ?? [] });
+			}
+		}
+		return { lead, hidden };
+	});
 	function groupInfo(run: Msg[]) {
 		let running = false;
 		let failed = 0;
@@ -603,7 +634,12 @@
 					</div>
 				{/if}
 			{:else if agents && isAgentCall(m)}
-				<SubagentCard name={m.name} callId={m.callId} output={m.output} args={m.args} running={m.running} isError={m.isError} rows={agents} onOpen={onOpenAgent} onViewChanges={onAgentChanges} onMerge={onMergeAgent} />
+				{@const attempt = attempts.lead.get(m)}
+				{#if attempt}
+					<AttemptGroupCard group={attempt.group} rows={attempt.rows} picked={attemptPicks[attempt.group] ?? ''} onOpen={onOpenAgent} onViewChanges={onAgentChanges} onPick={onPickAttempt} onStop={onStopAgent} />
+				{:else}
+					<SubagentCard name={m.name} callId={m.callId} output={m.output} args={m.args} running={m.running} isError={m.isError} rows={agents} onOpen={onOpenAgent} onViewChanges={onAgentChanges} onMerge={onMergeAgent} onStop={onStopAgent} />
+				{/if}
 			{:else}
 				<ToolCard name={m.name} output={m.output} running={m.running} isError={m.isError} subagent={m.subagent} trace={traceOf?.(m) ?? undefined} />
 			{/if}

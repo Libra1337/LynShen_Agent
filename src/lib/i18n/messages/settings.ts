@@ -102,7 +102,30 @@ const settings = {
 				reviewer: '只读，不继承对话上下文，只审查 diff。'
 			},
 			loadingRoles: '正在读取角色',
-			refreshRoles: '重新读取角色'
+			refreshRoles: '重新读取角色',
+			flow: '完成之后',
+			wakeOnResult: '子智能体完成后自动继续',
+			wakeOnResultHint: '后台子智能体完成时，主智能体自己开始新的一轮处理它的结果',
+			reviewOnComplete: '写代码的任务完成后自动审查',
+			reviewOnCompleteHint: '写代码的子智能体完成后，派出一个审查子智能体检查它的改动',
+			hooks: '钩子',
+			hooksHint: '命令保存在 ~/.lynshen/hooks.json，事件发生时在项目目录运行，事件内容以 JSON 从标准输入传入。',
+			hook: {
+				task_completed: '任务完成时',
+				agent_idle: '子智能体空闲时'
+			},
+			hookHint: {
+				task_completed: '任务板上的一个任务完成时运行',
+				agent_idle: '一个子智能体做完手上的工作、等待下一步时运行'
+			},
+			noCommands: '没有命令',
+			commandPlaceholder: '要运行的命令',
+			addCommand: '添加',
+			removeCommand: '删除命令',
+			onlyTools: '仅限 {tools}',
+			hooksUnreadable: '读取 hooks.json 失败：{msg}。修好这个文件后再在这里修改。',
+			hooksSaveFailed: '保存钩子失败：{msg}',
+			refreshHooks: '重新读取钩子'
 		},
 		shortcuts: {
 			customize: '自定义快捷键',
@@ -630,7 +653,30 @@ const settings = {
 				reviewer: 'Read-only. Starts without the conversation and reviews the diff only.'
 			},
 			loadingRoles: 'Reading roles',
-			refreshRoles: 'Read the roles again'
+			refreshRoles: 'Read the roles again',
+			flow: 'When work finishes',
+			wakeOnResult: 'Continue when a subagent finishes',
+			wakeOnResultHint: 'When a background subagent finishes, the main agent starts a new turn to take up its result',
+			reviewOnComplete: 'Review finished coding tasks',
+			reviewOnCompleteHint: 'When a subagent that writes code finishes, a reviewer subagent checks its changes',
+			hooks: 'Hooks',
+			hooksHint: 'Commands are kept in ~/.lynshen/hooks.json. They run in the project folder when the event happens and get the event as JSON on standard input.',
+			hook: {
+				task_completed: 'When a task completes',
+				agent_idle: 'When a subagent is idle'
+			},
+			hookHint: {
+				task_completed: 'Runs when a task on the task board completes',
+				agent_idle: 'Runs when a subagent has finished its work and waits for the next step'
+			},
+			noCommands: 'No commands',
+			commandPlaceholder: 'Command to run',
+			addCommand: 'Add',
+			removeCommand: 'Remove command',
+			onlyTools: 'Only for {tools}',
+			hooksUnreadable: 'Could not read hooks.json: {msg}. Fix the file before you change it here.',
+			hooksSaveFailed: 'Could not save the hooks: {msg}',
+			refreshHooks: 'Read the hooks again'
 		},
 		shortcuts: {
 			customize: 'Custom shortcuts',

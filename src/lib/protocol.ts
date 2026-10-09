@@ -79,6 +79,11 @@ export type Op =
 	// lynshen agent team: merge a subagent's worktree into the project, or drop
 	// it; answered with `merge_result`.
 	| { op: 'merge_agent'; target: string; action: 'apply' | 'discard' }
+	// lynshen agent team: stop one subagent (answered by its lifecycle).
+	| { op: 'close_agent'; target: string }
+	// lynshen best-of-N: merge the chosen attempt of a group, discard the
+	// others; answered by one `merge_result` per attempt.
+	| { op: 'pick_attempt'; group: string; target: string }
 	// lynshen plan mode: run a proposed plan in `mode`, or revise it with `feedback`.
 	| {
 			op: 'approve_plan';
@@ -275,6 +280,15 @@ export function readConfig(): Promise<Record<string, unknown>> {
 }
 export function writeConfig(patch: Record<string, unknown>): Promise<void> {
 	return invoke('write_config', { patch });
+}
+// The engine's shell hooks (~/.lynshen/hooks.json): read as an object ({}
+// when there is no file; a file that does not parse rejects), written by
+// replacing top-level keys only (the others stay as they are).
+export function readHooks(): Promise<Record<string, unknown>> {
+	return invoke('read_hooks');
+}
+export function writeHooks(patch: Record<string, unknown[]>): Promise<void> {
+	return invoke('write_hooks', { patch });
 }
 export function readAuthProviders(): Promise<string[]> {
 	return invoke('read_auth_providers');

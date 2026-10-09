@@ -50,7 +50,9 @@ describe('team settings', () => {
 			max_live: 6,
 			max_depth: 2,
 			turn_token_budget: 400000,
-			keep_worktrees_days: 3
+			keep_worktrees_days: 3,
+			wake_on_result: true,
+			review_on_complete: false
 		});
 		expect(readTeamConfig({ agents: { fanout: 'sometimes' } }).fanout).toBe('auto');
 	});

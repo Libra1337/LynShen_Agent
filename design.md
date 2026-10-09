@@ -135,6 +135,6 @@ Extension boundary:
 | Canvas | `Mosaic`, `.canvas`, `.stage` |
 | Leaf / tab | `LeafNode`, `TileTab` |
 | Conversation tile | `chat:<sessionId>` panel, `ChatPane` |
-| Tool panel | panel kinds `plan` `goal` `agents` `changes` `turns` `files` `git` `term` `browser` `diag` `audit` |
+| Tool panel | panel kinds `plan` `goal` `agents` `team` `changes` `turns` `files` `git` `term` `browser` `diag` `audit` |
 | Composer | `Composer` |
 | Full-panel page | `SettingsPage`, `DeskPage` |

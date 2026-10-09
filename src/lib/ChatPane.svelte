@@ -77,8 +77,9 @@
 	import Button from '$lib/ui/Button.svelte';
 	import TaskStrip from '$lib/TaskStrip.svelte';
 	import ProgressCard from '$lib/agents/ProgressCard.svelte';
-	import { agentRows, porcelainFiles, type AgentRow } from '$lib/agentProgress';
+	import { agentRows, isLive, numstatTotals, porcelainFiles, type AgentRow } from '$lib/agentProgress';
 	import { agentChanges } from '$lib/agents/agentChanges.svelte';
+	import { confirmStop } from '$lib/agents/confirmStop';
 	import { parseToolOutput, toolTarget, toolVerb } from '$lib/toolSummary';
 	import { isAbsolutePath, joinPath, parseFileHref, pathExt } from '$lib/fileRefs';
 	import type { Msg, ModelOption } from '$lib/chat.svelte';
@@ -116,7 +117,8 @@
 		onOpenSettings,
 		onOpenAgent,
 		onOpenRequirement,
-		onOpenTrace
+		onOpenTrace,
+		onOpenTeam
 	}: {
 		session: Session;
 		store: SessionStore;
@@ -136,6 +138,8 @@
 		onOpenRequirement?: (id: string) => void;
 		/** Opens the agent trace panel (it shows `chat.agentFocus`). */
 		onOpenTrace?: () => void;
+		/** Opens the agent team's panel (task board, messages). */
+		onOpenTeam?: () => void;
 	} = $props();
 
 	const chat = $derived(session.chat);
@@ -510,9 +514,16 @@
 		const m = chat.subagentLastTool[label];
 		return m ? `${toolVerb(m.name)} ${toolTarget(m.name, parseToolOutput(m.output))}`.trim() : '';
 	};
-	const allAgents = $derived(agentRows({ runs: chat.agentRuns, subagents: chat.subagents, lastTool, team: chat.team }));
+	const allAgents = $derived(agentRows({ runs: chat.agentRuns, subagents: chat.subagents, lastTool, team: chat.team, stopping: chat.stopRequested }));
 	const turnAgents = $derived(
-		agentRows({ runs: chat.agentRuns, subagents: chat.subagents, lastTool, team: chat.team, since: chat.turnStartedAt || Number.MAX_SAFE_INTEGER })
+		agentRows({
+			runs: chat.agentRuns,
+			subagents: chat.subagents,
+			lastTool,
+			team: chat.team,
+			stopping: chat.stopRequested,
+			since: chat.turnStartedAt || Number.MAX_SAFE_INTEGER
+		})
 	);
 	function openAgent(row: AgentRow) {
 		openTrace(row.workflow ? null : row.id);
@@ -525,6 +536,40 @@
 	function mergeAgent(row: AgentRow, action: 'apply' | 'discard') {
 		send(chat.mergeAgent(row.id, action));
 	}
+	// One subagent stops (close_agent); it asks first when its worktree has
+	// changes not merged yet.
+	async function stopAgent(row: AgentRow) {
+		if (await confirmStop(row)) send(chat.closeAgent(row.id));
+	}
+	// Best-of-N: the picked attempt merges, the others are discarded.
+	function pickAttempt(group: string, row: AgentRow) {
+		send(chat.pickAttempt(group, row.id));
+	}
+	// The agent team's panel, for this session (LynShen's engine has the team).
+	const teamPanel = $derived(chat.backendId === 'lynshen' && !!onOpenTeam);
+	function openTeam() {
+		store.activeId = session.id;
+		onOpenTeam?.();
+	}
+	// A finished attempt's worktree: the lines it adds and removes, read once
+	// (git diff there; files it created are not counted).
+	const measuredWorktrees = new Set<string>();
+	$effect(() => {
+		for (const r of allAgents) {
+			const a = r.team;
+			if (!a?.attemptGroup || !a.worktree || !a.workdir || a.diff || a.merge?.ok || isLive(r) || measuredWorktrees.has(a.workdir)) continue;
+			measuredWorktrees.add(a.workdir);
+			const id = r.id;
+			git(['diff', '--numstat', 'HEAD'], a.workdir)
+				.then((out) => {
+					const entry = chat.team[id];
+					if (entry && !entry.diff) entry.diff = numstatTotals(out);
+				})
+				.catch(() => {
+					/* the worktree is gone or not a repository */
+				});
+		}
+	});
 	// A finished worktree agent whose changed files the engine did not name:
 	// read them from its worktree once (git status there).
 	const scannedWorktrees = new Set<string>();
@@ -1272,10 +1317,17 @@
 	{/if}
 
 	<div class="mainwrap" bind:clientWidth={wrapW}>
-	<ProgressCard {chat} sessionId={session.id} rows={turnAgents} onOpen={traceable ? openAgent : undefined} />
+	<ProgressCard
+		{chat}
+		sessionId={session.id}
+		rows={turnAgents}
+		onOpen={traceable ? openAgent : undefined}
+		onStop={chat.backendId === 'lynshen' ? stopAgent : undefined}
+		onOpenTeam={teamPanel ? openTeam : undefined}
+	/>
 	<main bind:this={scroller} onscroll={onScroll} onwheel={onWheel}>
 		<div bind:this={contentEl}>
-			<MessageList bind:this={messageList} bind:mark messages={chat.messages} {streamingMsg} {streamingReasoning} phase={chat.phase} call={chat.call} compactionTokens={chat.compactionTokens} retry={chat.retry} autoRetry={chat.autoRetry} onAutoRetryNow={() => autoRetry.now(chat)} onAutoRetryCancel={() => autoRetry.cancel(chat)} {findActive} {scroller} onEdit={editMessage} onCite={citeText} onNote={noteRequirement} onRewind={rewindToMessage} onFile={openChatFile} onDismiss={(m) => (chat.messages = chat.messages.filter((x) => x !== m))} backend={chat.backendId} provider={chat.provider ?? ''} onErrorAction={fixError} traceOf={traceable ? traceOf : undefined} agents={allAgents} onOpenAgent={traceable ? openAgent : undefined} onAgentChanges={viewAgentChanges} onMergeAgent={mergeAgent} onPlan={planAction} onOpenPlan={(id) => planPages.open(session.id, id)} {planMode} />
+			<MessageList bind:this={messageList} bind:mark messages={chat.messages} {streamingMsg} {streamingReasoning} phase={chat.phase} call={chat.call} compactionTokens={chat.compactionTokens} retry={chat.retry} autoRetry={chat.autoRetry} onAutoRetryNow={() => autoRetry.now(chat)} onAutoRetryCancel={() => autoRetry.cancel(chat)} {findActive} {scroller} onEdit={editMessage} onCite={citeText} onNote={noteRequirement} onRewind={rewindToMessage} onFile={openChatFile} onDismiss={(m) => (chat.messages = chat.messages.filter((x) => x !== m))} backend={chat.backendId} provider={chat.provider ?? ''} onErrorAction={fixError} traceOf={traceable ? traceOf : undefined} agents={allAgents} onOpenAgent={traceable ? openAgent : undefined} onAgentChanges={viewAgentChanges} onMergeAgent={mergeAgent} onStopAgent={chat.backendId === 'lynshen' ? stopAgent : undefined} onPickAttempt={pickAttempt} attemptPicks={chat.attemptPicks} onPlan={planAction} onOpenPlan={(id) => planPages.open(session.id, id)} {planMode} />
 		</div>
 		{#if chat.booting && chat.engineState !== 'exited'}
 			<div class="welcome spawning">

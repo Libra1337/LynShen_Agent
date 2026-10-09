@@ -11,6 +11,8 @@
 	import { t } from '$lib/i18n';
 	import AgentTranscript from '$lib/agents/AgentTranscript.svelte';
 	import AgentMessageLine from '$lib/agents/AgentMessageLine.svelte';
+	import StopAgent from '$lib/agents/StopAgent.svelte';
+	import { confirmStop } from '$lib/agents/confirmStop';
 	import { roleLabel } from '$lib/agents/teamText';
 	import type { AgentRun, ChatState, WorkflowRun } from '$lib/chat.svelte';
 	import type { Op } from '$lib/protocol';
@@ -26,7 +28,7 @@
 		timeline,
 		type RunState
 	} from '$lib/agentTrace';
-	import { shortPath } from '$lib/agentProgress';
+	import { agentRows, shortPath, type AgentRow } from '$lib/agentProgress';
 
 	// The agent trace of a Claude Code session: each Workflow as a timeline of
 	// its agents by phase (when each ran, for how long, at what cost), the
@@ -98,6 +100,16 @@
 		focused ? runState(focused.agent.state) === 'running' : !!chat.agentFocus && runState(chat.subagents[chat.agentFocus]?.status ?? '') === 'running'
 	);
 
+	// LynShen's agent team: the subagent shown can be stopped while at work.
+	const focusRow = $derived(
+		chat.backendId === 'lynshen' && chat.agentFocus
+			? agentRows({ runs: chat.agentRuns, subagents: chat.subagents, team: chat.team, stopping: chat.stopRequested }).find((r) => r.id === chat.agentFocus)
+			: undefined
+	);
+	async function stopFocused(row: AgentRow) {
+		if (await confirmStop(row)) onOp(chat.closeAgent(row.id));
+	}
+
 	let scroller = $state<HTMLElement | null>(null);
 	function pick(id: string) {
 		chat.agentFocus = id;
@@ -152,6 +164,8 @@
 				<div class="ftitle">
 					{@render stateIcon(a.state)}
 					<span>{a.label || a.id}</span>
+					<span class="grow"></span>
+					{#if focusRow}<StopAgent row={focusRow} onStop={stopFocused} />{/if}
 				</div>
 				<div class="fmeta">
 					{#if focused.run}<span>{focused.run.name || focused.run.description}</span>{/if}
@@ -171,6 +185,8 @@
 				<div class="ftitle">
 					{@render stateIcon(life.status)}
 					<span>{shortPath(life.label || chat.agentFocus)}</span>
+					<span class="grow"></span>
+					{#if focusRow}<StopAgent row={focusRow} onStop={stopFocused} />{/if}
 				</div>
 				<div class="fmeta">
 					{#if life.model}<span>{shortModel(life.model)}</span>{/if}
@@ -521,6 +537,9 @@
 		gap: 7px;
 		font-size: var(--fs-md);
 		font-weight: 600;
+	}
+	.grow {
+		flex: 1;
 	}
 	.fres {
 		margin: 8px 0 0;

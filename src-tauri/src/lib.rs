@@ -603,6 +603,45 @@ fn write_config(patch: serde_json::Value) -> Result<(), String> {
     write_json(&path, &current)
 }
 
+/// The engine's shell hooks, `~/.lynshen/hooks.json`: `{}` when there is no
+/// file; a file that does not parse is an error (the page then offers no edit).
+#[tauri::command]
+fn read_hooks() -> Result<serde_json::Value, String> {
+    let value = read_json_strict(&lynshen_dir().join("hooks.json"))?;
+    if value.is_object() {
+        Ok(value)
+    } else {
+        Err("hooks.json 的内容不是 JSON 对象".to_string())
+    }
+}
+
+/// Replaces top-level keys of hooks.json (one list of `{command, tools?}` per
+/// hook event); every other key stays as it is. A file that does not parse is
+/// left alone (see `read_json_strict`).
+#[tauri::command]
+fn write_hooks(patch: serde_json::Value) -> Result<(), String> {
+    let path = lynshen_dir().join("hooks.json");
+    let next = merge_hooks(read_json_strict(&path)?, &patch)?;
+    write_json(&path, &next)
+}
+
+/// `current` with `patch`'s keys set; each value must be a list.
+fn merge_hooks(
+    mut current: serde_json::Value,
+    patch: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let (Some(cur), Some(patch)) = (current.as_object_mut(), patch.as_object()) else {
+        return Err("hooks.json 的内容不是 JSON 对象".to_string());
+    };
+    for (key, value) in patch {
+        if !value.is_array() {
+            return Err(format!("hooks.json 的 {key} 必须是列表"));
+        }
+        cur.insert(key.clone(), value.clone());
+    }
+    Ok(current)
+}
+
 /// App-data files owned by the desktop shell (workspaces / layout state).
 /// Confined to a plain file name directly under the per-app config dir —
 /// no separators, no dotfiles, so the frontend can't reach anything else.
@@ -3621,6 +3660,8 @@ pub fn run() {
             shell_env::refresh_shell_env,
             read_config,
             write_config,
+            read_hooks,
+            write_hooks,
             app_data_read,
             app_data_write,
             set_background_image,
@@ -4023,6 +4064,20 @@ mod tests {
         std::fs::write(&p, "   \n").unwrap();
         assert_eq!(read_json_strict(&p).unwrap(), serde_json::json!({}));
         let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn hooks_merge_sets_the_given_keys_only() {
+        let current =
+            serde_json::json!({ "stop": [{ "command": "say done" }], "task_completed": [] });
+        let patch = serde_json::json!({ "task_completed": [{ "command": "notify.sh" }] });
+        assert_eq!(
+            super::merge_hooks(current.clone(), &patch).unwrap(),
+            serde_json::json!({ "stop": [{ "command": "say done" }], "task_completed": [{ "command": "notify.sh" }] })
+        );
+        // Not a list, or a file that holds no object: nothing is written.
+        assert!(super::merge_hooks(current, &serde_json::json!({ "agent_idle": "x" })).is_err());
+        assert!(super::merge_hooks(serde_json::json!([]), &patch).is_err());
     }
 
     #[test]

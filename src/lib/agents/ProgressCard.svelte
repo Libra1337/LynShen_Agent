@@ -4,24 +4,30 @@
 	// team's tokens against its budget), the steps with their state and owner,
 	// and the subagents with their latest action, as the engines report them. Folds to a pill (the user's
 	// choice is kept per session) and folds by itself a few seconds after the
-	// turn is over; the pill stays until the next turn.
+	// turn is over; the pill stays until the next turn. A subagent still at
+	// work can be stopped; the team's panel (task board, messages) opens from
+	// the header.
 	import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
 	import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
+	import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 	import { t } from '$lib/i18n';
-	import { cardMode, pillParts, planShown, planSummary, shortPath, teamSummary, type AgentRow } from '$lib/agentProgress';
+	import { boardProgress, canStop, cardMode, pillParts, planShown, planSummary, shortPath, teamSummary, type AgentRow } from '$lib/agentProgress';
 	import { roleLabel, teamNote } from './teamText';
 	import type { ChatState } from '$lib/chat.svelte';
 	import { sheet } from '$lib/ui/motion';
 	import StateIcon from './StateIcon.svelte';
 	import Elapsed from './Elapsed.svelte';
+	import StopAgent from './StopAgent.svelte';
 
 	let {
 		chat,
 		sessionId,
 		rows,
-		onOpen
+		onOpen,
+		onStop,
+		onOpenTeam
 	}: {
 		chat: ChatState;
 		/** Keys the folded state. */
@@ -29,6 +35,10 @@
 		rows: AgentRow[];
 		/** Shows a subagent's own conversation (absent: rows are not links). */
 		onOpen?: (row: AgentRow) => void;
+		/** Stops a subagent still at work (close_agent). */
+		onStop?: (row: AgentRow) => void;
+		/** Opens the team's panel (task board, messages). */
+		onOpenTeam?: () => void;
 	} = $props();
 
 	const LINGER = 4000;
@@ -88,6 +98,7 @@
 	const summaryParts = $derived.by(() => {
 		const parts: { text: string; budget?: 'ok' | 'warn' | 'over' }[] = [];
 		if (summary.steps) parts.push({ text: t('chat.progress.stepsDone', summary.steps) });
+		if (chat.taskBoard?.length) parts.push({ text: t('chat.progress.tasksDone', boardProgress(chat.taskBoard)) });
 		if (summary.running) parts.push({ text: t('chat.progress.runningAgentsN', { n: summary.running }) });
 		else if (summary.agents) parts.push({ text: t('chat.progress.agentsN', { n: summary.agents }) });
 		if (summary.budget)
@@ -121,6 +132,9 @@
 		<header>
 			<span class="title">{t('chat.progress.label')}</span>
 			<span class="grow"></span>
+			{#if onOpenTeam}
+				<button class="fold" onclick={onOpenTeam} aria-label={t('chat.progress.openTeam')} title={t('chat.progress.openTeam')}><UsersThreeIcon size={14} /></button>
+			{/if}
 			<button class="fold" onclick={fold} aria-label={t('chat.progress.fold')} title={t('chat.progress.fold')}><CaretUpIcon size={14} /></button>
 		</header>
 		{#if summaryParts.length}
@@ -162,7 +176,7 @@
 				<div class="sec">{t('chat.progress.agents')}<span class="num">{rows.length}</span></div>
 				<ul class="agents">
 					{#each rows as r (r.id)}
-						<li>
+						<li class="arow">
 							<button
 								class="agent"
 								disabled={!onOpen}
@@ -175,6 +189,8 @@
 									<span class="aline">
 										<span class="aname">{r.label}</span>
 										{#if r.role}<span class="arole" title={t('chat.team.roleTitle', { role: r.role })}>{roleLabel(r.role)}</span>{/if}
+										{#if r.background}<span class="arole" title={t('chat.team.backgroundTitle')}>{t('chat.team.background')}</span>{/if}
+										{#if r.attempt}<span class="amodel num">#{r.attempt}</span>{/if}
 										{#if r.model}<span class="amodel">{r.model.replace(/^claude-/, '')}</span>{/if}
 										{#if r.progress}<span class="amodel num">{r.progress.done}/{r.progress.total}</span>{/if}
 										<span class="grow"></span>
@@ -182,8 +198,9 @@
 									</span>
 									<span class="act" class:err={r.state === 'failed'} class:warn={!!teamNote(r)}>{activityOf(r) || t('chat.progress.noActivity')}</span>
 								</span>
-								{#if onOpen}<span class="go"><CaretRightIcon size={12} /></span>{/if}
+								{#if onOpen && !(onStop && (r.stopping || canStop(r)))}<span class="go"><CaretRightIcon size={12} /></span>{/if}
 							</button>
+							{#if onStop && (r.stopping || canStop(r))}<span class="stop" class:held={r.stopping}><StopAgent row={r} {onStop} size="xs" /></span>{/if}
 						</li>
 					{/each}
 				</ul>
@@ -372,11 +389,31 @@
 		background: color-mix(in oklab, var(--text) 8%, transparent);
 		color: var(--text);
 	}
+	.arow {
+		display: flex;
+		align-items: flex-start;
+		gap: 2px;
+	}
+	/* The stop button shows on hover and keyboard focus. */
+	.stop {
+		display: inline-flex;
+		flex: none;
+		margin-top: 5px;
+		opacity: 0;
+		transition: opacity var(--t-fast) var(--ease-out);
+	}
+	.arow:hover .stop,
+	.arow:focus-within .stop,
+	.stop.held {
+		opacity: 1;
+	}
 	.agent {
 		display: flex;
+		flex: 1;
 		align-items: flex-start;
 		gap: 8px;
 		width: 100%;
+		min-width: 0;
 		padding: 6px 8px;
 		border: none;
 		border-radius: var(--r-md);
