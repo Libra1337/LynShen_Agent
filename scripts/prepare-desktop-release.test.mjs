@@ -47,3 +47,22 @@ test('rejects changed signatures and unsafe artifact paths', () => fixture(({ as
   assert.throws(() => prepareRelease(assets, output, 'https://www.lynshen.org'));
   assert.throws(() => prepareRelease(assets, output, 'http://www.lynshen.org'), /HTTPS/);
 }));
+test('offers the Linux installers when the release carries them', () => fixture(({ assets, output, manifest, save }) => {
+  for (const [platform, name] of Object.entries({
+    'linux-x86_64-appimage': 'LynShen_1.2.3_amd64.AppImage',
+    'linux-x86_64-deb': 'LynShen_1.2.3_amd64.deb',
+    'linux-x86_64-rpm': 'LynShen-1.2.3-1.x86_64.rpm',
+  })) {
+    writeFileSync(path.join(assets, name), 'linux');
+    writeFileSync(path.join(assets, name + '.sig'), 'signature\n');
+    manifest.platforms[platform] = { url: `https://github.com/example/releases/download/v1.2.3/${name}`, signature: 'signature' };
+  }
+  save();
+  const catalog = prepareRelease(assets, output, 'https://www.lynshen.org');
+  assert.deepEqual(Object.keys(catalog.platforms), ['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64', 'linux-x86_64-appimage', 'linux-x86_64-deb', 'linux-x86_64-rpm']);
+  assert.equal(catalog.platforms['linux-x86_64-rpm'].url, '/v1/public/releases/desktop/1.2.3/LynShen-1.2.3-1.x86_64.rpm');
+  assert.match(catalog.platforms['linux-x86_64-appimage'].sha256, /^[a-f0-9]{64}$/);
+}));
+test('leaves Linux out of the catalog when the release has none', () => fixture(({ assets, output }) => {
+  assert.equal('linux-x86_64-deb' in prepareRelease(assets, output, 'https://www.lynshen.org').platforms, false);
+}));

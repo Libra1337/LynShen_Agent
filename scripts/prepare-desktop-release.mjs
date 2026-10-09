@@ -3,7 +3,19 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFi
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export function prepareRelease(assets, output, origin, required = ['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64']) {
+// The installer the download page offers per platform, by file name.
+const INSTALLERS = {
+  'windows-x86_64': (name, version) => name.endsWith(`_${version}_x64-setup.exe`),
+  'darwin-aarch64': (name, version) => name.endsWith(`_${version}_aarch64.dmg`),
+  'darwin-x86_64': (name, version) => name.endsWith(`_${version}_x64.dmg`),
+  'linux-x86_64-appimage': (name, version) => name.endsWith(`_${version}_amd64.AppImage`),
+  'linux-x86_64-deb': (name, version) => name.endsWith(`_${version}_amd64.deb`),
+  'linux-x86_64-rpm': (name, version) => name.endsWith(`-${version}-1.x86_64.rpm`),
+};
+// Linux installers join the catalog when the release carries them.
+const LINUX = ['linux-x86_64-appimage', 'linux-x86_64-deb', 'linux-x86_64-rpm'];
+
+export function prepareRelease(assets, output, origin, required = ['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64'], optional = LINUX) {
   const base = new URL(origin);
   if (base.protocol !== 'https:' || base.username || base.password || base.pathname !== '/' || base.search || base.hash) {
     throw new Error('Public origin must be an HTTPS origin without a path or credentials');
@@ -36,9 +48,9 @@ export function prepareRelease(assets, output, origin, required = ['windows-x86_
     local(`${name}.sig`);
   }
   const catalog = { version: manifest.version, platforms: {} };
-  for (const platform of required) {
-    const suffix = { 'windows-x86_64': '_x64-setup.exe', 'darwin-aarch64': '_aarch64.dmg', 'darwin-x86_64': '_x64.dmg' }[platform];
-    const matches = files.filter(name => name.endsWith(suffix) && name.includes(`_${manifest.version}_`));
+  const offered = [...required, ...optional.filter(platform => manifest.platforms[platform])];
+  for (const platform of offered) {
+    const matches = files.filter(name => INSTALLERS[platform](name, manifest.version));
     if (matches.length !== 1) throw new Error(`Expected one installer for ${platform}, got ${matches.length}`);
     const name = matches[0];
     catalog.platforms[platform] = {
@@ -59,5 +71,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   const [assets, output, origin, platform] = process.argv.slice(2);
   if (!assets || !output || !origin) throw new Error('Usage: node scripts/prepare-desktop-release.mjs <assets> <output> <https-origin>');
   if (platform && platform !== '--windows-only') throw new Error('Unknown platform option');
-  console.log(JSON.stringify(prepareRelease(assets, output, origin, platform ? ['windows-x86_64'] : undefined)));
+  console.log(JSON.stringify(platform ? prepareRelease(assets, output, origin, ['windows-x86_64'], []) : prepareRelease(assets, output, origin)));
 }
