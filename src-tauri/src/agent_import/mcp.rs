@@ -7,7 +7,9 @@
 //! and its enabled plugins; opencode's `opencode.json(c)` (`mcp`); zcode's
 //! config and plugins; omp's `~/.omp/agent/mcp.json`. A server LynShen could
 //! not start as written is left out: an SSE endpoint, a command relative to
-//! the tool's own folder, or a `${…}` placeholder only its app fills in.
+//! the tool's own folder, a `${…}` placeholder only its app fills in, or a
+//! program inside an app bundle (ChatGPT's node_repl and cua_repl talk to
+//! that app's own services and fail outside it).
 
 use super::{codex_config, plugins, Roots};
 use serde::Serialize;
@@ -173,6 +175,11 @@ fn entry(name: &str, mut raw: Raw, plugin: Option<&Path>) -> Option<Value> {
         let command = raw.command?;
         // Relative to the tool's own folder (`./bin/server`): not found from here.
         if command.starts_with("./") || command.starts_with("../") || command.starts_with(".\\") {
+            return None;
+        }
+        // Part of an app (`/Applications/ChatGPT.app/Contents/…`): it runs
+        // against that app's own services, not as a server of its own.
+        if std::iter::once(&command).chain(&raw.args).any(|part| part.contains(".app/Contents/")) {
             return None;
         }
         Some(json!({
@@ -378,6 +385,7 @@ mod tests {
             "[mcp_servers.node_repl]\ncommand = \"/bin/node_repl\"\nargs = []\ntool_timeout_sec = 120\n\
              [mcp_servers.node_repl.env]\nA = \"1\"\n\
              [mcp_servers.computer-use]\ntype = \"stdio\"\ncommand = \"./App.app/client\"\nenabled = false\n\
+             [mcp_servers.chatgpt_repl]\ncommand = \"/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl\"\n\
              [mcp_servers.remote]\nurl = \"https://r.example.com/mcp\"\nenabled = false\n\
              [plugins.\"notion@curated\"]\nenabled = true\n",
         );
@@ -424,7 +432,7 @@ mod tests {
                 ("zcode", "android"),
                 ("omp", "gh"),
             ],
-            "SSE, unfilled placeholders and folder-relative commands are left out; a name set again for a project is offered once"
+            "SSE, unfilled placeholders, folder-relative commands and app internals are left out; a name set again for a project is offered once"
         );
         let files = by("claude", "files");
         assert!(files.present);
