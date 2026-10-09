@@ -64,6 +64,7 @@
 	import { browser } from '$lib/browser.svelte';
 	import { prefs } from '$lib/prefs.svelte';
 	import { t } from '$lib/i18n';
+	import { shortcutLabel } from '$lib/shortcuts';
 	import type { SessionStore } from '$lib/session.svelte';
 	import type { Session } from '$lib/types';
 	import { editorStore } from '$lib/editor/editorStore.svelte';
@@ -1261,7 +1262,7 @@
 				<div class="welcome-hints">
 					<span><kbd>/</kbd> {t('shell.hintCommand')}</span>
 					<span><kbd>@</kbd> {t('shell.hintRef')}</span>
-					<span><kbd>⌘K</kbd> {t('shell.hintPalette')}</span>
+					{#if shortcutLabel('palette')}<span><kbd>{shortcutLabel('palette')}</kbd> {t('shell.hintPalette')}</span>{/if}
 					<span>{t('shell.hintImage')}</span>
 				</div>
 			</div>

@@ -68,7 +68,29 @@ const settings = {
 			acp: '外部智能体（ACP）',
 			daemon: '远程访问',
 			updates: '更新',
-			import: '导入'
+			import: '导入',
+			shortcuts: '快捷键'
+		},
+		shortcuts: {
+			customize: '自定义快捷键',
+			hint: '点击一个快捷键，再按下新的组合。Esc 取消，Delete 清除。',
+			resetAll: '恢复全部默认',
+			reset: '恢复默认（{keys}）',
+			record: '修改「{name}」的快捷键，当前为 {keys}',
+			recording: '按下新的组合…',
+			none: '未设置',
+			modifier: '这个键需要配合 {mods} 使用',
+			modsMac: '⌘ 或 ⌃',
+			modsOther: 'Ctrl',
+			key: '这个键不能用作快捷键',
+			reserved: '系统或文字编辑在使用这个组合',
+			digits: '按住修饰键，再按 1 到 9 中的任一数字',
+			required: '这一项必须有快捷键',
+			conflict: '「{name}」已在使用 {keys}。',
+			swapTo: '交换后「{name}」改用 {keys}。',
+			swapToNone: '交换后「{name}」没有快捷键。',
+			noSwap: '先给「{name}」换一个快捷键。',
+			swap: '交换'
 		},
 		page: {
 			back: '返回',
@@ -541,7 +563,29 @@ const settings = {
 			acp: 'External agents (ACP)',
 			daemon: 'Remote access',
 			updates: 'Updates',
-			import: 'Import'
+			import: 'Import',
+			shortcuts: 'Shortcuts'
+		},
+		shortcuts: {
+			customize: 'Custom shortcuts',
+			hint: 'Click a shortcut, then press the new keys. Esc cancels, Delete clears.',
+			resetAll: 'Restore all defaults',
+			reset: 'Restore default ({keys})',
+			record: 'Change the shortcut for {name}, now {keys}',
+			recording: 'Press the new keys…',
+			none: 'None',
+			modifier: 'Use this key with {mods}',
+			modsMac: '⌘ or ⌃',
+			modsOther: 'Ctrl',
+			key: 'This key cannot be a shortcut',
+			reserved: 'The system or text editing uses this combination',
+			digits: 'Hold the modifier keys and press a digit from 1 to 9',
+			required: 'This action needs a shortcut',
+			conflict: '{name} already uses {keys}.',
+			swapTo: 'After the swap, {name} uses {keys}.',
+			swapToNone: 'After the swap, {name} has no shortcut.',
+			noSwap: 'Change the shortcut for {name} first.',
+			swap: 'Swap'
 		},
 		page: {
 			back: 'Back',

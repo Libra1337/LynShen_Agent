@@ -14,6 +14,7 @@
 	import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
 	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 	import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
+	import KeyboardIcon from 'phosphor-svelte/lib/KeyboardIcon';
 	import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 	import ChartBarIcon from 'phosphor-svelte/lib/ChartBarIcon';
 	import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
@@ -92,6 +93,7 @@
 	import DaemonSection from './DaemonSection.svelte';
 	import McpSection from './McpSection.svelte';
 	import ImportSection from './ImportSection.svelte';
+	import ShortcutsSection from './ShortcutsSection.svelte';
 	import PermissionRulesSection from './PermissionRulesSection.svelte';
 	import UpdateCard from './UpdateCard.svelte';
 	import ThirdPartyNotices from './ThirdPartyNotices.svelte';
@@ -134,6 +136,7 @@
 
 	const ICONS: Record<SectionKey, typeof GearSixIcon> = {
 		general: GearSixIcon,
+		shortcuts: KeyboardIcon,
 		account: UserCircleIcon,
 		usage: ChartBarIcon,
 		voice: MicrophoneIcon,
@@ -964,6 +967,8 @@
 							<Switch checked={prefs.telemetry} label={t('settings.help.telemetry')} onChange={(on) => prefs.setTelemetry(on)} />
 						</SettingsRow>
 					</SettingsSection>
+				{:else if current === 'shortcuts'}
+					<ShortcutsSection />
 				{:else if current === 'account'}
 					{@render loginNotice()}
 					<!-- 账户区：登录/余额/模型广场全部走 Monoize 网关（LynShen Console），

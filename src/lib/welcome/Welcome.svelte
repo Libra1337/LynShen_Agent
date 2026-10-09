@@ -155,7 +155,7 @@
 		{ label: t('setup.welcome.basics.newSession'), key: shortcutLabel('newSession') },
 		{ label: t('setup.welcome.basics.slash'), key: '/' },
 		{ label: t('setup.welcome.basics.mention'), key: '@' }
-	]);
+	].filter((k) => k.key));
 	const themeOpts = $derived([
 		{ value: 'system', label: t('settings.themeSystem') },
 		{ value: 'light', label: t('settings.themeLight') },
@@ -267,7 +267,7 @@
 										<div><dt>{k.label}</dt><dd><kbd>{k.key}</kbd></dd></div>
 									{/each}
 								</dl>
-								<p class="more">{t('setup.welcome.basics.all')} <kbd>{shortcutLabel('shortcuts')}</kbd></p>
+								{#if shortcutLabel('shortcuts')}<p class="more">{t('setup.welcome.basics.all')} <kbd>{shortcutLabel('shortcuts')}</kbd></p>{/if}
 							{/if}
 
 
