@@ -48,6 +48,8 @@ type PrefsShape = {
 	/** This machine's switch for agent team v2 (Beta); the engine gets it
 	 *  together with LynShen's remote switch (agents/teamSwitch.svelte.ts). */
 	teamV2: boolean;
+	/** Sending a message scrolls the conversation to its end. */
+	scrollOnSend: boolean;
 };
 
 export const BACKGROUND_STRENGTHS = ['faint', 'medium', 'strong'] as const;
@@ -71,7 +73,8 @@ const DEFAULTS: PrefsShape = {
 	backgroundStrength: 'medium',
 	backgroundStamp: 0,
 	glass: 40,
-	teamV2: true
+	teamV2: true,
+	scrollOnSend: true
 };
 
 /** A glass level within 0–100 (whole numbers); anything else is the default. */
@@ -159,6 +162,7 @@ class PrefsStore {
 	backgroundStamp = $state(DEFAULTS.backgroundStamp);
 	glass = $state(DEFAULTS.glass);
 	teamV2 = $state(DEFAULTS.teamV2);
+	scrollOnSend = $state(DEFAULTS.scrollOnSend);
 
 	init() {
 		const p = load();
@@ -179,6 +183,7 @@ class PrefsStore {
 		this.backgroundStamp = Number.isFinite(p.backgroundStamp) ? p.backgroundStamp : 0;
 		this.glass = glassLevel(p.glass);
 		this.teamV2 = p.teamV2 !== false;
+		this.scrollOnSend = p.scrollOnSend !== false;
 		this.#applyVibrancy();
 		this.#applyBackground();
 		// Asking the system for less transparency turns the glass solid.
@@ -213,7 +218,8 @@ class PrefsStore {
 					backgroundStrength: this.backgroundStrength,
 					backgroundStamp: this.backgroundStamp,
 					glass: this.glass,
-					teamV2: this.teamV2
+					teamV2: this.teamV2,
+					scrollOnSend: this.scrollOnSend
 				})
 			);
 		} catch {
@@ -308,6 +314,11 @@ class PrefsStore {
 
 	setCacheMissAlert(v: boolean) {
 		this.cacheMissAlert = v;
+		this.#save();
+	}
+
+	setScrollOnSend(v: boolean) {
+		this.scrollOnSend = v;
 		this.#save();
 	}
 
