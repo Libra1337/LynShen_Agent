@@ -305,9 +305,32 @@
 		window.addEventListener('pointercancel', end);
 		window.addEventListener('selectstart', noSelect);
 	}
-	// Collapsing closes the session filter (the rail has no room for it).
+	// Collapsed, the rail opens the whole sidebar over the canvas while the
+	// pointer rests on it (or focus is in it), so the conversations stay in
+	// reach without expanding the layout; it folds back once the pointer
+	// leaves or a conversation is picked.
+	const PEEK_OPEN_MS = 160;
+	const PEEK_CLOSE_MS = 280;
+	let peek = $state(false);
+	let peekTimer: ReturnType<typeof setTimeout> | undefined;
+	function peekLater(open: boolean) {
+		clearTimeout(peekTimer);
+		if (!railed || resizing || open === peek) return;
+		peekTimer = setTimeout(() => (peek = open), open ? PEEK_OPEN_MS : PEEK_CLOSE_MS);
+	}
+	function endPeek() {
+		clearTimeout(peekTimer);
+		peek = false;
+	}
 	$effect(() => {
-		if (railed && searchOpen) {
+		if (!railed) endPeek();
+	});
+	/** The labels and lists are hidden: collapsed and not peeking. */
+	const folded = $derived(railed && !peek);
+
+	// Folding closes the session filter (the rail has no room for it).
+	$effect(() => {
+		if (folded && searchOpen) {
 			searchQuery = '';
 			searchOpen = false;
 		}
@@ -320,9 +343,17 @@
 <aside
 	class="sidebar"
 	class:resizing
-	class:collapsed={railed}
+	class:railed
+	class:peek
+	class:collapsed={folded}
 	style:width="{railed ? SIDEBAR_RAIL_WIDTH : width}px"
 	style:--rail-w="{SIDEBAR_RAIL_WIDTH}px"
+	onpointerenter={() => peekLater(true)}
+	onpointerleave={() => peekLater(false)}
+	onfocusin={() => peekLater(true)}
+	onfocusout={(e) => {
+		if (!e.currentTarget.contains(e.relatedTarget as Node | null)) peekLater(false);
+	}}
 >
 <div class="sb-inner" style:width="{width}px">
 	<!-- Header: the logo and wordmark, or the session filter in its place
@@ -344,7 +375,7 @@
 		{:else}
 			<span class="logo" aria-hidden="true"><span class="mark">{@html mark}</span></span>
 		{/if}
-		<div class="brand-rest" inert={railed}>
+		<div class="brand-rest" inert={folded}>
 			{#if searchOpen}
 				<input
 					class="filter"
@@ -363,18 +394,18 @@
 	</div>
 
 	<nav class="primary">
-		<button class="row" onclick={newHere} aria-label={t('shell.newChat')} data-tip={railed ? t('shell.newChat') : undefined} data-tip-side="right">
+		<button class="row" onclick={() => (newHere(), endPeek())} aria-label={t('shell.newChat')} data-tip={folded ? t('shell.newChat') : undefined} data-tip-side="right">
 			<NotePencilIcon size={18} /><span class="label">{t('shell.newChat')}</span>
 		</button>
-		<button class="row" class:on={homeOpen} onclick={onHome} aria-label={t('shell.home.title')} data-tip={railed ? t('shell.home.title') : undefined} data-tip-side="right">
+		<button class="row" class:on={homeOpen} onclick={() => (onHome(), endPeek())} aria-label={t('shell.home.title')} data-tip={folded ? t('shell.home.title') : undefined} data-tip-side="right">
 			<HouseIcon size={18} weight={homeOpen ? 'fill' : 'regular'} /><span class="label">{t('shell.home.title')}</span>
 		</button>
 		{#if agentsStatus !== 'off'}
 			<button
 				class="row"
-				onclick={onDesk}
+				onclick={() => (onDesk(), endPeek())}
 				aria-label={pendingCount > 0 ? `${t('shell.desk.title')} · ${pendingCount}` : t('shell.desk.title')}
-				data-tip={railed ? (pendingCount > 0 ? `${t('shell.desk.title')} · ${pendingCount}` : t('shell.desk.title')) : undefined}
+				data-tip={folded ? (pendingCount > 0 ? `${t('shell.desk.title')} · ${pendingCount}` : t('shell.desk.title')) : undefined}
 				data-tip-side="right"
 			>
 				<TrayIcon size={18} /><span class="label">{t('shell.desk.title')}</span>
@@ -404,7 +435,7 @@
 			data-group={p ? `${p.id}:${s.pinned ? 'pin' : ''}` : undefined}
 			aria-pressed={selectable ? picked.includes(s.id) : undefined}
 			onpointerdown={(e) => p && rowDown(e, p, s)}
-			onclick={() => (selectable ? togglePick(s.id) : onSelect(s.id))}
+			onclick={() => (selectable ? togglePick(s.id) : (onSelect(s.id), endPeek()))}
 			oncontextmenu={(e) => onSessionMenu(s.id, e)}
 		>
 			{#if selectable}
@@ -530,7 +561,7 @@
 		{/if}
 	{/snippet}
 
-	<div class="list" class:dragging={drag?.live} bind:this={listEl} inert={railed}>
+	<div class="list" class:dragging={drag?.live} bind:this={listEl} inert={folded}>
 		<!-- Agents: long-lived workers of the local daemon. -->
 		<!-- Shown only while there are agents: they are no longer created here. -->
 		{#if agents.length}
@@ -660,7 +691,7 @@
 			{/each}
 		</section>
 	</div>
-	<SidebarFooter {...footer} collapsed={railed} />
+	<SidebarFooter {...footer} collapsed={folded} />
 
 </div>
 </aside>
@@ -684,6 +715,33 @@
 		flex-direction: column;
 		flex-shrink: 0;
 		min-height: 0;
+	}
+	/* Collapsed, the panel stays the rail's width and the content clips
+	   itself to the rail; peeking opens the clip, so the whole sidebar floats
+	   over the canvas (which does not move) and slides open from the rail. */
+	.sidebar.railed {
+		position: relative;
+		z-index: 40;
+		overflow: visible;
+		contain: none;
+	}
+	.sidebar.railed .sb-inner {
+		clip-path: inset(0 calc(100% - var(--rail-w)) 0 0);
+		transition:
+			clip-path var(--t-base) var(--ease-out),
+			box-shadow var(--t-base) var(--ease-out);
+	}
+	.sidebar.peek .sb-inner {
+		/* Past the right edge, so the shadow shows. */
+		clip-path: inset(0 -48px 0 0);
+		background: var(--sidebar);
+		border-right: 1px solid var(--border);
+		box-shadow: 0 18px 48px -12px rgb(0 0 0 / 0.28);
+	}
+	:global(:root[data-glass]) .sidebar.peek .sb-inner {
+		background: color-mix(in oklab, var(--sidebar) 86%, transparent);
+		-webkit-backdrop-filter: var(--glass-filter);
+		backdrop-filter: var(--glass-filter);
 	}
 	.sidebar.resizing {
 		transition: none;
