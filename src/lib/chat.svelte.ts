@@ -1257,7 +1257,7 @@ export class ChatState {
 			...prev,
 			status: prev?.status ?? (str(out.status) || 'running'),
 			message: prev?.message ?? '',
-			label: prev?.label ?? (str(out.task_name) || undefined),
+			label: prev?.label ?? (str(out.nickname) || str(out.task_name) || undefined),
 			toolUseId: prev?.toolUseId ?? callId,
 			startedAt: prev?.startedAt ?? Date.now()
 		};

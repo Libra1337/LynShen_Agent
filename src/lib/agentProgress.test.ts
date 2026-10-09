@@ -165,6 +165,8 @@ describe('spawn and wait payloads', () => {
 		expect(spawnPayload('{"task_name":"scan","path":"/root/scan","status":"running"}')).toEqual({ name: 'scan', task: '', path: '/root/scan' });
 		expect(spawnPayload('{"description":"Scan auth","prompt":"Find the bug"}')).toMatchObject({ name: 'Scan auth', task: 'Find the bug' });
 		expect(spawnPayload('not json')).toEqual({ name: '', task: '', path: '' });
+		// LynShen names its agents: the nickname is what the card shows.
+		expect(spawnPayload('{"task_name":"starcore_ui","nickname":"青岚","path":"/root/starcore_ui"}').name).toBe('青岚');
 	});
 
 	it('reads which agents a wait names and their states', () => {

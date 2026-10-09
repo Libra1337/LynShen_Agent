@@ -317,7 +317,7 @@ export function spawnPayload(output: string): { name: string; task: string; path
 	const o = parse(output);
 	const s = (k: string) => (typeof o?.[k] === 'string' ? (o[k] as string) : '');
 	return {
-		name: s('description') || s('task_name') || s('name'),
+		name: s('nickname') || s('description') || s('task_name') || s('name'),
 		task: s('prompt') || s('message') || s('task'),
 		path: s('path')
 	};
