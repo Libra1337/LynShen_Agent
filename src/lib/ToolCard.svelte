@@ -13,7 +13,10 @@
 		running,
 		isError,
 		subagent = '',
-		trace
+		trace,
+		heading,
+		badge,
+		sections
 	}: {
 		name: string;
 		output: string;
@@ -23,6 +26,14 @@
 		subagent?: string;
 		/** An Agent / Workflow call: opens what it ran in the agent trace. */
 		trace?: { label: string; run: () => void };
+		/** Names the call instead of its verb and target (send_to_session:
+		 *  the conversation it wrote to). */
+		heading?: string;
+		/** Where what the call started is now, after the heading (`ok`: done). */
+		badge?: { label: string; tone?: 'ok' };
+		/** What the call's body shows instead of its output, one titled text
+		 *  each (none: the card does not open). */
+		sections?: { label: string; text: string }[];
 	} = $props();
 
 	// Auto-expand while the tool runs, auto-collapse once it finishes. Starts in
@@ -108,8 +119,9 @@
 	const fmtBytes = (n: number) =>
 		n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`;
 
-	// Read cards stay a single line — the header names the file; the contents add noise.
-	const isRead = $derived(name === 'read' && !errorText);
+	// Read cards stay a single line — the header names the file; the contents add
+	// noise. So does a card given nothing to show.
+	const isRead = $derived((name === 'read' || (!!sections && !sections.length && !isError)) && !errorText);
 
 	// Only render inline images for a whitelist of raster MIME types. SVG is
 	// deliberately excluded: it can embed <script> and run in a data: URL.
@@ -133,8 +145,13 @@
 <div class="tool" class:err={isError || !!errorText}>
 	<button class="head" class:static={isRead} onclick={() => !isRead && (collapsed = !collapsed)}>
 		<span class="ico"><Icon size={14} /></span>
-		<span class="verb">{verb}</span>
-		{#if target}<span class="target">{target}</span>{/if}
+		{#if heading}
+			<span class="verb heading">{heading}</span>
+		{:else}
+			<span class="verb">{verb}</span>
+			{#if target}<span class="target">{target}</span>{/if}
+		{/if}
+		{#if badge}<span class="badge" class:ok={badge.tone === 'ok'}>{badge.label}</span>{/if}
 		{#if subagent}<span class="by" title={t('chat.bySubagent', { name: subagent })}>{subagent}</span>{/if}
 		{#if exitCode !== null && exitCode !== 0}
 			<span class="exit bad">exit {exitCode}</span>
@@ -160,6 +177,13 @@
 			<div class="body">
 				{#if errorText}
 					<div class="err-text"><Notice mono>{errorText}</Notice></div>
+				{:else if sections}
+					{#each sections as sec, i (i)}
+						<div class="sec">
+							{#if sec.label}<div class="sec-label">{sec.label}</div>{/if}
+							<div class="sec-text">{sec.text}</div>
+						</div>
+					{/each}
 				{:else if !parsed}
 					{#if output}<pre>{output}</pre>{/if}
 				{:else if imageSrc}
@@ -290,6 +314,43 @@
 	}
 	.body {
 		margin: 2px 0 6px 20px;
+	}
+	.heading {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		flex-shrink: 1;
+	}
+	.badge {
+		font-size: var(--fs-2xs);
+		color: var(--dim);
+		background: var(--surface2);
+		border-radius: var(--r-full);
+		padding: 0 7px;
+		flex-shrink: 0;
+	}
+	.badge.ok {
+		color: var(--ok);
+	}
+	.sec {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 4px 0;
+	}
+	.sec-label {
+		font-size: var(--fs-2xs);
+		color: var(--dim2);
+	}
+	.sec-text {
+		max-height: 320px;
+		overflow: auto;
+		color: var(--dim);
+		font-size: var(--fs-sm);
+		line-height: 1.6;
+		white-space: pre-wrap;
+		word-break: break-word;
 	}
 	.partial {
 		font-size: var(--fs-2xs);

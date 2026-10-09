@@ -94,6 +94,7 @@ export const ROWS: SearchRow[] = [
 	{ section: 'agents', id: 'backend-list', titleKey: 'settings.section.agents' },
 	{ section: 'agents', id: 'dependencies', titleKey: 'setup.deps.title' },
 	{ section: 'team', id: 'team-fanout', titleKey: 'settings.team.fanout', descKey: 'settings.team.fanoutHint.plan' },
+	{ section: 'team', id: 'team-messages', titleKey: 'settings.team.messages', descKey: 'settings.team.messagesHint.on' },
 	{ section: 'team', id: 'team-wake', titleKey: 'settings.team.wakeOnResult', descKey: 'settings.team.wakeOnResultHint' },
 	{ section: 'team', id: 'team-review', titleKey: 'settings.team.reviewOnComplete', descKey: 'settings.team.reviewOnCompleteHint' },
 	{ section: 'team', id: 'team-max-live', titleKey: 'settings.team.maxLive', descKey: 'settings.team.maxLiveHint' },

@@ -16,14 +16,22 @@ export interface SubagentResult {
 const BLOCK = /<subagent_result\b([^>]*)>([\s\S]*?)(?:<\/subagent_result>|$)/g;
 const ATTR = /([A-Za-z_][\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
 
+/** The attributes of a mark's opening tag (`path="…"`, `path='…'` or
+ *  `path=…`), by lowercase name. Shared with the marks other turns carry
+ *  (sessions/sessionMessage.ts). */
+export function markAttrs(raw: string): Record<string, string> {
+	const attrs: Record<string, string> = {};
+	for (const a of raw.matchAll(ATTR)) attrs[a[1]!.toLowerCase()] = a[2] ?? a[3] ?? a[4] ?? '';
+	return attrs;
+}
+
 export function parseSubagentResult(text: string): SubagentResult | null {
 	if (!/^\s*<subagent_result\b/.test(text)) return null;
 	const paths: string[] = [];
 	const bodies: string[] = [];
 	let failed = false;
 	for (const m of text.matchAll(BLOCK)) {
-		const attrs: Record<string, string> = {};
-		for (const a of m[1]!.matchAll(ATTR)) attrs[a[1]!.toLowerCase()] = a[2] ?? a[3] ?? a[4] ?? '';
+		const attrs = markAttrs(m[1]!);
 		if (attrs.path && !paths.includes(attrs.path)) paths.push(attrs.path);
 		if (/^(failed|errored|error)$/i.test(attrs.status ?? '')) failed = true;
 		const body = m[2]!.trim();
