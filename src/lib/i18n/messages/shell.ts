@@ -785,6 +785,7 @@ const shell = {
 			windowHint: '右侧填写上下文窗口，可写 272k、1m。留空则使用网关的值。',
 			windowUnset: '未设置',
 			windowMax: '最大 {max}',
+			windowOfTotal: '共 {total}',
 			windowInvalid: '{model} 的窗口格式不对，可写 272000、272k 或 1m',
 			windowTooLarge: '{model} 的窗口不能超过 {max}'
 		},
@@ -1711,6 +1712,7 @@ const shell = {
 			windowHint: 'Set a context window on the right, e.g. 272k or 1m. Leave empty to use the gateway value.',
 			windowUnset: 'Not set',
 			windowMax: 'Max {max}',
+			windowOfTotal: 'of {total}',
 			windowInvalid: 'Invalid window for {model}; use 272000, 272k or 1m',
 			windowTooLarge: 'The window for {model} cannot exceed {max}'
 		},

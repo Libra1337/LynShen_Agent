@@ -190,6 +190,10 @@
 							</Checkbox>
 							{#if max > (m.context_window ?? 0) && m.context_window}
 								<span class="ctx">{t('shell.modelSetup.windowMax', { max: fmtContext(max) })}</span>
+							{:else if (m.context_total ?? 0) > (m.context_window ?? 0) && m.context_window}
+								<!-- The gateway registers a smaller input limit than the model's
+								     whole context (glm-5.3: 128K of 1M): name both. -->
+								<span class="ctx">{t('shell.modelSetup.windowOfTotal', { total: fmtContext(m.context_total) })}</span>
 							{/if}
 							<input
 								class="win"

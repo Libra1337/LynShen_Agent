@@ -410,6 +410,9 @@ export type LynShenModel = {
 	context_window?: number;
 	/** Largest; the user may raise their window up to this. */
 	max_context_window?: number;
+	/** Input and output together, when the gateway records it; the window
+	 *  above is the input part and can be far smaller. */
+	context_total?: number;
 	max_output_tokens?: number;
 	reasoning_efforts?: string[];
 	/** What the model is called for people; absent: the id. */
