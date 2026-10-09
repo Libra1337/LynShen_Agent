@@ -2346,24 +2346,39 @@ fn walk_files(root: &Path, dir: &Path, out: &mut Vec<String>) {
 }
 
 /// Resolves a relative file path a reply names. Agents write paths relative to
-/// the directory they worked in, which in a multi-repo project is often a nested
-/// repo rather than the project root: try `root/rel` first, then `dir/rel` for
-/// every directory up to REF_DEPTH below the root, and answer only when exactly
-/// one file matches.
+/// the directory they worked in, which is often below the project root (a
+/// nested repo, the folder the reply just named): try `root/rel` first, then
+/// `hint/rel` for each directory the reply mentions (`hints`, in order), then
+/// `dir/rel` for every directory up to REF_DEPTH below the root. Of several
+/// matches the most recently modified wins: the file the agent just wrote,
+/// not an older one of the same name (`index.html` in two games).
 #[tauri::command]
-fn resolve_file_ref(root: String, rel: String) -> Option<String> {
+fn resolve_file_ref(root: String, rel: String, hints: Option<Vec<String>>) -> Option<String> {
     let root = PathBuf::from(root).canonicalize().ok()?;
     let rel = Path::new(&rel);
+    let inside = |path: PathBuf| {
+        path.canonicalize()
+            .ok()
+            .filter(|p| p.is_file() && p.starts_with(&root))
+    };
     let direct = root.join(rel);
     if direct.is_file() {
         return Some(ui_path(&direct));
     }
+    for hint in hints.unwrap_or_default() {
+        let dir = Path::new(hint.trim());
+        let dir = if dir.is_absolute() { dir.to_path_buf() } else { root.join(dir) };
+        if let Some(found) = inside(dir.join(rel)) {
+            return Some(ui_path(&found));
+        }
+    }
     let mut found = Vec::new();
     find_ref(&root, rel, 0, &mut found);
-    match found.as_slice() {
-        [one] => one.canonicalize().ok().filter(|p| p.starts_with(&root)).map(|p| ui_path(&p)),
-        _ => None,
-    }
+    found
+        .into_iter()
+        .filter_map(inside)
+        .max_by_key(|path| path.metadata().and_then(|m| m.modified()).ok())
+        .map(|path| ui_path(&path))
 }
 
 /// A canonical path as the UI opens it: on Windows `canonicalize` adds a
@@ -2380,8 +2395,11 @@ fn ui_path(path: &Path) -> String {
 
 const REF_DEPTH: usize = 4;
 
+/// Matches `find_ref` collects before it stops looking.
+const REF_MATCHES: usize = 32;
+
 fn find_ref(dir: &Path, rel: &Path, depth: usize, out: &mut Vec<PathBuf>) {
-    if depth >= REF_DEPTH || out.len() > 1 {
+    if depth >= REF_DEPTH || out.len() >= REF_MATCHES {
         return;
     }
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -3790,7 +3808,39 @@ mod tests {
     }
 
     #[test]
-    fn resolve_file_ref_finds_a_unique_nested_match() {
+    fn resolve_file_ref_follows_the_reply_then_the_newest_match() {
+        let root = std::env::temp_dir().join(format!("lynshen-ref-new-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let at = |secs: u64| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs);
+        for (p, secs) in [("minecraft/index.html", 2_000_000_000), ("starcore/index.html", 1_000_000_000)] {
+            let f = root.join(p);
+            std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+            std::fs::File::create(&f).unwrap().set_modified(at(secs)).unwrap();
+        }
+        let r = root.display().to_string();
+        let canon = root.canonicalize().unwrap();
+        // The reply named the folder: its file, though another is newer.
+        let hinted = vec![canon.join("starcore/").display().to_string()];
+        assert_eq!(
+            resolve_file_ref(r.clone(), "index.html".into(), Some(hinted)),
+            Some(ui_path(&canon.join("starcore/index.html")))
+        );
+        assert_eq!(
+            resolve_file_ref(r.clone(), "index.html".into(), Some(vec!["starcore".into()])),
+            Some(ui_path(&canon.join("starcore/index.html")))
+        );
+        // No hint (or one that does not have it): the newest of the two.
+        assert_eq!(
+            resolve_file_ref(r.clone(), "index.html".into(), Some(vec!["docs/".into()])),
+            Some(ui_path(&canon.join("minecraft/index.html")))
+        );
+        // A hint outside the project is not followed.
+        assert_eq!(resolve_file_ref(r.clone(), "nope.html".into(), Some(vec!["/".into()])), None);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn resolve_file_ref_finds_nested_matches() {
         let root = std::env::temp_dir().join(format!("lynshen-ref-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         for p in ["a/repo/src/x.ts", "a/repo/src/y.ts", "b/src/y.ts", "top.ts"] {
@@ -3801,10 +3851,10 @@ mod tests {
         let r = root.display().to_string();
         let canon = root.canonicalize().unwrap();
         // As the UI gets it: without the `\\?\` prefix canonicalize adds on Windows.
-        assert_eq!(resolve_file_ref(r.clone(), "top.ts".into()), Some(ui_path(&canon.join("top.ts"))));
-        assert_eq!(resolve_file_ref(r.clone(), "src/x.ts".into()), Some(ui_path(&canon.join("a/repo/src/x.ts"))));
-        assert_eq!(resolve_file_ref(r.clone(), "src/y.ts".into()), None);
-        assert_eq!(resolve_file_ref(r.clone(), "src/z.ts".into()), None);
+        assert_eq!(resolve_file_ref(r.clone(), "top.ts".into(), None), Some(ui_path(&canon.join("top.ts"))));
+        assert_eq!(resolve_file_ref(r.clone(), "src/x.ts".into(), None), Some(ui_path(&canon.join("a/repo/src/x.ts"))));
+        assert!(resolve_file_ref(r.clone(), "src/y.ts".into(), None).is_some());
+        assert_eq!(resolve_file_ref(r.clone(), "src/z.ts".into(), None), None);
         std::fs::remove_dir_all(&root).unwrap();
     }
 

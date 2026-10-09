@@ -82,7 +82,7 @@
 	import { agentChanges } from '$lib/agents/agentChanges.svelte';
 	import { confirmStop } from '$lib/agents/confirmStop';
 	import { parseToolOutput, toolTarget, toolVerb } from '$lib/toolSummary';
-	import { isAbsolutePath, joinPath, parseFileHref, pathExt } from '$lib/fileRefs';
+	import { dirHints, isAbsolutePath, joinPath, parseFileHref, pathExt } from '$lib/fileRefs';
 	import type { Msg, ModelOption } from '$lib/chat.svelte';
 	import type { SessionSwitch } from '$lib/composer/SessionSwitches.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
@@ -1209,14 +1209,17 @@
 	// Open a workspace file referenced by a chat link. HTML opens in the built-in
 	// browser (rendered) or the editor (source) per preference; everything else
 	// opens in the editor. Paths resolve relative to this session's project root.
-	async function openChatFile(href: string) {
+	async function openChatFile(href: string, context?: string) {
 		const cwd = project?.path;
 		if (!cwd) return;
 		// A file a reply names, maybe at a line (`src/a.ts#L12:4`).
 		const ref = parseFileHref(href);
 		const rel = ref.path;
 		if (!rel) return;
-		const abs = isAbsolutePath(rel) ? rel : ((await resolveFileRef(cwd, rel).catch(() => null)) ?? joinPath(cwd, rel));
+		// A bare name (`index.html`) is looked for first in the folders the
+		// same reply named (`…/starcore/`).
+		const hints = context ? dirHints(context) : undefined;
+		const abs = isAbsolutePath(rel) ? rel : ((await resolveFileRef(cwd, rel, hints).catch(() => null)) ?? joinPath(cwd, rel));
 		const ext = pathExt(abs);
 		if ((ext === 'html' || ext === 'htm') && prefs.htmlOpenInBrowser) {
 			// The embedded browser loads http(s) only; a loopback URL also lets the

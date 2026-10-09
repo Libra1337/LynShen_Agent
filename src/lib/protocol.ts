@@ -715,8 +715,10 @@ export function listFiles(cwd?: string): Promise<string[]> {
 	return invoke('list_files', { cwd });
 }
 /** A reply's relative path → the one file it names under `root` (maybe in a nested repo). */
-export function resolveFileRef(root: string, rel: string): Promise<string | null> {
-	return invoke('resolve_file_ref', { root, rel });
+/** `rel` under the project `root`: directly, in one of the directories the
+ *  reply mentioned (`hints`), or the newest match below the root. */
+export function resolveFileRef(root: string, rel: string, hints?: string[]): Promise<string | null> {
+	return invoke('resolve_file_ref', { root, rel, hints: hints ?? null });
 }
 
 export interface ProviderInfo {

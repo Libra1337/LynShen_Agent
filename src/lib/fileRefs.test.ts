@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { codeFileRef, fileHref, isAbsolutePath, joinPath, parseFileHref, pathExt, splitFileRefs } from './fileRefs';
+import { codeFileRef, fileHref, isAbsolutePath, joinPath, parseFileHref, pathExt, splitFileRefs, dirHints } from './fileRefs';
 
 const refs = (text: string) => splitFileRefs(text).filter((p) => typeof p !== 'string');
 
@@ -58,5 +58,17 @@ describe('file references', () => {
 		expect(pathExt('C:\\p\\site.v2\\Index.HTML')).toBe('html');
 		expect(pathExt('C:\\p.d\\README')).toBe('');
 		expect(pathExt('/p/.env')).toBe('');
+	});
+});
+
+describe('dirHints', () => {
+	it('lists the folders a reply names, in order', () => {
+		const reply =
+			'已完成。游戏在 `/Users/chad/Desktop/test/starcore/`，双击 `index.html` 即可玩。\n\n' +
+			'- `starcore/js/core.js` 确定性随机\n- 沿用 `minecraft/` 的结构\n- 见 https://example.com/docs/ 和 www.lynshen.org/download';
+		expect(dirHints(reply)).toEqual(['/Users/chad/Desktop/test/starcore/', 'starcore/js/', 'minecraft/']);
+	});
+	it('has nothing to offer for a reply without folders', () => {
+		expect(dirHints('双击 index.html 即可。')).toEqual([]);
 	});
 });

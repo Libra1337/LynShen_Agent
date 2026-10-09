@@ -95,7 +95,8 @@
 		onNote?: (text: string) => void;
 		onRewind: (text: string, userIndex: number) => void;
 		/** Open a workspace file referenced by a chat link (editor / browser). */
-		onFile?: (href: string) => void;
+		/** A file link in a message; `context` is that message's text. */
+		onFile?: (href: string, context?: string) => void;
 		/** Remove a message the user closed (error notices). */
 		onDismiss?: (m: Msg) => void;
 		/** The session's engine, for reading its errors. */
@@ -553,7 +554,7 @@
 					{#each stableBlocks(rt.slice(0, si)) as block (block.key)}<Markdown text={block.text} />{/each}
 					<div class="stream">{rt.slice(si)}</div>
 				{:else}
-					<Markdown text={m.text} {onFile} />
+					<Markdown text={m.text} onFile={(href) => onFile?.(href, m.text)} />
 					<!-- Only the turn's last reply carries the request's totals. -->
 					{#if m.turn}
 						<div class="foot">
@@ -602,7 +603,7 @@
 							     it renders as Markdown once finished. -->
 							<div class="stream">{revealed(m)}</div>
 						{:else}
-							<Markdown text={m.text} {onFile} />
+							<Markdown text={m.text} onFile={(href) => onFile?.(href, m.text)} />
 						{/if}
 					</div>
 				</Collapse>

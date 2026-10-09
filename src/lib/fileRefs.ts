@@ -105,3 +105,27 @@ export function pathExt(path: string): string {
 	const dot = name.lastIndexOf('.');
 	return dot > 0 ? name.slice(dot + 1).toLowerCase() : '';
 }
+
+/** At most this many directories from one reply are tried. */
+const MAX_DIR_HINTS = 24;
+const DIR_MENTION = new RegExp(String.raw`(?:~|\.{1,2})?\/?(?:[\w@+.\-一-鿿]+\/)+(?:[\w@+.\-一-鿿]+)?`, 'g');
+
+/** The directories a reply mentions, in order: folders it names
+ *  (`/Users/me/game/`, `starcore/`) and the folders of files it names
+ *  (`starcore/js/core.js` → `starcore/js/`). A bare file name the reply
+ *  links (`index.html`) is looked for in them first. */
+export function dirHints(text: string): string[] {
+	const hints: string[] = [];
+	for (const match of text.matchAll(DIR_MENTION)) {
+		const path = match[0];
+		// Inside a URL or a longer word (`https://a.com/x/`): not a folder.
+		const before = text[(match.index ?? 0) - 1] ?? ' ';
+		if (/[\w:/.]/.test(before) || looksLikeDomain(path) || !path.includes('/')) continue;
+		const dir = path.endsWith('/') ? path : path.slice(0, path.lastIndexOf('/') + 1);
+		if (dir === '/' || dir === './' || hints.includes(dir)) continue;
+		hints.push(dir);
+		if (hints.length >= MAX_DIR_HINTS) break;
+	}
+	return hints;
+}
+
