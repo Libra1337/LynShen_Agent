@@ -264,7 +264,8 @@ describe('agent team', () => {
 				{ step: 'b', status: 'pending' },
 				{ step: 'c', status: 'pending' }
 			],
-			{ '/root/y': { planStep: 1 }, '/root/z': { planStep: 0 } }
+			// By number (1-based) or by the step's text; the first claim wins.
+			{ '/root/y': { planStep: '2' }, '/root/z': { planStep: 'b' }, '/root/w': { planStep: '9' } }
 		);
 		expect(p.steps.map((s) => [s.agent, s.files])).toEqual([
 			['/root/x', ['x.ts']],

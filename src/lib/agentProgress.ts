@@ -40,10 +40,15 @@ export interface PlanSummary {
 }
 
 /** The plan's steps and progress. A step's owner is the agent the plan
- *  names, else the team agent that reports working on it (`plan_step`). */
+ *  names, else the team agent that reports working on it (`plan_step`: the
+ *  step's text or its 1-based number). */
 export function planSummary(plan: PlanStep[], team: Record<string, Pick<TeamAgent, 'planStep'>> = {}): PlanSummary {
+	const indexOf = (key: string) => (/^\d+$/.test(key) ? Number(key) - 1 : plan.findIndex((p) => p.step.trim() === key));
 	const byStep = new Map<number, string>();
-	for (const [path, a] of Object.entries(team)) if (a.planStep !== null && !byStep.has(a.planStep)) byStep.set(a.planStep, path);
+	for (const [path, a] of Object.entries(team)) {
+		const at = a.planStep === null ? -1 : indexOf(a.planStep);
+		if (at >= 0 && !byStep.has(at)) byStep.set(at, path);
+	}
 	const steps = plan.map((p, i) => ({ text: p.step, state: stepState(p.status), agent: p.agent || byStep.get(i) || '', files: p.files ?? [] }));
 	const done = steps.filter((s) => s.state === 'done' || s.state === 'skipped').length;
 	let current = steps.findIndex((s) => s.state === 'active');
@@ -178,7 +183,7 @@ export function agentRows({ runs, subagents, lastTool, since = 0, team = {} }: R
 }
 
 /** Lifecycle words the agent trace does not know. */
-const TEAM_STATUS = new Set(['conflict', 'budget_exhausted']);
+const TEAM_STATUS = new Set(['conflict', 'merged', 'discarded', 'budget_exhausted']);
 
 /** What a row says of the agent team: the engine's state word (the
  *  lifecycle's `conflict` / `budget_exhausted` win over the trace's), the
@@ -403,6 +408,9 @@ export function mergeView(row: Pick<AgentRow, 'state' | 'status' | 'team'>): Mer
 	if (a.pending) return view('pending', false);
 	const m = a.merge;
 	if (m?.ok) return view(m.action === 'apply' ? 'applied' : 'discarded', false, m.files.length ? { files: m.files } : {});
+	// The model merged or discarded it itself (merge_agent as a tool call).
+	if (row.status === 'merged') return view('applied', false);
+	if (row.status === 'discarded') return view('discarded', false);
 	if ((m && m.conflicts.length) || row.status === 'conflict') return view('conflict', idle, { conflicts: m?.conflicts ?? [] });
 	if (m) return view('failed', idle, { error: m.error });
 	return a.files.length ? view('ready', idle) : none;

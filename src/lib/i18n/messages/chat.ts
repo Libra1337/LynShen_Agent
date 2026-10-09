@@ -355,6 +355,7 @@ const chat = {
 		reasoningNow: 'Reasoning',
 		reasoningFor: 'Reasoned for {t}',
 		rewindTitle: 'Rewind to this turn and rewrite (reverts file changes)',
+		rewindTitleN: 'Rewind to this turn and rewrite (reverts file changes, drops the {n} turns after it)',
 		quoteTitle: 'Quote into the composer',
 		tokens: '{n} tokens',
 		// Composer

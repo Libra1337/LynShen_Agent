@@ -21,8 +21,8 @@ const frames = {
 		output: JSON.stringify({ task_name: 'auth_fix', path: W, status: 'running', workdir: WORKDIR }),
 		is_error: false
 	},
-	running: { type: 'subagent_lifecycle', path: W, status: 'running', message: 'started', label: 'auth_fix', model: 'gpt-5.5', tool_use_id: 'c1', role: 'worker', plan_step: 1 },
-	done: { type: 'subagent_lifecycle', path: W, status: 'completed', message: 'finished', label: 'auth_fix', model: 'gpt-5.5', tool_use_id: 'c1', role: 'worker', plan_step: 1, files_changed: ['src/auth.ts', 'src/auth.test.ts'] },
+	running: { type: 'subagent_lifecycle', path: W, status: 'running', message: 'started', label: 'auth_fix', model: 'gpt-5.5', tool_use_id: 'c1', role: 'worker', plan_step: '2' },
+	done: { type: 'subagent_lifecycle', path: W, status: 'completed', message: 'finished', label: 'auth_fix', model: 'gpt-5.5', tool_use_id: 'c1', role: 'worker', plan_step: '2', files_changed: ['src/auth.ts', 'src/auth.test.ts'] },
 	plan: {
 		type: 'plan',
 		plan: [
@@ -41,12 +41,12 @@ describe('agent team state', () => {
 		c.handle({ type: 'connecting' });
 		for (const f of [frames.spawnStart, frames.spawnArgs, frames.spawnDone, frames.running]) c.handle(f);
 		expect(c.subagents[W]).toMatchObject({ status: 'running', role: 'worker', model: 'gpt-5.5', toolUseId: 'c1' });
-		expect(c.team[W]).toEqual({ role: 'worker', planStep: 1, workdir: WORKDIR, worktree: true, files: [], pending: null, merge: null });
+		expect(c.team[W]).toEqual({ role: 'worker', planStep: '2', workdir: WORKDIR, worktree: true, files: [], pending: null, merge: null });
 		c.handle(frames.done);
 		expect(c.team[W]!.files).toEqual(['src/auth.ts', 'src/auth.test.ts']);
 		// A lifecycle frame without the new fields leaves them as they were.
 		c.handle({ type: 'subagent_lifecycle', path: W, status: 'message', message: 'queued message' });
-		expect(c.team[W]).toMatchObject({ role: 'worker', planStep: 1, files: ['src/auth.ts', 'src/auth.test.ts'] });
+		expect(c.team[W]).toMatchObject({ role: 'worker', planStep: '2', files: ['src/auth.ts', 'src/auth.test.ts'] });
 		// The next turn drops the finished agent from `subagents`, not from the team.
 		c.handle({ type: 'status', message: 'ready' });
 		c.handle({ type: 'connecting' });
@@ -64,7 +64,7 @@ describe('agent team state', () => {
 		c.handle({ type: 'subagent_lifecycle', path: '/root/d', status: 'running', message: '' });
 		expect(c.team['/root/d']).toBeUndefined();
 		// plan_step null clears it.
-		c.handle({ type: 'subagent_lifecycle', path: '/root/a', status: 'running', message: '', plan_step: 2 });
+		c.handle({ type: 'subagent_lifecycle', path: '/root/a', status: 'running', message: '', plan_step: 'Fix the login check' });
 		c.handle({ type: 'subagent_lifecycle', path: '/root/a', status: 'running', message: '', plan_step: null });
 		expect(c.team['/root/a']!.planStep).toBeNull();
 	});
@@ -82,8 +82,8 @@ describe('agent team state', () => {
 			})
 		});
 		expect(c.team[W]).toMatchObject({ workdir: WORKDIR, worktree: true, files: ['a.ts'] });
-		c.handle({ type: 'agent_runs', workflows: [], agents: [{ id: '/root/rev', label: 'rev', state: 'running', role: 'reviewer', plan_step: 2 }] });
-		expect(c.team['/root/rev']).toMatchObject({ role: 'reviewer', planStep: 2, worktree: false });
+		c.handle({ type: 'agent_runs', workflows: [], agents: [{ id: '/root/rev', label: 'rev', state: 'running', role: 'reviewer', plan_step: '3' }] });
+		expect(c.team['/root/rev']).toMatchObject({ role: 'reviewer', planStep: '3', worktree: false });
 	});
 
 	it('shows agent messages as one line and keeps them per agent', () => {
@@ -150,13 +150,26 @@ describe('agent team state', () => {
 		expect(mergeView(rows[1]!)).toMatchObject({ state: 'conflict', actionable: true });
 	});
 
+	it('shows a worktree the model merged or discarded itself as done with', () => {
+		const c = new ChatState();
+		c.handle({ type: 'subagent_lifecycle', path: W, status: 'running', message: '', workdir: WORKDIR, files_changed: ['a.ts'] });
+		c.handle({ type: 'subagent_lifecycle', path: W, status: 'merged', message: '' });
+		c.handle({ type: 'subagent_lifecycle', path: '/root/b', status: 'running', message: '', workdir: `${WORKDIR}-b`, isolation: 'worktree', files_changed: ['b.ts'] });
+		c.handle({ type: 'subagent_lifecycle', path: '/root/b', status: 'discarded', message: '' });
+		const rows = agentRows({ runs: { workflows: [], agents: [] }, subagents: c.subagents, team: c.team });
+		expect(rows.map((r) => [r.state, mergeView(r).state, mergeView(r).actionable])).toEqual([
+			['done', 'applied', false],
+			['done', 'discarded', false]
+		]);
+	});
+
 	it('reads plan steps with their owner and files', () => {
 		const c = new ChatState();
 		c.handle(frames.plan);
 		expect(c.plan[0]).toEqual({ step: 'Read the auth module', status: 'completed', agent: '/root/scan' });
 		expect(c.plan[1]).toEqual({ step: 'Fix the login check', status: 'in_progress', files: ['src/auth.ts'] });
 		c.handle(frames.running);
-		// Step 1 names no agent: the one working on it (plan_step 1) owns it.
+		// Step 2 names no agent: the one working on it (plan_step "2") owns it.
 		expect(planSummary(c.plan, c.team).steps.map((s) => s.agent)).toEqual(['/root/scan', W, '']);
 	});
 

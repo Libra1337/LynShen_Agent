@@ -17,8 +17,11 @@ export function runState(state: string): RunState {
 		case 'done':
 		case 'completed':
 		case 'success':
-		// The agent team: done, but its changes did not merge.
+		// The agent team: done, but its changes did not merge; or done and
+		// its worktree merged back or discarded.
 		case 'conflict':
+		case 'merged':
+		case 'discarded':
 			return 'done';
 		case 'failed':
 		case 'error':

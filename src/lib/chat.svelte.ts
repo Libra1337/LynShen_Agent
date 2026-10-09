@@ -191,8 +191,9 @@ export interface MergeResult {
  *  discarded, past the turn that ran it. */
 export interface TeamAgent {
 	role: string;
-	/** The plan step it works on (0-based index), null for none. */
-	planStep: number | null;
+	/** The plan step it works on, as the engine names it: the step's text or
+	 *  its 1-based number; null for none. */
+	planStep: string | null;
 	/** Its working directory; a worktree of its own when `worktree`. */
 	workdir: string;
 	worktree: boolean;
@@ -272,6 +273,8 @@ const FINAL_AGENT = [
 	'killed',
 	'cancelled',
 	'conflict',
+	'merged',
+	'discarded',
 	'budget_exhausted'
 ];
 
@@ -1190,11 +1193,12 @@ export class ChatState {
 		const files = Array.isArray(raw.files_changed)
 			? arr<unknown>(raw.files_changed).filter((f): f is string => typeof f === 'string' && f !== '')
 			: null;
-		if (!prev && !role && typeof step !== 'number' && !workdir && !files?.length) return;
+		const named = typeof step === 'string' && step.trim() ? step.trim() : typeof step === 'number' ? String(step) : '';
+		if (!prev && !role && !named && !workdir && !files?.length) return;
 		const dir = workdir || prev?.workdir || '';
 		this.team[path] = {
 			role: role || prev?.role || '',
-			planStep: typeof step === 'number' && Number.isInteger(step) && step >= 0 ? step : step === null ? null : (prev?.planStep ?? null),
+			planStep: named || (step === null ? null : (prev?.planStep ?? null)),
 			workdir: dir,
 			worktree: prev?.worktree || isWorktree(dir, str(raw.isolation)),
 			files: files ?? prev?.files ?? [],
