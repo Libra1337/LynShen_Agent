@@ -1583,6 +1583,30 @@
 		min-width: 0;
 		min-height: 0;
 		background: var(--bg);
+		--plate-feather: 72px;
+	}
+	/* Over a custom background the column the text reads in sits on a calm
+	   plate: a blurred copy of the image under the canvas veil (worked out
+	   to keep the text readable, prefs.svelte.ts), feathered into the sharp
+	   image either side. The copy is made once; nothing here animates. */
+	:global(:root[data-canvas-bg]) .chatpane {
+		isolation: isolate;
+	}
+	:global(:root[data-canvas-bg]) .chatpane::before {
+		content: '';
+		position: absolute;
+		inset-block: 0;
+		inset-inline: max(0px, calc(50% - var(--chat-w) / 2 - var(--chat-pad) - var(--plate-feather)));
+		z-index: -1;
+		pointer-events: none;
+		background:
+			linear-gradient(
+				color-mix(in oklab, var(--bg) var(--canvas-veil, 80%), transparent),
+				color-mix(in oklab, var(--bg) var(--canvas-veil, 80%), transparent)
+			),
+			var(--canvas-image-soft, none) center / cover fixed no-repeat;
+		-webkit-mask-image: linear-gradient(to right, transparent, #000 var(--plate-feather), #000 calc(100% - var(--plate-feather)), transparent);
+		mask-image: linear-gradient(to right, transparent, #000 var(--plate-feather), #000 calc(100% - var(--plate-feather)), transparent);
 	}
 	.jump {
 		position: absolute;

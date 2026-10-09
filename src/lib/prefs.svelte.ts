@@ -1,6 +1,7 @@
 // Lightweight user preferences (localStorage-backed, reactive). Kept separate
 // from engine/backend settings — these are pure UI choices.
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { leastVeil, parseColor, sampleImage, softImage, SECONDARY_CONTRAST, TEXT_CONTRAST, type RGB } from './readability';
 
 const KEY = 'lynshen-prefs';
 
@@ -89,11 +90,14 @@ const CHROME_OVER_IMAGE: Record<BackgroundStrength, number> = { faint: 90, mediu
  * `blur` is false where the webview cannot blur (or the user asked for less
  * transparency), and the surfaces then stay solid.
  */
-export function glassStyle(glass: number, background: BackgroundStrength | null, blur: boolean) {
+export function glassStyle(glass: number, background: BackgroundStrength | null, blur: boolean, readableChrome = 0) {
 	const g = blur ? glassLevel(glass) / 100 : 0;
 	// Glass thins the chrome over the image toward 50%, where the blur keeps
 	// its secondary text readable; without an image the chrome stays solid.
-	const chrome = background ? CHROME_OVER_IMAGE[background] - (CHROME_OVER_IMAGE[background] - 50) * g : 100;
+	// It never goes below what keeps the text readable over this image.
+	const chrome = background
+		? Math.max(readableChrome, CHROME_OVER_IMAGE[background] - (CHROME_OVER_IMAGE[background] - 50) * g)
+		: 100;
 	return {
 		on: g > 0,
 		vars: {
@@ -189,6 +193,9 @@ class PrefsStore {
 		// Asking the system for less transparency turns the glass solid.
 		if (typeof window !== 'undefined')
 			window.matchMedia('(prefers-reduced-transparency: reduce)').addEventListener('change', () => this.#applyGlass());
+		// The veils follow the theme's text colours.
+		if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined')
+			new MutationObserver(() => this.#applyGlass()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 		if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
 			invoke<string | null>('window_effect')
 				.then((effect) => {
@@ -248,11 +255,54 @@ class PrefsStore {
 			const src = `${convertFileSrc(this.backgroundImage)}?v=${this.backgroundStamp}`;
 			root.style.setProperty('--canvas-image', `url(${JSON.stringify(src)})`);
 			root.dataset.canvasBg = this.backgroundStrength;
+			this.#sampleBackground(src);
 		} else {
 			root.style.removeProperty('--canvas-image');
+			root.style.removeProperty('--canvas-image-soft');
 			delete root.dataset.canvasBg;
+			this.#bgSamples = [];
+			this.#bgSampled = '';
 		}
 		this.#applyGlass();
+	}
+
+	/** The background's colours, sampled once per image: the veils are
+	 *  worked out from them (readability.ts). */
+	#bgSamples: RGB[] = [];
+	#bgSampled = '';
+	#sampleBackground(src: string) {
+		if (this.#bgSampled === src) return;
+		this.#bgSampled = src;
+		this.#bgSamples = [];
+		sampleImage(src)
+			.then((samples) => {
+				if (this.#bgSampled !== src) return;
+				this.#bgSamples = samples;
+				this.#applyGlass();
+			})
+			.catch(() => {});
+		// The chat column reads on a blurred copy (ChatPane's plate).
+		softImage(src)
+			.then((soft) => {
+				if (this.#bgSampled === src && soft && typeof document !== 'undefined')
+					document.documentElement.style.setProperty('--canvas-image-soft', `url(${JSON.stringify(soft)})`);
+			})
+			.catch(() => {});
+	}
+
+	/** The least canvas and chrome veils (percent) that keep the theme's text
+	 *  readable over the background; null until it is sampled. */
+	#readableVeils(root: HTMLElement): { canvas: number; chrome: number } | null {
+		if (!this.#bgSamples.length || !root.dataset.canvasBg) return null;
+		const css = getComputedStyle(root);
+		const color = (name: string) => parseColor(css.getPropertyValue(name));
+		const [bg, sidebar, text, dim] = ['--bg', '--sidebar', '--text', '--dim'].map(color);
+		if (!bg || !sidebar || !text || !dim) return null;
+		const inks = [
+			{ color: text, min: TEXT_CONTRAST },
+			{ color: dim, min: SECONDARY_CONTRAST }
+		];
+		return { canvas: leastVeil(this.#bgSamples, bg, inks), chrome: leastVeil(this.#bgSamples, sidebar, inks) };
 	}
 
 	/** Reflect the glass level onto the root: the fills and blur as custom
@@ -264,8 +314,12 @@ class PrefsStore {
 			typeof CSS !== 'undefined' &&
 			(CSS.supports('backdrop-filter', 'blur(1px)') || CSS.supports('-webkit-backdrop-filter', 'blur(1px)')) &&
 			!window.matchMedia('(prefers-reduced-transparency: reduce)').matches;
-		const style = glassStyle(this.glass, root.dataset.canvasBg ? this.backgroundStrength : null, canBlur);
+		const readable = this.#readableVeils(root);
+		const style = glassStyle(this.glass, root.dataset.canvasBg ? this.backgroundStrength : null, canBlur, readable?.chrome);
 		for (const [k, v] of Object.entries(style.vars)) root.style.setProperty(k, v);
+		// The canvas veil: the strength's, or more where this image needs it.
+		if (readable) root.style.setProperty('--canvas-veil', `${Math.max(CHROME_OVER_IMAGE[this.backgroundStrength], readable.canvas)}%`);
+		else root.style.removeProperty('--canvas-veil');
 		if (style.on) root.dataset.glass = '';
 		else delete root.dataset.glass;
 	}

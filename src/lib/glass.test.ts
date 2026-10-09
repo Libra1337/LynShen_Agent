@@ -32,6 +32,12 @@ describe('glass level', () => {
 		expect(glassStyle(100, 'medium', true).vars['--chrome-tint']).toBe('50%');
 	});
 
+	it('never thins the chrome below what keeps its text readable', () => {
+		expect(glassStyle(100, 'medium', true, 74).vars['--chrome-tint']).toBe('74%');
+		expect(glassStyle(0, 'faint', false, 74).vars['--chrome-tint']).toBe('90%');
+		expect(glassStyle(100, null, true, 74).vars['--chrome-tint']).toBe('100%');
+	});
+
 	it('keeps levels in range', () => {
 		expect(glassStyle(250, null, true).vars['--float-tint']).toBe('60%');
 		expect(glassStyle(-5, null, true).on).toBe(false);
