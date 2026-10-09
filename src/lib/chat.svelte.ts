@@ -105,6 +105,20 @@ export type Msg =
 	  }
 	| { kind: 'system'; text: string }
 	| { kind: 'error'; text: string }
+	/** Context compaction: running (summary tokens `written` so far), then
+	 *  done (the context's tokens `before` and `after`, the `summary`) or
+	 *  failed. `live`: it ran in front of the user, not a replay. */
+	| {
+			kind: 'compaction';
+			state: 'running' | 'done' | 'failed';
+			before: number;
+			after?: number;
+			written: number;
+			since: number;
+			summary?: string;
+			error?: string;
+			live?: boolean;
+	  }
 	/** A message one agent of the team sent another (`agent_message`): agent
 	 *  paths, or `parent` for the main agent; one line. */
 	| { kind: 'agent_message'; from: string; to: string; summary: string }
@@ -888,6 +902,12 @@ export class ChatState {
 	/** Stamp the turn's total elapsed onto its last assistant message. */
 	#endTurn() {
 		this.activeAt = Date.now();
+		// A compaction cut short (stopped, the engine gone) is not left spinning.
+		const compaction = this.#compaction();
+		if (compaction) {
+			compaction.state = 'failed';
+			compaction.error = t('chat.compaction.stopped');
+		}
 		if (this.#turnStart !== null) this.turnEndedAt = this.activeAt;
 		this.#collapseReasoning();
 		if (this.#sending?.state !== 'failed') this.#setSend(null);
@@ -1150,6 +1170,26 @@ export class ChatState {
 	closePicker() {
 		this.picker = null;
 	}
+
+	/** The compaction now running: the conversation's last card (status
+	 *  notes may follow it; they show elsewhere). */
+	#compaction() {
+		for (let i = this.messages.length - 1; i >= 0; i--) {
+			const m = this.messages[i];
+			if (m.kind === 'compaction' && m.state === 'running') return m;
+			if (m.kind !== 'system') return null;
+		}
+		return null;
+	}
+
+	#pushCompaction() {
+		this.messages.push({ kind: 'compaction', state: 'running', before: this.contextTokens, written: 0, since: Date.now(), live: true });
+		// The pushed object is wrapped by the state proxy: hand back that one.
+		return this.messages[this.messages.length - 1] as Extract<Msg, { kind: 'compaction' }>;
+	}
+
+	/** A compaction that finished, waiting for the context's new size. */
+	#compactedCard: Extract<Msg, { kind: 'compaction' }> | null = null;
 
 	#resetCurrent() {
 		this.#assistantIdx = -1;
@@ -1665,6 +1705,10 @@ export class ChatState {
 			}
 			case 'context_usage':
 				this.contextTokens = num(ev.tokens);
+				if (this.#compactedCard) {
+					this.#compactedCard.after = this.contextTokens;
+					this.#compactedCard = null;
+				}
 				this.contextBreakdown = parseBreakdown(ev.breakdown);
 				if (typeof ev.cost === 'number') {
 					this.cost = ev.cost;
@@ -1759,6 +1803,8 @@ export class ChatState {
 								isError: false
 							};
 						if (role === 'branch') return { kind: 'system', text: `branch: ${str(it.label)}` };
+						if (role === 'compaction')
+							return { kind: 'compaction', state: 'done', before: 0, written: 0, since: 0, summary: str(it.summary) };
 						if (role === 'plan')
 							return { kind: 'plan', id: str(it.id), title: str(it.title), text: str(it.content), status: planStatus(it.status) };
 						if (role === 'agent_message' && (str(it.summary) || str(it.content)))
@@ -1809,17 +1855,30 @@ export class ChatState {
 				// looping on the same doomed --resume.
 				this.resumeBroken = true;
 				break;
-			case 'compaction_progress':
+			case 'compaction_progress': {
 				this.compactionTokens = num(ev.output_tokens);
+				const card = this.#compaction();
+				if (card) card.written = this.compactionTokens;
 				break;
-			case 'compaction_end':
+			}
+			case 'compaction_end': {
 				this.compactionTokens = 0;
 				this.#cacheWatch.reset();
-				this.messages.push({ kind: 'system', text: 'context compacted' });
+				if (this.engineState === 'compacting') this.engineState = 'streaming';
+				// Engines that announce only the end (claude, codex) get the divider alone.
+				const card = this.#compaction() ?? this.#pushCompaction();
+				card.state = 'done';
+				if (str(ev.summary)) card.summary = str(ev.summary);
+				// The context's new size comes with the next context_usage.
+				this.#compactedCard = card;
 				break;
-			case 'compaction_failed':
-				this.messages.push({ kind: 'error', text: `compaction failed: ${str(ev.error)}` });
+			}
+			case 'compaction_failed': {
+				const card = this.#compaction() ?? this.#pushCompaction();
+				card.state = 'failed';
+				card.error = str(ev.error);
 				break;
+			}
 			case 'goal':
 				this.goal = ev.goal ? (ev.goal as unknown as Goal) : null;
 				break;
@@ -2155,6 +2214,7 @@ export class ChatState {
 			case 'compaction_start':
 				this.engineState = 'compacting';
 				this.compactionTokens = 0;
+				if (!this.#compaction()) this.#pushCompaction();
 				break;
 			case 'status': {
 				const msg = str(ev.message);

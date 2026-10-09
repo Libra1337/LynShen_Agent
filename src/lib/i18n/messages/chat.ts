@@ -396,7 +396,19 @@ const chat = {
 		phaseFirstToken: '等待首字',
 		phaseGenerating: '生成中',
 		phaseTool: '执行工具',
-		phaseCompacting: '压缩上下文'
+		phaseCompacting: '压缩上下文',
+		compaction: {
+			running: '正在压缩上下文',
+			folding: '把 {n} tokens 的对话折叠成摘要',
+			foldingUnknown: '把较早的对话折叠成摘要',
+			written: '摘要已写 {n} tokens',
+			done: '上下文已压缩',
+			failed: '压缩没有完成',
+			stopped: '已停止',
+			showSummary: '查看压缩后保留的摘要',
+			hideSummary: '收起摘要',
+			summaryTitle: '压缩后保留的摘要（较早的对话现在以这段内容出现）'
+		}
 	},
 	en: {
 		actionDeferred: 'Nobody was watching: {name} ({summary}) was recorded as a pending action; decide it on the desk',
@@ -794,7 +806,19 @@ const chat = {
 		phaseFirstToken: 'Waiting for the first token',
 		phaseGenerating: 'Generating',
 		phaseTool: 'Running tool',
-		phaseCompacting: 'Compacting context'
+		phaseCompacting: 'Compacting context',
+		compaction: {
+			running: 'Compacting context',
+			folding: 'Folding {n} tokens of conversation into a summary',
+			foldingUnknown: 'Folding the older conversation into a summary',
+			written: '{n} tokens of summary written',
+			done: 'Context compacted',
+			failed: 'Compaction did not finish',
+			stopped: 'stopped',
+			showSummary: 'Show the summary kept in its place',
+			hideSummary: 'Hide the summary',
+			summaryTitle: 'The summary kept in its place (the older conversation now reads as this)'
+		}
 	}
 };
 export default chat;

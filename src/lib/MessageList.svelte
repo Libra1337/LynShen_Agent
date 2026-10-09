@@ -11,6 +11,7 @@
 	import AttemptGroupCard from '$lib/agents/AttemptGroupCard.svelte';
 	import AgentMessageLine from '$lib/agents/AgentMessageLine.svelte';
 	import PlanCard, { type PlanAction } from '$lib/PlanCard.svelte';
+	import CompactionCard from '$lib/CompactionCard.svelte';
 	import type { ApprovalMode } from '$lib/approval';
 	import { attemptGroups, SPAWN_TOOLS, spawnAgentRow, WAIT_TOOLS, type AgentRow } from '$lib/agentProgress';
 	import DeliveryNotice from '$lib/DeliveryNotice.svelte';
@@ -321,7 +322,11 @@
 		}
 		return false;
 	});
-	const shownPhase = $derived(sendingShown && (phase === 'connecting' || phase === 'waiting') ? null : phase);
+	// A running compaction card says it all; the line below it would repeat it.
+	const compactionCard = $derived(messages.findLast((m) => m.kind !== 'system')?.kind === 'compaction');
+	const shownPhase = $derived(
+		(sendingShown && (phase === 'connecting' || phase === 'waiting')) || (phase === 'compacting' && compactionCard) ? null : phase
+	);
 
 	// Smoothing buffer: SSE deltas arrive in big bursts every few seconds, which
 	// reads as jerky chunk-by-chunk output. Reveal the received text at an adaptive
@@ -436,6 +441,7 @@
 		if (m.kind === 'tool') return !!(m.name || m.output);
 		if (m.kind === 'plan') return !!(m.title || m.text);
 		if (m.kind === 'agent_message') return !!m.summary;
+		if (m.kind === 'compaction') return true;
 		return !!m.text && m.text.trim().length > 0;
 	}
 
@@ -646,6 +652,8 @@
 			{:else}
 				<ToolCard name={m.name} output={m.output} running={m.running} isError={m.isError} subagent={m.subagent} trace={traceOf?.(m) ?? undefined} />
 			{/if}
+		{:else if m.kind === 'compaction'}
+			<CompactionCard stage={m.state} before={m.before} after={m.after} written={m.written} since={m.since} summary={m.summary} error={m.error} live={m.live} />
 		{:else if m.kind === 'plan'}
 			<PlanCard id={m.id} title={m.title} text={m.text} status={m.status} actionable={m === lastShown} defaultMode={planMode} onAction={onPlan} onOpen={onOpenPlan} />
 		{:else if m.kind === 'agent_message'}

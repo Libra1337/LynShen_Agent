@@ -291,13 +291,63 @@ describe('ChatState.handle', () => {
 	it('collects meta notices into statusLog, keeping them out of the bubble stream', () => {
 		const c = new ChatState();
 		c.handle({ type: 'user_message', content: 'hi' });
-		c.handle({ type: 'compaction_end' });
-		c.handle({ type: 'compaction_end' });
+		c.handle({ type: 'info', message: 'context reached the compaction threshold; compacting and continuing' });
+		c.handle({ type: 'info', message: 'nothing old enough to compact' });
 		c.handle({ type: 'error', message: 'boom' });
 		// statusLog holds only the system/meta notices…
 		expect(c.statusLog.length).toBe(2);
 		// …while user + error stay as bubbles in messages.
 		expect(c.messages.map((m) => m.kind)).toEqual(['user', 'system', 'system', 'error']);
+	});
+
+	it('shows a compaction as a card in the conversation, then as a divider with its sizes', () => {
+		const c = new ChatState();
+		c.handle({ type: 'user_message', content: 'hi' });
+		c.handle({ type: 'context_usage', tokens: 755_000, tokenizer: 'x' });
+		c.handle({ type: 'info', message: 'context reached the compaction threshold; compacting and continuing' });
+		c.handle({ type: 'compaction_start' });
+		expect(c.phase).toBe('compacting');
+		c.handle({ type: 'info', message: 'a note in between' });
+		c.handle({ type: 'compaction_progress', output_tokens: 1_200 });
+		const card = c.messages.find((m) => m.kind === 'compaction');
+		expect(card).toMatchObject({ state: 'running', before: 755_000, written: 1_200, live: true });
+		c.handle({ type: 'compaction_end', summary: '## Kept\n- the plan' });
+		c.handle({ type: 'context_usage', tokens: 21_000, tokenizer: 'x' });
+		expect(c.messages.filter((m) => m.kind === 'compaction')).toEqual([
+			expect.objectContaining({ state: 'done', before: 755_000, after: 21_000, summary: '## Kept\n- the plan' })
+		]);
+		// A later size is the conversation growing again, not the compaction's.
+		c.handle({ type: 'context_usage', tokens: 30_000, tokenizer: 'x' });
+		expect(c.messages.find((m) => m.kind === 'compaction')).toMatchObject({ after: 21_000 });
+	});
+
+	it('ends a compaction cut short, and shows one that only reports its end', () => {
+		const c = new ChatState();
+		c.handle({ type: 'status', message: 'compacting' });
+		c.handle({ type: 'compaction_start' });
+		c.handle({ type: 'status', message: 'ready' });
+		expect(c.messages.find((m) => m.kind === 'compaction')).toMatchObject({ state: 'failed' });
+		// claude and codex announce only the end.
+		const d = new ChatState();
+		d.handle({ type: 'compaction_end' });
+		expect(d.messages).toEqual([expect.objectContaining({ kind: 'compaction', state: 'done' })]);
+		d.handle({ type: 'compaction_failed', error: 'model refused' });
+		expect(d.messages.at(-1)).toMatchObject({ kind: 'compaction', state: 'failed', error: 'model refused' });
+	});
+
+	it('shows where a reloaded conversation was compacted', () => {
+		const c = new ChatState();
+		c.handle({
+			type: 'transcript',
+			items: [
+				{ role: 'user', content: 'first' },
+				{ role: 'compaction', summary: 'what came before' },
+				{ role: 'user', content: 'next' }
+			]
+		});
+		expect(c.messages.map((m) => m.kind)).toEqual(['user', 'compaction', 'user']);
+		expect(c.messages[1]).toMatchObject({ state: 'done', summary: 'what came before' });
+		expect(c.messages[1]).not.toHaveProperty('live');
 	});
 
 	it('shows a retry as live state, not a log line, until output flows again', () => {
