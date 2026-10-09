@@ -59,6 +59,7 @@ beforeEach(() => {
 describe('cross-session messages: the event', () => {
 	it('reads the frame, and refuses one that names no ends or no known state', () => {
 		expect(readSessionMessageEvent(event(A, 'queued'))).toEqual({
+			key: '',
 			from: A,
 			fromTitle: '项目 A：重构接口',
 			to: B,
@@ -85,6 +86,17 @@ describe('cross-session messages: the event', () => {
 		// The same words sent again after the answer are a new message.
 		c.handle(event(A, 'queued'));
 		expect(c.sessionMessages.map((m) => m.status)).toEqual(['replied', 'queued']);
+	});
+
+	it('tells two messages with the same words apart by the daemon’s id', () => {
+		const c = sender();
+		c.handle(event(A, 'queued', { id: 'm1' }));
+		c.handle(event(A, 'queued', { id: 'm2' }));
+		c.handle(event(A, 'replied', { id: 'm1' }));
+		expect(c.sessionMessages.map((m) => [m.key, m.status])).toEqual([
+			['m1', 'replied'],
+			['m2', 'queued']
+		]);
 	});
 
 	it('tells the receiver’s end from the sender’s by the routing field', () => {

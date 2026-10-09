@@ -83,6 +83,9 @@ export function summaryOf(body: string): string {
 /** A `session_message` event: the daemon sends it to the clients of both
  *  conversations as the message moves on. */
 export interface SessionMessageEvent {
+	/** The daemon's id for the message, the same in every event about it
+	 *  ('' from a daemon that sends none). */
+	key: string;
 	from: string;
 	fromTitle: string;
 	to: string;
@@ -101,6 +104,7 @@ export function readSessionMessageEvent(ev: Record<string, unknown>): SessionMes
 	const status = readStatus(ev.status);
 	if (!from || !to || !status) return null;
 	return {
+		key: str(ev.id).trim() || (typeof ev.id === 'number' ? String(ev.id) : ''),
 		from,
 		fromTitle: str(ev.from_title).trim(),
 		to,
@@ -125,7 +129,12 @@ export interface SessionMessageView extends SessionMessageEvent {
  *  sent again with the same words after the first was answered is a new
  *  one); undefined for a new message. */
 export function matchMessage(list: SessionMessageView[], ev: SessionMessageEvent): SessionMessageView | undefined {
-	const same = list.findLast((m) => m.from === ev.from && m.to === ev.to && m.summary === ev.summary);
+	// The daemon's id names the message exactly.
+	if (ev.key) {
+		const known = list.findLast((m) => m.key === ev.key);
+		if (known) return known;
+	}
+	const same = list.findLast((m) => (!ev.key || !m.key) && m.from === ev.from && m.to === ev.to && m.summary === ev.summary);
 	return same && STATUS_RANK[ev.status] >= STATUS_RANK[same.status] ? same : undefined;
 }
 
