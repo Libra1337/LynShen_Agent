@@ -103,6 +103,11 @@
 			.then((a) => (acpAgents = a))
 			.catch(() => {});
 	});
+	// Only agents this machine has: Claude Code / Codex show once their probe
+	// finds them (the session's own always shows). One agent alone is nothing
+	// to switch between, so the section goes.
+	const shownNative = $derived(NATIVE_BACKEND_IDS.filter((id) => id === 'lynshen' || id === chat.backendId || probe[id]?.found));
+	const canSwitchAgent = $derived(shownNative.length + acpAgents.length > 1);
 	const agentTitle = (id: BackendId) => {
 		const p = probe[id];
 		if (!p) return BACKEND_LABELS[id];
@@ -223,13 +228,12 @@
 			{#key toolProvider.model}<GroupPicker model={toolProvider.model} tool={toolProvider} />{/key}
 		{/if}
 
-		{#if !backendLocked}
+		{#if !backendLocked && canSwitchAgent}
 			<section class="agents" role="group" aria-label={t('chat.switchBackend')}>
-				{#each NATIVE_BACKEND_IDS as id (id)}
+				{#each shownNative as id (id)}
 					<button
 						class="agent"
 						class:on={chat.backendId === id}
-						class:miss={probe[id] ? !probe[id]!.found : false}
 						disabled={switching}
 						title={agentTitle(id)}
 						onclick={() => pickNative(id)}
@@ -464,9 +468,6 @@
 		background: var(--surface2);
 		color: var(--text);
 		font-weight: 500;
-	}
-	.agent.miss {
-		opacity: 0.45;
 	}
 	.agent:disabled {
 		cursor: default;

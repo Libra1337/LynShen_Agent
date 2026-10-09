@@ -42,6 +42,7 @@
 		listProviders,
 		listDir,
 		gitCheckpointCapture,
+		checkBackend,
 		daemon
 	} from '$lib/protocol';
 	import { dispatch } from '$lib/backends/router';
@@ -511,9 +512,18 @@
 	/** A new conversation: in the chat, or (the TUI by default) in the TUI of
 	 *  the backend the user picks. */
 	let tuiPick = $state<Project | null>(null);
+	/** The TUIs this machine has: LynShen's always, Claude Code / Codex once found. */
+	let tuiBackends = $state<BackendId[]>(['lynshen']);
 	function newSession(p: Project) {
-		if (prefs.defaultSurface === 'tui' && !p.chats) tuiPick = p;
-		else store.addSession(p);
+		if (prefs.defaultSurface !== 'tui' || p.chats) return store.addSession(p);
+		tuiPick = p;
+		const paths = loadBackendSettings().paths;
+		for (const id of ['claude', 'codex'] as const)
+			checkBackend(id, paths[id])
+				.then((s) => {
+					if (s.found && !tuiBackends.includes(id)) tuiBackends = [id, ...tuiBackends];
+				})
+				.catch(() => {});
 	}
 	function pickTuiBackend(backend: BackendId) {
 		const p = tuiPick;
@@ -1788,7 +1798,7 @@
 		<Modal title={t('chat.tuiNewTitle')} width={380} onClose={() => (tuiPick = null)}>
 			<p class="tui-pick-hint">{t('chat.tuiNewHint')}</p>
 			<div class="tui-pick">
-				{#each ['claude', 'codex', 'lynshen'] as const as backend (backend)}
+				{#each tuiBackends as backend (backend)}
 					<button class="tui-pick-item" onclick={() => pickTuiBackend(backend)}>
 						<BackendIcon {backend} size={18} />
 						<span>{BACKEND_LABELS[backend]}</span>
