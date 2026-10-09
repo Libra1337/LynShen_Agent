@@ -24,6 +24,7 @@
 	import HardDrivesIcon from 'phosphor-svelte/lib/HardDrivesIcon';
 	import StorefrontIcon from 'phosphor-svelte/lib/StorefrontIcon';
 	import RobotIcon from 'phosphor-svelte/lib/RobotIcon';
+	import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 	import PlugsConnectedIcon from 'phosphor-svelte/lib/PlugsConnectedIcon';
 	import TrayArrowDownIcon from 'phosphor-svelte/lib/TrayArrowDownIcon';
 	import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
@@ -94,6 +95,7 @@
 	import McpSection from './McpSection.svelte';
 	import ImportSection from './ImportSection.svelte';
 	import ShortcutsSection from './ShortcutsSection.svelte';
+	import TeamSection from './TeamSection.svelte';
 	import PermissionRulesSection from './PermissionRulesSection.svelte';
 	import UpdateCard from './UpdateCard.svelte';
 	import ThirdPartyNotices from './ThirdPartyNotices.svelte';
@@ -146,6 +148,7 @@
 		mcp: HardDrivesIcon,
 		market: StorefrontIcon,
 		agents: RobotIcon,
+		team: UsersThreeIcon,
 		acp: PlugsConnectedIcon,
 		import: TrayArrowDownIcon,
 		daemon: DeviceMobileIcon,
@@ -1202,6 +1205,8 @@
 						{/snippet}
 						<Dependencies ids={depIds} heading={false} flat />
 					</SettingsSection>
+				{:else if current === 'team'}
+					<TeamSection project={chat && !chat.isChatMode ? chat.cwd : ''} />
 				{:else if current === 'acp'}
 					<AcpSection />
 				{:else if current === 'import'}

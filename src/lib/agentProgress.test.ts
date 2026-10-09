@@ -3,6 +3,10 @@ import {
 	agentOfCall,
 	agentRows,
 	cardMode,
+	compactTokens,
+	mergeView,
+	porcelainFiles,
+	teamSummary,
 	pillParts,
 	planShown,
 	planSummary,
@@ -14,7 +18,7 @@ import {
 	waitTargets,
 	type AgentRow
 } from './agentProgress';
-import type { AgentRun, WorkflowRun } from './chat.svelte';
+import type { AgentRun, TeamAgent, WorkflowRun } from './chat.svelte';
 
 const run = (over: Partial<AgentRun>): AgentRun => ({
 	id: 'a1',
@@ -211,5 +215,96 @@ describe('progress card', () => {
 	it('writes the pill', () => {
 		expect(pillParts(plan, [runningRow, doneRow], true)).toEqual({ steps: '1/2', agents: 2, running: 1 });
 		expect(pillParts(plan, [], false).steps).toBe('');
+	});
+});
+
+describe('agent team', () => {
+	const team = (over: Partial<TeamAgent> = {}): TeamAgent => ({
+		role: 'worker',
+		planStep: null,
+		workdir: '/repo/.lynshen/agents/w-1',
+		worktree: true,
+		files: ['a.ts', 'b.ts'],
+		pending: null,
+		merge: null,
+		...over
+	});
+	const row = (over: Partial<AgentRow> = {}) => ({ state: 'done' as const, status: 'completed', team: team(), ...over });
+
+	it('writes token counts short', () => {
+		expect([0, 950, 1000, 18_400, 120_000, 400_400, 1_000_000, 1_250_000].map(compactTokens)).toEqual([
+			'0',
+			'950',
+			'1k',
+			'18.4k',
+			'120k',
+			'400k',
+			'1M',
+			'1.3M'
+		]);
+	});
+
+	it('sums up steps, subagents and the budget', () => {
+		const plan = planSummary([
+			{ step: 'a', status: 'completed' },
+			{ step: 'b', status: 'pending' }
+		]);
+		const rows = [{ state: 'running' }, { state: 'done' }] as AgentRow[];
+		expect(teamSummary(plan, rows, null, true)).toEqual({ steps: { done: 1, total: 2 }, agents: 2, running: 1, budget: null });
+		// No limit: no budget part; the plan hidden: no steps part.
+		expect(teamSummary(plan, rows, { used: 5000, limit: 0 }, false)).toMatchObject({ steps: null, budget: null });
+		expect(teamSummary(plan, rows, { used: 330_000, limit: 400_000 }, true).budget).toEqual({ used: '330k', limit: '400k', level: 'warn' });
+		expect(teamSummary(plan, rows, { used: 401_000, limit: 400_000 }, true).budget?.level).toBe('over');
+	});
+
+	it('names each step’s owner: the plan’s agent, else the one on that step', () => {
+		const p = planSummary(
+			[
+				{ step: 'a', status: 'completed', agent: '/root/x', files: ['x.ts'] },
+				{ step: 'b', status: 'pending' },
+				{ step: 'c', status: 'pending' }
+			],
+			{ '/root/y': { planStep: 1 }, '/root/z': { planStep: 0 } }
+		);
+		expect(p.steps.map((s) => [s.agent, s.files])).toEqual([
+			['/root/x', ['x.ts']],
+			['/root/y', []],
+			['', []]
+		]);
+	});
+
+	it('offers a worktree agent’s changes once it stopped, until merged or dropped', () => {
+		expect(mergeView(row({ team: undefined })).state).toBe('none');
+		expect(mergeView(row({ team: team({ worktree: false }) })).state).toBe('none');
+		expect(mergeView(row({ team: team({ files: [] }) })).state).toBe('none');
+		expect(mergeView(row())).toMatchObject({ state: 'ready', files: ['a.ts', 'b.ts'], actionable: true });
+		expect(mergeView(row({ state: 'running' }))).toMatchObject({ state: 'ready', actionable: false });
+		expect(mergeView(row({ team: team({ pending: 'apply' }) }))).toMatchObject({ state: 'pending', actionable: false });
+		const applied = { action: 'apply' as const, ok: true, files: ['a.ts'], conflicts: [], error: '' };
+		expect(mergeView(row({ team: team({ merge: applied }) }))).toMatchObject({ state: 'applied', files: ['a.ts'], actionable: false });
+		expect(mergeView(row({ team: team({ merge: { ...applied, action: 'discard', files: [] } }) }))).toMatchObject({ state: 'discarded', actionable: false });
+		const conflict = { ...applied, ok: false, files: [], conflicts: ['b.ts'] };
+		expect(mergeView(row({ team: team({ merge: conflict }) }))).toMatchObject({ state: 'conflict', conflicts: ['b.ts'], actionable: true });
+		expect(mergeView(row({ status: 'conflict' }))).toMatchObject({ state: 'conflict', conflicts: [] });
+		expect(mergeView(row({ team: team({ merge: { ...conflict, conflicts: [], error: 'not a git repository' } }) }))).toMatchObject({
+			state: 'failed',
+			error: 'not a git repository',
+			actionable: true
+		});
+	});
+
+	it('reads the files git status lists', () => {
+		expect(porcelainFiles(' M src/a.ts\n?? new/\nR  old.ts -> new.ts\n?? "with space.ts"\n')).toEqual(['src/a.ts', 'new/', 'new.ts', 'with space.ts']);
+		expect(porcelainFiles('')).toEqual([]);
+	});
+
+	it('carries the team’s role and state words on the rows', () => {
+		const rows = agentRows({
+			runs: { workflows: [], agents: [run({ id: '/root/w', state: 'completed' })] },
+			subagents: { '/root/w': { status: 'budget_exhausted', message: '', role: 'worker' } },
+			team: { '/root/w': team({ role: 'reviewer' }) }
+		});
+		expect(rows[0]).toMatchObject({ state: 'done', status: 'budget_exhausted', role: 'reviewer' });
+		expect(rows[0]!.team?.files).toEqual(['a.ts', 'b.ts']);
 	});
 });

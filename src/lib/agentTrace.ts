@@ -17,6 +17,8 @@ export function runState(state: string): RunState {
 		case 'done':
 		case 'completed':
 		case 'success':
+		// The agent team: done, but its changes did not merge.
+		case 'conflict':
 			return 'done';
 		case 'failed':
 		case 'error':
@@ -28,6 +30,8 @@ export function runState(state: string): RunState {
 		case 'skipped':
 		case 'interrupted':
 		case 'closed':
+		// The agent team's token budget ran out (its partial result stays).
+		case 'budget_exhausted':
 			return 'stopped';
 		default:
 			return state ? 'queued' : 'done';

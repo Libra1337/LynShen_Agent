@@ -90,6 +90,9 @@ export type Msg =
 	  }
 	| { kind: 'system'; text: string }
 	| { kind: 'error'; text: string }
+	/** A message one agent of the team sent another (`agent_message`): agent
+	 *  paths, or `parent` for the main agent; one line. */
+	| { kind: 'agent_message'; from: string; to: string; summary: string }
 	/** A plan the engine proposes in plan mode (`proposed_plan`): `text` is
 	 *  its Markdown; status pending / approved / revising. */
 	| { kind: 'plan'; id: string; title: string; text: string; status: string };
@@ -155,7 +158,69 @@ export interface CommandItem {
 export interface PlanStep {
 	step: string;
 	status: string;
+	/** The subagent that owns the step (its path), when the plan assigns one. */
+	agent?: string;
+	/** The files the step expects to write. */
+	files?: string[];
 }
+
+/** A plan step as the engines send it (`plan` / `update_plan`). */
+function planStep(raw: Record<string, unknown>): PlanStep {
+	const files = arr<unknown>(raw.files).filter((f): f is string => typeof f === 'string' && f !== '');
+	return {
+		step: str(raw.step),
+		status: str(raw.status),
+		...(str(raw.agent) ? { agent: str(raw.agent) } : {}),
+		...(files.length ? { files } : {})
+	};
+}
+
+/** What became of a subagent's worktree changes (`merge_result`). */
+export interface MergeResult {
+	action: 'apply' | 'discard';
+	ok: boolean;
+	files: string[];
+	conflicts: string[];
+	/** Why it failed when there are no conflicts to name. */
+	error: string;
+}
+
+/** A subagent of the agent team as its events report it: its role, the plan
+ *  step it works on, where it writes, the files it changed and what became
+ *  of them. Kept for the session: its worktree stays until it is merged or
+ *  discarded, past the turn that ran it. */
+export interface TeamAgent {
+	role: string;
+	/** The plan step it works on (0-based index), null for none. */
+	planStep: number | null;
+	/** Its working directory; a worktree of its own when `worktree`. */
+	workdir: string;
+	worktree: boolean;
+	/** Files it changed (relative to its workdir). */
+	files: string[];
+	/** The merge_agent op sent and not answered yet. */
+	pending: 'apply' | 'discard' | null;
+	merge: MergeResult | null;
+}
+
+/** One message between the agents of the team (`agent_message`). */
+export interface AgentMessage {
+	from: string;
+	to: string;
+	summary: string;
+	at: number;
+}
+
+/** The team's token use in this turn against its limit (0: none). */
+export interface TeamBudget {
+	used: number;
+	limit: number;
+}
+
+/** A subagent's workdir is a worktree of its own: the engine says so, or it
+ *  lies where the engine makes them (`<cwd>/.lynshen/agents/<task>-<ms>`). */
+const isWorktree = (workdir: string, isolation: string) =>
+	isolation === 'worktree' || (isolation === '' && /[\\/]\.lynshen[\\/]agents[\\/][^\\/]+[\\/]?$/.test(workdir));
 
 /** Mode names as a client sends them to the daemon (see backends/lynshen.ts). */
 const PENDING_MODES: Record<string, ApprovalMode> = { manual: 'ask', 'auto-edit': 'edits', auto: 'auto', 'full-access': 'all', plan: 'plan' };
@@ -189,10 +254,26 @@ export interface SubagentInfo {
 	/** When this client first saw it, and saw it end (ms). */
 	startedAt?: number;
 	endedAt?: number;
+	/** Its role (explorer, worker, reviewer or a custom one). */
+	role?: string;
 }
 
-/** The lifecycle words of an agent that has stopped for good. */
-const FINAL_AGENT = ['completed', 'done', 'failed', 'errored', 'stopped', 'interrupted', 'closed', 'killed', 'cancelled'];
+/** The lifecycle words of an agent that has stopped for good (`conflict`:
+ *  done, its changes did not merge; `budget_exhausted`: stopped by the
+ *  team's token budget). */
+const FINAL_AGENT = [
+	'completed',
+	'done',
+	'failed',
+	'errored',
+	'stopped',
+	'interrupted',
+	'closed',
+	'killed',
+	'cancelled',
+	'conflict',
+	'budget_exhausted'
+];
 
 /** Calls that start a subagent: their arguments name it. */
 const SUBAGENT_CALLS = new Set(['spawn_agent', 'Task', 'Agent']);
@@ -446,6 +527,14 @@ export class ChatState {
 	/** The latest tool call each Task subagent made, by its label (claude
 	 *  attributes the calls of a subagent to it, `tool_start.subagent`). */
 	subagentLastTool = $state<Record<string, Extract<Msg, { kind: 'tool' }>>>({});
+	/** The agent team by agent path: roles, plan steps, worktrees and merges
+	 *  (see TeamAgent). Unlike `subagents`, kept past the turn. */
+	team = $state<Record<string, TeamAgent>>({});
+	/** Messages between the agents of the team, oldest first. */
+	agentMessages = $state<AgentMessage[]>([]);
+	/** The team's token use in the running (or last) turn; null until the
+	 *  engine reports one. */
+	teamBudget = $state<TeamBudget | null>(null);
 	/** The engine has sent an agent trace (`agent_runs`): it answers the trace ops
 	 *  (an older LynShen engine refuses them). */
 	agentRunsSeen = $state(false);
@@ -811,8 +900,10 @@ export class ChatState {
 		this.#turnStart = Date.now();
 		this.turnStartedAt = this.#turnStart;
 		this.turnEndedAt = 0;
-		// The agents a finished turn ran leave with it.
+		// The agents a finished turn ran leave with it (their team entries,
+		// and worktrees still to merge, stay).
 		for (const [id, a] of Object.entries(this.subagents)) if (a.endedAt) delete this.subagents[id];
+		this.teamBudget = null;
 		this.#segStart = this.#turnStart;
 		this.#firstOutput = null;
 		this.#turnIn = this.#turnOut = this.#turnTools = this.#turnSegments = 0;
@@ -1043,7 +1134,7 @@ export class ChatState {
 	/** A spawn_agent call finished: an engine that reports its subagents
 	 *  only there (LynShen before the agent trace) names the agent in the
 	 *  output (`path`, `task_name`, `status`). */
-	#spawned(callId: string, output: string) {
+	#spawned(callId: string, output: string, args: string) {
 		let out: Record<string, unknown>;
 		try {
 			out = JSON.parse(output) as Record<string, unknown>;
@@ -1054,14 +1145,75 @@ export class ChatState {
 		if (!path) return;
 		const prev = this.subagents[path];
 		this.subagents[path] = {
+			...prev,
 			status: prev?.status ?? (str(out.status) || 'running'),
 			message: prev?.message ?? '',
 			label: prev?.label ?? (str(out.task_name) || undefined),
-			...(prev?.model ? { model: prev.model } : {}),
 			toolUseId: prev?.toolUseId ?? callId,
-			startedAt: prev?.startedAt ?? Date.now(),
-			...(prev?.endedAt ? { endedAt: prev.endedAt } : {})
+			startedAt: prev?.startedAt ?? Date.now()
 		};
+		// The call's arguments name its role and isolation; its output, the workdir.
+		let input: Record<string, unknown> = {};
+		try {
+			const v = JSON.parse(args) as unknown;
+			if (v && typeof v === 'object' && !Array.isArray(v)) input = v as Record<string, unknown>;
+		} catch {
+			/* no arguments shown */
+		}
+		this.#noteTeam(path, { ...input, ...out });
+	}
+
+	/** A list_agents call's answer names each agent's workdir and, once it
+	 *  finished, the files it changed (`agents[].task_name` is its path). */
+	#listed(output: string) {
+		let out: Record<string, unknown>;
+		try {
+			out = JSON.parse(output) as Record<string, unknown>;
+		} catch {
+			return;
+		}
+		for (const a of arr<Record<string, unknown>>(out.agents)) {
+			const path = str(a?.task_name);
+			if (!path.startsWith('/')) continue;
+			const result = a.result && typeof a.result === 'object' ? (a.result as Record<string, unknown>) : {};
+			this.#noteTeam(path, { ...result, ...a, files_changed: result.files_changed });
+		}
+	}
+
+	/** Records what an event says of a team agent: `role`, `plan_step`,
+	 *  `workdir`, `isolation`, `files_changed` (each only when present). */
+	#noteTeam(path: string, raw: Record<string, unknown>) {
+		const prev = this.team[path];
+		const role = str(raw.role);
+		const step = raw.plan_step;
+		const workdir = str(raw.workdir);
+		const files = Array.isArray(raw.files_changed)
+			? arr<unknown>(raw.files_changed).filter((f): f is string => typeof f === 'string' && f !== '')
+			: null;
+		if (!prev && !role && typeof step !== 'number' && !workdir && !files?.length) return;
+		const dir = workdir || prev?.workdir || '';
+		this.team[path] = {
+			role: role || prev?.role || '',
+			planStep: typeof step === 'number' && Number.isInteger(step) && step >= 0 ? step : step === null ? null : (prev?.planStep ?? null),
+			workdir: dir,
+			worktree: prev?.worktree || isWorktree(dir, str(raw.isolation)),
+			files: files ?? prev?.files ?? [],
+			pending: prev?.pending ?? null,
+			merge: prev?.merge ?? null
+		};
+	}
+
+	/** The op that merges a subagent's worktree into the project (`apply`)
+	 *  or drops it (`discard`); marks the agent as waiting for the answer. */
+	mergeAgent(target: string, action: 'apply' | 'discard'): { op: 'merge_agent'; target: string; action: 'apply' | 'discard' } {
+		const a = this.team[target];
+		if (a) a.pending = action;
+		return { op: 'merge_agent', target, action };
+	}
+
+	/** The messages an agent sent or received, oldest first. */
+	messagesOf(path: string): AgentMessage[] {
+		return this.agentMessages.filter((m) => m.from === path || m.to === path);
 	}
 
 	handle(ev: AgentEvent) {
@@ -1243,7 +1395,8 @@ export class ChatState {
 					t.running = false;
 					t.isError = ev.is_error === true;
 				}
-				if (str(ev.name) === 'spawn_agent' && ev.is_error !== true) this.#spawned(str(ev.call_id), str(ev.output));
+				if (str(ev.name) === 'spawn_agent' && ev.is_error !== true) this.#spawned(str(ev.call_id), str(ev.output), t?.args ?? '');
+				if (str(ev.name) === 'list_agents' && ev.is_error !== true) this.#listed(str(ev.output));
 				// A successful browser_open acknowledgement carries the URL the agent
 				// wants shown — drive the embedded browser panel.
 				if (ev.is_error !== true && str(ev.name) === 'browser_open') {
@@ -1422,6 +1575,8 @@ export class ChatState {
 						if (role === 'branch') return { kind: 'system', text: `branch: ${str(it.label)}` };
 						if (role === 'plan')
 							return { kind: 'plan', id: str(it.id), title: str(it.title), text: str(it.content), status: planStatus(it.status) };
+						if (role === 'agent_message' && (str(it.summary) || str(it.content)))
+							return { kind: 'agent_message', from: str(it.from), to: str(it.to), summary: str(it.summary) || str(it.content) };
 						return null;
 					})
 					.filter((m): m is Msg => m !== null);
@@ -1478,7 +1633,9 @@ export class ChatState {
 				this.goal = ev.goal ? (ev.goal as unknown as Goal) : null;
 				break;
 			case 'plan': {
-				const next = arr<PlanStep>(ev.plan);
+				const next = arr<Record<string, unknown>>(ev.plan)
+					.filter((p) => p && typeof p === 'object')
+					.map(planStep);
 				if (JSON.stringify(next) !== JSON.stringify(this.plan)) this.planAt = Date.now();
 				this.plan = next;
 				break;
@@ -1576,11 +1733,50 @@ export class ChatState {
 					...((str(ev.label) || prev?.label) ? { label: str(ev.label) || prev?.label } : {}),
 					...((str(ev.model) || prev?.model) ? { model: str(ev.model) || prev?.model } : {}),
 					...((str(ev.tool_use_id) || prev?.toolUseId) ? { toolUseId: str(ev.tool_use_id) || prev?.toolUseId } : {}),
+					...((str(ev.role) || prev?.role) ? { role: str(ev.role) || prev?.role } : {}),
 					startedAt: prev?.startedAt ?? now,
 					...(ended ? { endedAt: prev?.endedAt ?? now } : {})
 				};
+				this.#noteTeam(path, ev);
 				break;
 			}
+			// The agent team (工作组): messages between its agents, the answer
+			// to a merge of a worktree, the turn's token budget.
+			case 'agent_message': {
+				const msg = { from: str(ev.from), to: str(ev.to), summary: str(ev.summary) };
+				if (!msg.summary) break;
+				this.agentMessages.push({ ...msg, at: Date.now() });
+				this.#collapseReasoning();
+				this.#closeSegment(Date.now());
+				this.messages.push({ kind: 'agent_message', ...msg });
+				break;
+			}
+			case 'merge_result': {
+				const target = str(ev.target);
+				if (!target) break;
+				const action = ev.action === 'discard' ? 'discard' : 'apply';
+				const files = arr<unknown>(ev.files).filter((f): f is string => typeof f === 'string');
+				const prev = this.team[target];
+				this.team[target] = {
+					role: prev?.role ?? '',
+					planStep: prev?.planStep ?? null,
+					workdir: prev?.workdir ?? '',
+					worktree: true,
+					files: files.length ? files : (prev?.files ?? []),
+					pending: null,
+					merge: {
+						action,
+						ok: ev.ok === true,
+						files,
+						conflicts: arr<unknown>(ev.conflicts).filter((f): f is string => typeof f === 'string'),
+						error: str(ev.error) || str(ev.message)
+					}
+				};
+				break;
+			}
+			case 'team_budget':
+				this.teamBudget = { used: Math.max(0, num(ev.used)), limit: Math.max(0, num(ev.limit)) };
+				break;
 			// The plan as the model writes it: one message grows, and the
 			// proposed_plan with the same id completes it.
 			case 'plan_draft': {
@@ -1677,6 +1873,7 @@ export class ChatState {
 					})),
 					agents: arr<Record<string, unknown>>(ev.agents).map(agentRun)
 				};
+				for (const a of arr<Record<string, unknown>>(ev.agents)) if (str(a.id)) this.#noteTeam(str(a.id), a);
 				break;
 			}
 			case 'subagent_transcript': {
@@ -1806,10 +2003,17 @@ export class ChatState {
 				break;
 			case 'error': {
 				// An engine without the agent trace refuses its ops: nothing failed.
-				const refused = /^unknown op: (agent_runs|subagent_transcript)$/.exec(str(ev.message));
+				const refused = /^unknown op: (agent_runs|subagent_transcript|merge_agent)$/.exec(str(ev.message));
 				if (refused) {
 					if (refused[1] === 'subagent_transcript' && this.agentFocus && !this.subagentTranscripts[this.agentFocus])
 						this.subagentTranscripts[this.agentFocus] = { task: '', messages: [], error: t('dock.agents.noTranscript') };
+					// An engine before the agent team: the merges sent are not coming.
+					if (refused[1] === 'merge_agent')
+						for (const a of Object.values(this.team))
+							if (a.pending) {
+								a.merge = { action: a.pending, ok: false, files: [], conflicts: [], error: t('chat.team.mergeUnsupported') };
+								a.pending = null;
+							}
 					break;
 				}
 				this.retry = null;

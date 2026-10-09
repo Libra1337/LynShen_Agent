@@ -117,6 +117,8 @@
 	import PlanPanel from '$lib/PlanPanel.svelte';
 	import ProposalPane from '$lib/ProposalPane.svelte';
 	import { planPages, proposalOf, proposalPanel } from '$lib/planPages.svelte';
+	import { agentChanges, agentChangesOf, agentChangesPanel } from '$lib/agents/agentChanges.svelte';
+	import { shortPath } from '$lib/agentProgress';
 	import type { ApprovalMode } from '$lib/approval';
 	import GoalPanel from '$lib/GoalPanel.svelte';
 	import ChangesPanel from '$lib/ChangesPanel.svelte';
@@ -500,6 +502,8 @@
 		if (tab.panel === 'audit') return t('editor.title');
 		const proposal = proposalOf(tab.panel);
 		if (proposal) return planOf(proposal.sessionId, proposal.planId)?.title || t('chat.planCard.label');
+		const changes = agentChangesOf(tab.panel);
+		if (changes) return t('chat.team.changesTab', { name: shortPath(changes.agent) });
 		return (ALL_PANELS as readonly string[]).includes(tab.panel) ? t(`dock.tabs.${tab.panel}`) : tab.panel;
 	}
 	function tuiReady(sid: string): boolean {
@@ -675,6 +679,19 @@
 		const request = planPages.request;
 		if (!request || !tilesReady) return;
 		untrack(() => openPlanPage(request.sessionId, request.planId));
+	});
+	/** A worktree subagent's changes beside its session's chat: the Changes
+	 *  panel at the agent's workdir, one tab per agent. */
+	function openAgentChanges(sessionId: string, agent: string) {
+		const panel = agentChangesPanel(sessionId, agent);
+		const existing = findPanelTab(panel);
+		if (existing) return applyTiles(activateTab(tiles, existing.id));
+		openTool(leafOfTab(tiles.root, chatPanel(sessionId))?.id ?? focusedLeaf, panel);
+	}
+	$effect(() => {
+		const request = agentChanges.request;
+		if (!request || !tilesReady) return;
+		untrack(() => openAgentChanges(request.sessionId, request.agent));
 	});
 
 	// The workbench-active session always has a chat tile: activating a session
@@ -1601,6 +1618,14 @@
 											if (action.decision === 'revise') panes.get(p.sessionId)?.focusComposer();
 										}}
 									/>
+								{:else if agentChangesOf(tab.panel)}
+									{@const c = agentChangesOf(tab.panel)!}
+									{@const member = sessionMap.get(c.sessionId)?.chat.team[c.agent]}
+									{#if member?.workdir && !member.merge?.ok}
+										<ChangesPanel cwd={member.workdir} files={member.files} readonly title={t('chat.team.changesTab', { name: shortPath(c.agent) })} />
+									{:else}
+										<p class="panel-gone">{t('chat.team.changesGone')}</p>
+									{/if}
 								{:else if tab.panel === 'goal'}<GoalPanel goal={chat?.goal ?? null} />
 								{:else if tab.panel === 'agents'}{#if chat && activeId}{#key activeId}<AgentRunsPanel {chat} onOp={(op) => activeId && dispatch(activeId, op)} />{/key}{/if}
 								{:else if tab.panel === 'changes'}<ChangesPanel cwd={activeProject?.path ?? ''} files={chat?.changedFiles ?? []} agentDiffs={chat?.agentDiffs ?? {}} onRevert={(p) => chat && (chat.changedFiles = chat.changedFiles.filter((x) => x !== p))} />
@@ -1945,6 +1970,12 @@
 		justify-content: center;
 		font-size: var(--fs-sm);
 		color: var(--dim2);
+	}
+	.panel-gone {
+		margin: 0;
+		padding: 18px;
+		font-size: var(--fs-sm);
+		color: var(--dim);
 	}
 	/* ---------- sidebar resizer ---------- */
 	.resizer {

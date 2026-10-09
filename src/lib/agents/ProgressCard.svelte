@@ -1,7 +1,8 @@
 <script lang="ts">
 	// Top right of the conversation while a turn has a todo list or runs
-	// subagents: the steps with their state and the subagents with their
-	// latest action, as the engines report them. Folds to a pill (the user's
+	// subagents: a one-line summary (steps done, subagents running, the
+	// team's tokens against its budget), the steps with their state and owner,
+	// and the subagents with their latest action, as the engines report them. Folds to a pill (the user's
 	// choice is kept per session) and folds by itself a few seconds after the
 	// turn is over; the pill stays until the next turn.
 	import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
@@ -9,7 +10,8 @@
 	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
 	import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
 	import { t } from '$lib/i18n';
-	import { cardMode, pillParts, planShown, planSummary, type AgentRow } from '$lib/agentProgress';
+	import { cardMode, pillParts, planShown, planSummary, shortPath, teamSummary, type AgentRow } from '$lib/agentProgress';
+	import { roleLabel, teamNote } from './teamText';
 	import type { ChatState } from '$lib/chat.svelte';
 	import { sheet } from '$lib/ui/motion';
 	import StateIcon from './StateIcon.svelte';
@@ -67,7 +69,7 @@
 		return () => clearTimeout(timer);
 	});
 
-	const plan = $derived(planSummary(chat.plan));
+	const plan = $derived(planSummary(chat.plan, chat.team));
 	const planFresh = $derived(chat.turnStartedAt > 0 && chat.planAt >= chat.turnStartedAt);
 	const showPlan = $derived(planShown(plan, chat.busy, planFresh));
 	const mode = $derived(
@@ -82,6 +84,17 @@
 		})
 	);
 	const pill = $derived(pillParts(plan, rows, showPlan));
+	const summary = $derived(teamSummary(plan, rows, chat.teamBudget, showPlan));
+	const summaryParts = $derived.by(() => {
+		const parts: { text: string; budget?: 'ok' | 'warn' | 'over' }[] = [];
+		if (summary.steps) parts.push({ text: t('chat.progress.stepsDone', summary.steps) });
+		if (summary.running) parts.push({ text: t('chat.progress.runningAgentsN', { n: summary.running }) });
+		else if (summary.agents) parts.push({ text: t('chat.progress.agentsN', { n: summary.agents }) });
+		if (summary.budget)
+			parts.push({ text: t('chat.progress.budget', { used: summary.budget.used, limit: summary.budget.limit }), budget: summary.budget.level });
+		return parts;
+	});
+	const ownerRow = (agent: string) => (agent ? rows.find((r) => r.id === agent) : undefined);
 
 	function unfold() {
 		if (folded) setFolded(false);
@@ -91,7 +104,9 @@
 		peek = false;
 		setFolded(true);
 	}
-	const agentTitle = (r: AgentRow) => [r.label, r.model, r.activity].filter(Boolean).join(' · ');
+	const agentTitle = (r: AgentRow) => [r.label, r.role ? roleLabel(r.role) : '', r.model, activityOf(r)].filter(Boolean).join(' · ');
+	/** The team's word for its state wins over its latest action. */
+	const activityOf = (r: AgentRow) => teamNote(r) || r.activity;
 </script>
 
 {#if mode === 'pill'}
@@ -105,18 +120,40 @@
 	<section class="card" in:sheet={{ y: -8 }} aria-label={t('chat.progress.label')}>
 		<header>
 			<span class="title">{t('chat.progress.label')}</span>
-			{#if showPlan}<span class="num count">{t('chat.progress.count', { done: plan.done, total: plan.total })}</span>{/if}
 			<span class="grow"></span>
 			<button class="fold" onclick={fold} aria-label={t('chat.progress.fold')} title={t('chat.progress.fold')}><CaretUpIcon size={14} /></button>
 		</header>
+		{#if summaryParts.length}
+			<!-- One line; a narrow card wraps it between parts, never inside one. -->
+			<p class="summary">
+				{#each summaryParts as p, i (i)}
+					<span class="part" class:num={!!p.budget} class:warn={p.budget === 'warn'} class:over={p.budget === 'over'} title={p.budget ? t('chat.progress.budgetTitle') : undefined}
+						>{p.text}{#if i < summaryParts.length - 1}<span class="dot">·</span>{/if}</span
+					>
+				{/each}
+			</p>
+		{/if}
 		<div class="body">
 			{#if showPlan}
 				<div class="sec">{t('chat.progress.todo')}</div>
 				<ol class="steps">
 					{#each plan.steps as s, i (i)}
+						{@const owner = ownerRow(s.agent)}
 						<li class="step {s.state}" class:current={i === plan.current} aria-current={i === plan.current ? 'step' : undefined}>
 							<StateIcon state={s.state} size={14} label={t(`chat.progress.step.${s.state}`)} />
-							<span class="stext">{s.text}</span>
+							<span class="stext" title={s.files.length ? s.files.join('\n') : undefined}>{s.text}</span>
+							{#if s.agent}
+								<button
+									class="owner"
+									disabled={!onOpen || !owner}
+									onclick={() => owner && onOpen?.(owner)}
+									title={t('chat.progress.owner', { name: shortPath(s.agent) })}
+									aria-label={t('chat.progress.owner', { name: shortPath(s.agent) })}
+								>
+									{#if owner}<StateIcon state={owner.state} size={11} />{/if}
+									<span>{owner?.label ?? shortPath(s.agent)}</span>
+								</button>
+							{/if}
 						</li>
 					{/each}
 				</ol>
@@ -137,12 +174,13 @@
 								<span class="acol">
 									<span class="aline">
 										<span class="aname">{r.label}</span>
+										{#if r.role}<span class="arole" title={t('chat.team.roleTitle', { role: r.role })}>{roleLabel(r.role)}</span>{/if}
 										{#if r.model}<span class="amodel">{r.model.replace(/^claude-/, '')}</span>{/if}
 										{#if r.progress}<span class="amodel num">{r.progress.done}/{r.progress.total}</span>{/if}
 										<span class="grow"></span>
 										<Elapsed row={r} />
 									</span>
-									<span class="act" class:err={r.state === 'failed'}>{r.activity || t('chat.progress.noActivity')}</span>
+									<span class="act" class:err={r.state === 'failed'} class:warn={!!teamNote(r)}>{activityOf(r) || t('chat.progress.noActivity')}</span>
 								</span>
 								{#if onOpen}<span class="go"><CaretRightIcon size={12} /></span>{/if}
 							</button>
@@ -167,7 +205,7 @@
 	.card {
 		display: flex;
 		flex-direction: column;
-		width: min(320px, calc(100% - 28px));
+		width: min(360px, calc(100% - 28px));
 		max-height: min(60%, 520px);
 		border-radius: var(--r-lg);
 		overflow: hidden;
@@ -208,9 +246,27 @@
 		font-size: var(--fs-sm);
 		font-weight: 600;
 	}
-	.count {
+	.summary {
+		display: flex;
+		flex-wrap: wrap;
+		row-gap: 2px;
+		margin: 0;
+		padding: 0 14px 6px;
 		font-size: var(--fs-2xs);
 		color: var(--dim);
+	}
+	.part {
+		white-space: nowrap;
+	}
+	.part .dot {
+		margin: 0 5px;
+		color: var(--dim2);
+	}
+	.part.warn {
+		color: var(--warn);
+	}
+	.part.over {
+		color: var(--err);
 	}
 	.grow {
 		flex: 1;
@@ -279,8 +335,42 @@
 		color: var(--dim2);
 	}
 	.stext {
+		flex: 1;
 		min-width: 0;
 		overflow-wrap: anywhere;
+	}
+	.owner {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		gap: 4px;
+		max-width: 110px;
+		margin: 1px -4px 0 0;
+		padding: 0 4px;
+		border: none;
+		border-radius: var(--r-xs);
+		background: none;
+		color: var(--dim);
+		font-family: var(--font-mono);
+		font-size: var(--fs-2xs);
+		font-weight: 400;
+		line-height: 1.5;
+		cursor: pointer;
+		transition:
+			background var(--t-fast) var(--ease-out),
+			color var(--t-fast) var(--ease-out);
+	}
+	.owner span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.owner:disabled {
+		cursor: default;
+	}
+	.owner:hover:not(:disabled) {
+		background: color-mix(in oklab, var(--text) 8%, transparent);
+		color: var(--text);
 	}
 	.agent {
 		display: flex;
@@ -345,6 +435,17 @@
 	}
 	.act.err {
 		color: var(--err);
+	}
+	.act.warn {
+		color: var(--warn);
+	}
+	.arole {
+		flex: none;
+		padding: 0 5px;
+		border-radius: var(--r-xs);
+		background: var(--surface2);
+		font-size: var(--fs-2xs);
+		color: var(--dim);
 	}
 	.go {
 		display: inline-flex;

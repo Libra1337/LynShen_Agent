@@ -65,11 +65,44 @@ const settings = {
 			mcp: 'MCP 服务器',
 			market: '技能市场',
 			agents: '编码智能体',
+			team: '工作组',
 			acp: '外部智能体（ACP）',
 			daemon: '远程访问',
 			updates: '更新',
 			import: '导入',
 			shortcuts: '快捷键'
+		},
+		team: {
+			fanout: '派出子智能体',
+			fanoutOpt: { off: '关闭', plan: '按计划', auto: '自动' },
+			fanoutHint: {
+				off: '不派出子智能体，所有工作由主智能体完成。',
+				plan: '写代码的子智能体只按你批准的计划派出；调研和审查不受限制。',
+				auto: '主智能体自己判断何时派出子智能体，受下面的上限和预算约束。'
+			},
+			limits: '上限与预算',
+			maxLive: '同时运行的子智能体',
+			maxLiveHint: '达到上限后，新的子智能体要等前面的结束',
+			maxDepth: '嵌套层数',
+			maxDepthHint: '子智能体还能再派出子智能体的层数',
+			budget: '每轮 token 预算',
+			budgetHint: '一轮里全部子智能体的 token 总上限，0 = 不限',
+			keepDays: '保留没合并的 worktree',
+			keepDaysHint: '子智能体没合并的改动保留的天数，到期自动清理',
+			days: '天',
+			tokensUnit: 'tokens',
+			roles: '角色',
+			rolesHint: '自定义角色放在 ~/.lynshen/roles/ 或项目的 .lynshen/roles/，每个角色一个 .md 文件。同名时项目覆盖用户，用户覆盖内置。',
+			source: { builtin: '内置', user: '用户', project: '项目' },
+			shadowed: { user: '已被同名的用户角色覆盖', project: '已被同名的项目角色覆盖' },
+			noDescription: '没有描述',
+			builtin: {
+				explorer: '只读调研，默认用较便宜的模型。',
+				worker: '在独立的 worktree 里写代码，改动合并后才进入项目。',
+				reviewer: '只读，不继承对话上下文，只审查 diff。'
+			},
+			loadingRoles: '正在读取角色',
+			refreshRoles: '重新读取角色'
 		},
 		shortcuts: {
 			customize: '自定义快捷键',
@@ -560,11 +593,44 @@ const settings = {
 			mcp: 'MCP servers',
 			market: 'Skills marketplace',
 			agents: 'Coding agents',
+			team: 'Agent team',
 			acp: 'External agents (ACP)',
 			daemon: 'Remote access',
 			updates: 'Updates',
 			import: 'Import',
 			shortcuts: 'Shortcuts'
+		},
+		team: {
+			fanout: 'Start subagents',
+			fanoutOpt: { off: 'Off', plan: 'By plan', auto: 'Auto' },
+			fanoutHint: {
+				off: 'No subagents. The main agent does all the work.',
+				plan: 'Subagents that write code start only from a plan you approved. Exploring and reviewing are not limited.',
+				auto: 'The main agent decides when to start subagents, within the limits and budget below.'
+			},
+			limits: 'Limits and budget',
+			maxLive: 'Subagents running at once',
+			maxLiveHint: 'At the limit, a new subagent waits for one to finish',
+			maxDepth: 'Nesting depth',
+			maxDepthHint: 'How many levels of subagents can start subagents',
+			budget: 'Token budget per turn',
+			budgetHint: 'Total tokens all subagents of a turn can use, 0 = no limit',
+			keepDays: 'Keep unmerged worktrees',
+			keepDaysHint: 'Days to keep subagent changes that were not merged, then clean them up',
+			days: 'days',
+			tokensUnit: 'tokens',
+			roles: 'Roles',
+			rolesHint: 'Put custom roles in ~/.lynshen/roles/ or in .lynshen/roles/ of the project, one .md file per role. For the same name, a project role replaces a user role, and a user role replaces a built-in one.',
+			source: { builtin: 'Built-in', user: 'User', project: 'Project' },
+			shadowed: { user: 'Replaced by the user role of the same name', project: 'Replaced by the project role of the same name' },
+			noDescription: 'No description',
+			builtin: {
+				explorer: 'Read-only research. Uses a cheaper model by default.',
+				worker: 'Writes code in its own worktree. Its changes reach the project only when merged.',
+				reviewer: 'Read-only. Starts without the conversation and reviews the diff only.'
+			},
+			loadingRoles: 'Reading roles',
+			refreshRoles: 'Read the roles again'
 		},
 		shortcuts: {
 			customize: 'Custom shortcuts',

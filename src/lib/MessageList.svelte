@@ -8,6 +8,7 @@
 	import Collapse from '$lib/ui/Collapse.svelte';
 	import ToolCard from '$lib/ToolCard.svelte';
 	import SubagentCard from '$lib/agents/SubagentCard.svelte';
+	import AgentMessageLine from '$lib/agents/AgentMessageLine.svelte';
 	import PlanCard, { type PlanAction } from '$lib/PlanCard.svelte';
 	import type { ApprovalMode } from '$lib/approval';
 	import { SPAWN_TOOLS, WAIT_TOOLS, type AgentRow } from '$lib/agentProgress';
@@ -54,6 +55,8 @@
 		traceOf,
 		agents,
 		onOpenAgent,
+		onAgentChanges,
+		onMergeAgent,
 		onPlan,
 		onOpenPlan,
 		planMode = 'edits',
@@ -100,6 +103,10 @@
 		agents?: AgentRow[];
 		/** Shows a subagent's own conversation. */
 		onOpenAgent?: (row: AgentRow) => void;
+		/** Shows a worktree subagent's changes. */
+		onAgentChanges?: (row: AgentRow) => void;
+		/** Merges a worktree subagent's changes into the project, or drops them. */
+		onMergeAgent?: (row: AgentRow, action: 'apply' | 'discard') => void;
 		/** Approves or revises a proposed plan (absent: plans have no actions). */
 		onPlan?: (id: string, action: PlanAction) => void;
 		/** The mode a plan's approval offers first. */
@@ -429,6 +436,7 @@
 		if (m.kind === 'system') return false;
 		if (m.kind === 'tool') return !!(m.name || m.output);
 		if (m.kind === 'plan') return !!(m.title || m.text);
+		if (m.kind === 'agent_message') return !!m.summary;
 		return !!m.text && m.text.trim().length > 0;
 	}
 
@@ -595,12 +603,14 @@
 					</div>
 				{/if}
 			{:else if agents && isAgentCall(m)}
-				<SubagentCard name={m.name} callId={m.callId} output={m.output} args={m.args} running={m.running} isError={m.isError} rows={agents} onOpen={onOpenAgent} />
+				<SubagentCard name={m.name} callId={m.callId} output={m.output} args={m.args} running={m.running} isError={m.isError} rows={agents} onOpen={onOpenAgent} onViewChanges={onAgentChanges} onMerge={onMergeAgent} />
 			{:else}
 				<ToolCard name={m.name} output={m.output} running={m.running} isError={m.isError} subagent={m.subagent} trace={traceOf?.(m) ?? undefined} />
 			{/if}
 		{:else if m.kind === 'plan'}
 			<PlanCard id={m.id} title={m.title} text={m.text} status={m.status} actionable={m === lastShown} defaultMode={planMode} onAction={onPlan} onOpen={onOpenPlan} />
+		{:else if m.kind === 'agent_message'}
+			<AgentMessageLine from={m.from} to={m.to} summary={m.summary} />
 		{:else if m.kind === 'error'}
 			<ErrorNotice text={m.text} {backend} {provider} onAction={onErrorAction} onDismiss={onDismiss ? () => onDismiss(m) : undefined} />
 				{/if}
