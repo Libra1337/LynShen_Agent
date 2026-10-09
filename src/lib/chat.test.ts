@@ -15,6 +15,15 @@ describe('countDiffLines', () => {
 });
 
 describe('ChatState.handle', () => {
+	it('leaves a reasoning block the reader opened open when it ends', () => {
+		const c = new ChatState();
+		c.handle({ type: 'reasoning_delta', delta: 'think' });
+		const block = c.messages.find((m) => m.kind === 'reasoning');
+		if (block?.kind === 'reasoning') block.collapsed = false;
+		c.handle({ type: 'assistant_delta', delta: 'answer' });
+		expect(block?.kind === 'reasoning' && !block.collapsed && !block.live).toBe(true);
+	});
+
 	it('records how long the model reasoned once the answer starts', () => {
 		vi.useFakeTimers();
 		try {
@@ -25,11 +34,14 @@ describe('ChatState.handle', () => {
 			c.handle({ type: 'reasoning_delta', delta: ' more' });
 			const block = c.messages.find((m) => m.kind === 'reasoning');
 			expect(block && block.kind === 'reasoning' && block.durationMs).toBeUndefined();
+			// Folded from the start: one scrolling line until the reader opens it.
+			expect(block?.kind === 'reasoning' && block.collapsed && block.live).toBe(true);
 			vi.setSystemTime(14_200);
 			c.handle({ type: 'assistant_delta', delta: 'answer' });
 			const done = c.messages.find((m) => m.kind === 'reasoning');
 			expect(done?.kind === 'reasoning' && done.durationMs).toBe(4200);
 			expect(done?.kind === 'reasoning' && done.collapsed).toBe(true);
+			expect(done?.kind === 'reasoning' && done.live).toBe(false);
 		} finally {
 			vi.useRealTimers();
 		}

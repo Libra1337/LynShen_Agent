@@ -79,7 +79,11 @@ export type Msg =
 	| {
 			kind: 'reasoning';
 			text: string;
+			/** The reader's view: folded to its heading (and, while it streams,
+			 *  one scrolling line) unless they open it. */
 			collapsed: boolean;
+			/** Still receiving deltas. */
+			live?: boolean;
 			/** When the block's first delta arrived (live turns only). */
 			startedAt?: number;
 			/** How long the model thought, once the block ended. */
@@ -1149,13 +1153,14 @@ export class ChatState {
 		this.#reasoningIdx = -1;
 	}
 
-	/** Collapse the active reasoning block once its tool call or the answer
-	 *  starts (or the turn ends), recording how long the model thought. */
+	/** End the active reasoning block once its tool call or the answer
+	 *  starts (or the turn ends), recording how long the model thought. It
+	 *  stays as the reader left it: folded unless they opened it. */
 	#collapseReasoning() {
 		if (this.#reasoningIdx >= 0) {
 			const m = this.messages[this.#reasoningIdx];
 			if (m?.kind === 'reasoning') {
-				m.collapsed = true;
+				m.live = false;
 				if (m.startedAt !== undefined && m.durationMs === undefined) m.durationMs = Date.now() - m.startedAt;
 			}
 			this.#reasoningIdx = -1;
@@ -1513,7 +1518,7 @@ export class ChatState {
 			case 'reasoning_delta': {
 				this.#outputStarted();
 				if (this.#reasoningIdx < 0) {
-					this.messages.push({ kind: 'reasoning', text: '', collapsed: false, startedAt: Date.now() });
+					this.messages.push({ kind: 'reasoning', text: '', collapsed: true, live: true, startedAt: Date.now() });
 					this.#reasoningIdx = this.messages.length - 1;
 				}
 				const m = this.messages[this.#reasoningIdx];

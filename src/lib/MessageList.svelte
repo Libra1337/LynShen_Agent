@@ -364,6 +364,12 @@
 		return () => cancelAnimationFrame(raf);
 	});
 
+	/** The end of streaming reasoning as one line: enough to overflow the
+	 *  widest pane, so the line always ends at the newest word. */
+	function reasoningTail(text: string): string {
+		return text.slice(-240).replace(/\s+/g, ' ').trimStart();
+	}
+
 	// Text to show for a message — smoothed slice for the one currently streaming.
 	function revealed(m: Msg): string {
 		return m === active ? textOf(m).slice(0, Math.floor(shownChars)) : textOf(m);
@@ -565,6 +571,7 @@
 			</div>
 		{:else if m.kind === 'reasoning'}
 			<div class="reason" class:open={!m.collapsed}>
+				<div class="reason-row">
 				<button class="reason-head" onclick={() => (m.collapsed = !m.collapsed)}>
 					<span>
 						{#if m.durationMs !== undefined}
@@ -577,6 +584,14 @@
 					</span>
 					<span class="rchev"><CaretRightIcon size={13} /></span>
 				</button>
+				{#if m.collapsed && m === streamingReasoning}
+					<!-- Folded while it streams: its latest words in one line,
+					     the earliest sliding out to the left. -->
+					<button class="reason-line" onclick={() => (m.collapsed = false)} aria-label={t('chat.reasoningExpand')}
+						><span>{reasoningTail(revealed(m))}</span></button
+					>
+				{/if}
+				</div>
 				<Collapse open={!m.collapsed}>
 					<div class="reason-body">
 						{#if m === streamingReasoning}
@@ -922,7 +937,14 @@
 	.mono {
 		font-family: var(--font-mono);
 	}
+	.reason-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-width: 0;
+	}
 	.reason-head {
+		flex-shrink: 0;
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
@@ -1011,6 +1033,39 @@
 		flex-direction: column;
 		gap: 2px;
 		margin: 6px 0 0 20px;
+	}
+	/* One line, anchored at its end: overflowing text leaves on the left,
+	   where it fades out. */
+	.reason-line {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		justify-content: flex-end;
+		overflow: hidden;
+		padding: 2px 0;
+		border: none;
+		background: none;
+		color: var(--dim2, var(--dim));
+		font: inherit;
+		font-size: var(--fs-xs);
+		font-style: italic;
+		white-space: nowrap;
+		text-align: left;
+		cursor: pointer;
+		-webkit-mask-image: linear-gradient(to right, transparent, #000 56px);
+		mask-image: linear-gradient(to right, transparent, #000 56px);
+		animation: reason-line-in var(--t-med) var(--ease-out);
+	}
+	.reason-line > span {
+		flex: none;
+	}
+	.reason-line:hover {
+		color: var(--dim);
+	}
+	@keyframes reason-line-in {
+		from {
+			opacity: 0;
+		}
 	}
 	.reason-body {
 		margin-top: 4px;

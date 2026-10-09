@@ -476,7 +476,7 @@
 	const streamingReasoning = $derived.by(() => {
 		if (!chat.busy) return null;
 		const last = chat.messages[chat.messages.length - 1];
-		return last?.kind === 'reasoning' && !last.collapsed ? last : null;
+		return last?.kind === 'reasoning' && last.live ? last : null;
 	});
 
 	// Message indices in this chat matching the find query, and the current one.
