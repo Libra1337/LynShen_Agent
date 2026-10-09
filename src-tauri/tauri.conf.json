@@ -70,10 +70,10 @@
     ],
     "linux": {
       "deb": {
-        "recommends": ["fonts-noto-cjk"]
+        "recommends": ["fonts-noto-cjk", "desktop-file-utils", "xdg-utils"]
       },
       "rpm": {
-        "recommends": ["google-noto-sans-cjk-fonts"]
+        "recommends": ["google-noto-sans-cjk-fonts", "desktop-file-utils", "xdg-utils"]
       }
     }
   }
