@@ -3732,6 +3732,10 @@ pub fn run() {
             app_update::update_apply,
             #[cfg(desktop)]
             app_update::update_policy,
+            #[cfg(desktop)]
+            app_update::update_feeds,
+            #[cfg(desktop)]
+            app_update::feature_flags,
             native_import::import_native_session,
             agent_import::import_scan,
             agent_import::import_apply,

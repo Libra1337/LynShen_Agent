@@ -1,12 +1,14 @@
 <script lang="ts">
-	// Settings → 工作组: whether the main agent starts subagents
-	// (`agents.fanout`), how many run at once and how deep, the token budget
-	// of a turn, how long unmerged worktrees stay, what happens when a
-	// subagent finishes — config.json `agents.*`, written ~500 ms after a
-	// change — whether conversations message each other (`sessions.messages`,
-	// written at once), the roles a subagent can take, read from the role files
-	// (built-in, the user's, the project's), and the team's shell hooks in
-	// ~/.lynshen/hooks.json (`task_completed`, `agent_idle`).
+	// Settings → 工作组: the agent team v2 Beta switch (agents/teamSwitch),
+	// whether the main agent starts subagents (`agents.fanout`), how many run
+	// at once and how deep, the token budget of a turn, how long unmerged
+	// worktrees stay, what happens when a subagent finishes — config.json
+	// `agents.*`, written ~500 ms after a change — whether conversations
+	// message each other (`sessions.messages`, written at once), the roles a
+	// subagent can take, read from the role files (built-in, the user's, the
+	// project's), and the team's shell hooks in ~/.lynshen/hooks.json
+	// (`task_completed`, `agent_idle`). With v2 off, its settings (what
+	// happens when work finishes, the hooks) are not shown.
 	import { onDestroy, onMount } from 'svelte';
 	import { homeDir, join } from '@tauri-apps/api/path';
 	import ArrowsClockwiseIcon from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
@@ -35,6 +37,7 @@
 	} from '$lib/agents/teamConfig';
 	import { listRoles, parseRole, type RoleInfo, type RoleSource } from '$lib/agents/roles';
 	import { listHooks, TEAM_HOOKS, validHookList, withHook, withoutHook, type TeamHook } from '$lib/agents/teamHooks';
+	import { teamSwitch } from '$lib/agents/teamSwitch.svelte';
 	import SettingsSection from './SettingsSection.svelte';
 	import SettingsRow from './SettingsRow.svelte';
 
@@ -55,12 +58,13 @@
 	});
 	const fanoutOpts = $derived(FANOUTS.map((v) => ({ value: v, label: t(`settings.team.fanoutOpt.${v}`) })));
 
-	// config.json's `agents` as last read or written: keys this page does not
-	// show are written back as they are.
+	// config.json's `agents` as last read or written; a write reads the file
+	// again, so keys this page does not show (`team_v2`, which the Beta switch
+	// writes) stay as the file has them then.
 	let agents: unknown = {};
 	let loaded = $state(false);
 	let written = '';
-	let pending: Record<string, unknown> | null = null;
+	let pending: typeof form | null = null;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
 	// ---------- messages between conversations ----------
@@ -85,22 +89,32 @@
 		messages = readSessionMessages(cfg);
 		written = JSON.stringify(teamPatch(agents, form));
 		loaded = true;
+		// config.json may have come after the launch (a first run).
+		void teamSwitch.apply();
 	});
 
-	function flush() {
+	async function flush() {
 		clearTimeout(timer);
 		if (!pending) return;
-		const next = pending;
+		const changed = pending;
 		pending = null;
-		agents = next;
-		written = JSON.stringify(next);
-		writeConfig({ agents: next }).catch((e) => toast.error(t('settings.page.saveFailed', { msg: String(e) })));
+		try {
+			const fresh = ((await readConfig().catch(() => null)) ?? {}) as Record<string, unknown>;
+			const next = teamPatch(fresh.agents ?? agents, changed);
+			agents = next;
+			written = JSON.stringify(next);
+			await writeConfig({ agents: next });
+			// A switch written in between is not lost.
+			void teamSwitch.apply();
+		} catch (e) {
+			toast.error(t('settings.page.saveFailed', { msg: String(e) }));
+		}
 	}
 	$effect(() => {
 		if (!loaded) return;
-		const next = teamPatch(agents, { ...form });
-		if (JSON.stringify(next) === written) return;
-		pending = next;
+		const changed = { ...form };
+		if (JSON.stringify(teamPatch(agents, changed)) === written) return;
+		pending = changed;
 		clearTimeout(timer);
 		timer = setTimeout(flush, 500);
 	});
@@ -195,6 +209,14 @@
 </script>
 
 <SettingsSection>
+	<SettingsRow
+		id="team-v2"
+		title={t('settings.team.v2Title')}
+		tag={t('settings.team.beta')}
+		description={teamSwitch.remote ? t('settings.team.v2Hint') : t('settings.team.v2RemoteOff')}
+	>
+		<Switch checked={teamSwitch.on} disabled={!teamSwitch.remote} label={t('settings.team.v2')} onChange={(on) => teamSwitch.setLocal(on)} />
+	</SettingsRow>
 	<SettingsRow id="team-fanout" title={t('settings.team.fanout')} description={t(`settings.team.fanoutHint.${form.fanout}`)}>
 		<Segmented bind:value={form.fanout} options={fanoutOpts} />
 	</SettingsRow>
@@ -203,14 +225,16 @@
 	</SettingsRow>
 </SettingsSection>
 
-<SettingsSection title={t('settings.team.flow')}>
-	<SettingsRow id="team-wake" title={t('settings.team.wakeOnResult')} description={t('settings.team.wakeOnResultHint')}>
-		<Switch bind:checked={form.wake_on_result} label={t('settings.team.wakeOnResult')} />
-	</SettingsRow>
-	<SettingsRow id="team-review" title={t('settings.team.reviewOnComplete')} description={t('settings.team.reviewOnCompleteHint')}>
-		<Switch bind:checked={form.review_on_complete} label={t('settings.team.reviewOnComplete')} />
-	</SettingsRow>
-</SettingsSection>
+{#if teamSwitch.on}
+	<SettingsSection title={t('settings.team.flow')}>
+		<SettingsRow id="team-wake" title={t('settings.team.wakeOnResult')} description={t('settings.team.wakeOnResultHint')}>
+			<Switch bind:checked={form.wake_on_result} label={t('settings.team.wakeOnResult')} />
+		</SettingsRow>
+		<SettingsRow id="team-review" title={t('settings.team.reviewOnComplete')} description={t('settings.team.reviewOnCompleteHint')}>
+			<Switch bind:checked={form.review_on_complete} label={t('settings.team.reviewOnComplete')} />
+		</SettingsRow>
+	</SettingsSection>
+{/if}
 
 <SettingsSection title={t('settings.team.limits')}>
 	<SettingsRow id="team-max-live" title={t('settings.team.maxLive')} description={t('settings.team.maxLiveHint')}>
@@ -249,46 +273,48 @@
 	<p class="hint">{t('settings.team.rolesHint')}</p>
 </SettingsSection>
 
-<SettingsSection id="team-hooks" title={t('settings.team.hooks')}>
-	{#snippet action()}
-		<button class="iconbtn" title={t('settings.team.refreshHooks')} aria-label={t('settings.team.refreshHooks')} disabled={hooksBusy} onclick={loadHooks}>
-			{#if hooksBusy}<CircleNotchIcon size={14} class="spin" />{:else}<ArrowsClockwiseIcon size={14} />{/if}
-		</button>
-	{/snippet}
-	{#if hooksError}
-		<div class="notice"><Notice tone="error">{t('settings.team.hooksUnreadable', { msg: hooksError })}</Notice></div>
-	{/if}
-	{#each TEAM_HOOKS as key (key)}
-		<SettingsRow id={`team-hook-${key}`} title={t(`settings.team.hook.${key}`)} description={t(`settings.team.hookHint.${key}`)} stacked>
-			<ul class="cmds">
-				{#each listHooks(hooks, key) as h (h.index)}
-					<li class="cmd">
-						<code>{h.command}</code>
-						{#if h.tools}<span class="ctools">{t('settings.team.onlyTools', { tools: h.tools.join(', ') })}</span>{/if}
-						<span class="cact">
-							<IconButton size="sm" label={t('settings.team.removeCommand')} title={t('settings.team.removeCommand')} disabled={hooksBusy || !!hooksError} onclick={() => removeHook(key, h.index, h.command)}>
-								<XIcon size={13} />
-							</IconButton>
-						</span>
-					</li>
-				{:else}
-					<li class="none">{t('settings.team.noCommands')}</li>
-				{/each}
-			</ul>
-			<form
-				class="add"
-				onsubmit={(e) => {
-					e.preventDefault();
-					void addHook(key);
-				}}
-			>
-				<TextField bind:value={drafts[key]} placeholder={t('settings.team.commandPlaceholder')} mono disabled={!!hooksError} />
-				<Button size="sm" type="submit" disabled={hooksBusy || !!hooksError || !drafts[key].trim()}>{t('settings.team.addCommand')}</Button>
-			</form>
-		</SettingsRow>
-	{/each}
-	<p class="hint">{t('settings.team.hooksHint')}</p>
-</SettingsSection>
+{#if teamSwitch.on}
+	<SettingsSection id="team-hooks" title={t('settings.team.hooks')}>
+		{#snippet action()}
+			<button class="iconbtn" title={t('settings.team.refreshHooks')} aria-label={t('settings.team.refreshHooks')} disabled={hooksBusy} onclick={loadHooks}>
+				{#if hooksBusy}<CircleNotchIcon size={14} class="spin" />{:else}<ArrowsClockwiseIcon size={14} />{/if}
+			</button>
+		{/snippet}
+		{#if hooksError}
+			<div class="notice"><Notice tone="error">{t('settings.team.hooksUnreadable', { msg: hooksError })}</Notice></div>
+		{/if}
+		{#each TEAM_HOOKS as key (key)}
+			<SettingsRow id={`team-hook-${key}`} title={t(`settings.team.hook.${key}`)} description={t(`settings.team.hookHint.${key}`)} stacked>
+				<ul class="cmds">
+					{#each listHooks(hooks, key) as h (h.index)}
+						<li class="cmd">
+							<code>{h.command}</code>
+							{#if h.tools}<span class="ctools">{t('settings.team.onlyTools', { tools: h.tools.join(', ') })}</span>{/if}
+							<span class="cact">
+								<IconButton size="sm" label={t('settings.team.removeCommand')} title={t('settings.team.removeCommand')} disabled={hooksBusy || !!hooksError} onclick={() => removeHook(key, h.index, h.command)}>
+									<XIcon size={13} />
+								</IconButton>
+							</span>
+						</li>
+					{:else}
+						<li class="none">{t('settings.team.noCommands')}</li>
+					{/each}
+				</ul>
+				<form
+					class="add"
+					onsubmit={(e) => {
+						e.preventDefault();
+						void addHook(key);
+					}}
+				>
+					<TextField bind:value={drafts[key]} placeholder={t('settings.team.commandPlaceholder')} mono disabled={!!hooksError} />
+					<Button size="sm" type="submit" disabled={hooksBusy || !!hooksError || !drafts[key].trim()}>{t('settings.team.addCommand')}</Button>
+				</form>
+			</SettingsRow>
+		{/each}
+		<p class="hint">{t('settings.team.hooksHint')}</p>
+	</SettingsSection>
+{/if}
 
 <style>
 	.w-num {

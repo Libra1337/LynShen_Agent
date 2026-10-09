@@ -182,6 +182,28 @@ describe('agent team v2: background agents', () => {
 		expect(c.messages).toEqual([{ kind: 'system', text: t('chat.team.stopUnsupported') }]);
 	});
 
+	it('takes back a stop or a pick the engine refuses with team v2 switched off', () => {
+		const off = (op: string) => `${op} is not available: agent team v2 (Beta) is switched off (agents.team_v2 is false)`;
+		const c = new ChatState();
+		c.handle(life('/root/a', 'running'));
+		c.closeAgent('/root/a');
+		c.handle({ type: 'error', message: off('close_agent') });
+		expect(c.stopRequested).toEqual({});
+		expect(c.lastError).toBeNull();
+		c.handle(attempt(1, 'completed'));
+		c.handle(attempt(2, 'completed'));
+		c.pickAttempt('fix_login', '/root/login_2');
+		c.handle({ type: 'error', message: off('pick_attempt') });
+		expect(c.attemptPicks).toEqual({});
+		expect(c.team['/root/login_1']!.pending).toBeNull();
+		expect(c.team['/root/login_2']!.pending).toBeNull();
+		expect(c.lastError).toBeNull();
+		expect(c.messages).toEqual([
+			{ kind: 'system', text: t('chat.team.v2Off') },
+			{ kind: 'system', text: t('chat.team.v2Off') }
+		]);
+	});
+
 	it('counts the unmerged changes a stop asks about', () => {
 		const c = new ChatState();
 		c.handle(attempt(1, 'running', { files_changed: ['src/auth.ts'] }));
@@ -295,7 +317,10 @@ describe('agent team v2: settings', () => {
 		expect(searchRows('自动继续', t).map((r) => r.id)).toContain('team-wake');
 		expect(searchRows('审查', t).map((r) => r.id)).toContain('team-review');
 		expect(searchRows('钩子', t).map((r) => r.id)).toContain('team-hooks');
+		expect(searchRows('Beta', t).map((r) => r.id)).toContain('team-v2');
+		expect(searchRows('任务板', t).map((r) => r.id)).toContain('team-v2');
 		setLocale('en');
+		expect(searchRows('team v2', t).map((r) => r.id)).toContain('team-v2');
 		expect(searchRows('idle', t).map((r) => r.id)).toContain('team-hook-agent_idle');
 	});
 

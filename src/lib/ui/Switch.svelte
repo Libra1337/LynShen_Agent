@@ -2,8 +2,9 @@
 	let {
 		checked = $bindable(),
 		label,
+		disabled = false,
 		onChange
-	}: { checked: boolean; label?: string; onChange?: (checked: boolean) => void } = $props();
+	}: { checked: boolean; label?: string; disabled?: boolean; onChange?: (checked: boolean) => void } = $props();
 
 	function toggle() {
 		checked = !checked;
@@ -11,7 +12,7 @@
 	}
 </script>
 
-<button class="sw" class:on={checked} role="switch" aria-checked={checked} aria-label={label} onclick={toggle}>
+<button class="sw" class:on={checked} role="switch" aria-checked={checked} aria-label={label} {disabled} onclick={toggle}>
 	<span class="knob"></span>
 </button>
 
@@ -45,5 +46,9 @@
 	}
 	.sw.on .knob {
 		transform: translateX(18px);
+	}
+	.sw:disabled {
+		opacity: 0.45;
+		cursor: default;
 	}
 </style>

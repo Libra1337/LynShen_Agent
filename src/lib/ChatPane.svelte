@@ -101,6 +101,7 @@
 	import { gateNext, gateOf, useRequirements } from '$lib/requirements.svelte';
 	import RequirementStart, { beginRequirement } from '$lib/requirements/RequirementStart.svelte';
 	import { telemetry } from '$lib/telemetry.svelte';
+	import { teamSwitch } from '$lib/agents/teamSwitch.svelte';
 
 	// One full conversation (transcript + composer + approvals + pickers) for a
 	// single session, extracted from the page so several chats can tile side by
@@ -549,6 +550,9 @@
 	function pickAttempt(group: string, row: AgentRow) {
 		send(chat.pickAttempt(group, row.id));
 	}
+	// Stopping one agent and picking an attempt are agent team v2: with v2
+	// off what came in still shows, without those actions.
+	const teamOps = $derived(chat.backendId === 'lynshen' && teamSwitch.on);
 	// The agent team's panel, for this session (LynShen's engine has the team).
 	const teamPanel = $derived(chat.backendId === 'lynshen' && !!onOpenTeam);
 	function openTeam() {
@@ -1326,7 +1330,7 @@
 		sessionId={session.id}
 		rows={turnAgents}
 		onOpen={traceable ? openAgent : undefined}
-		onStop={chat.backendId === 'lynshen' ? stopAgent : undefined}
+		onStop={teamOps ? stopAgent : undefined}
 		onOpenTeam={teamPanel ? openTeam : undefined}
 	/>
 	<main bind:this={scroller} onscroll={onScroll} onwheel={onWheel}>

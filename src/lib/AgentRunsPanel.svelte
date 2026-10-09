@@ -13,6 +13,7 @@
 	import AgentMessageLine from '$lib/agents/AgentMessageLine.svelte';
 	import StopAgent from '$lib/agents/StopAgent.svelte';
 	import { confirmStop } from '$lib/agents/confirmStop';
+	import { teamSwitch } from '$lib/agents/teamSwitch.svelte';
 	import { roleLabel } from '$lib/agents/teamText';
 	import type { AgentRun, ChatState, WorkflowRun } from '$lib/chat.svelte';
 	import type { Op } from '$lib/protocol';
@@ -100,9 +101,10 @@
 		focused ? runState(focused.agent.state) === 'running' : !!chat.agentFocus && runState(chat.subagents[chat.agentFocus]?.status ?? '') === 'running'
 	);
 
-	// LynShen's agent team: the subagent shown can be stopped while at work.
+	// LynShen's agent team: the subagent shown can be stopped while at work
+	// (agent team v2).
 	const focusRow = $derived(
-		chat.backendId === 'lynshen' && chat.agentFocus
+		chat.backendId === 'lynshen' && teamSwitch.on && chat.agentFocus
 			? agentRows({ runs: chat.agentRuns, subagents: chat.subagents, team: chat.team, stopping: chat.stopRequested }).find((r) => r.id === chat.agentFocus)
 			: undefined
 	);

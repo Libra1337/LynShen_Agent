@@ -119,7 +119,7 @@
 						<Button size="sm" variant="ghost" disabled={!onViewChanges || !v.merge.actionable} onclick={() => onViewChanges?.(r)}>
 							<GitDiffIcon size={13} />{t('chat.team.viewChanges')}
 						</Button>
-						{#if !chosen}
+						{#if !chosen && onPick}
 							<Button size="sm" variant="secondary" disabled={!canPick(v)} onclick={() => onPick?.(group, r)} title={t('chat.attempts.pickTitle')}>
 								<GitMergeIcon size={13} />{t('chat.attempts.pick')}
 							</Button>
