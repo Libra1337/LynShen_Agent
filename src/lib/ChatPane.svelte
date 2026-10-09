@@ -1301,8 +1301,6 @@
 	<!-- Progressive edge blur: the transcript dissolves at the top and bottom
 	     of the scroller instead of a hard cut. Six bands, each blurring twice
 	     the last; glass only (app.css), never on the rows themselves. -->
-	<div class="edge-blur top" aria-hidden="true">{#each [1, 2, 3, 4, 5, 6] as n (n)}<span style:--n={n} style:--blur="{0.25 * 2 ** n}px"></span>{/each}</div>
-	<div class="edge-blur bottom" aria-hidden="true">{#each [1, 2, 3, 4, 5, 6] as n (n)}<span style:--n={n} style:--blur="{0.25 * 2 ** n}px"></span>{/each}</div>
 	{#if marks.length > 1}
 		<TurnRail {marks} current={mark} onJump={(n) => messageList?.jumpToMark(n)} />
 	{/if}
@@ -1624,43 +1622,16 @@
 		text-align: center;
 	}
 
-	.edge-blur {
-		display: none;
-		position: absolute;
-		left: 0;
-		right: 12px;
-		height: 28px;
-		z-index: 2;
-		pointer-events: none;
-	}
-	.edge-blur.top {
-		top: 0;
-	}
-	.edge-blur.bottom {
-		bottom: 0;
-		transform: scaleY(-1);
-	}
-	/* Band n covers the top (7 - n) / 6 of the strip, fading out, and blurs
-	   0.25px × 2^n: the edge is the most blurred. */
-	.edge-blur span {
-		position: absolute;
-		inset: 0;
-		-webkit-backdrop-filter: blur(var(--blur));
-		backdrop-filter: blur(var(--blur));
-		mask-image: linear-gradient(to bottom, #000 calc((6 - var(--n)) * 100% / 6), transparent calc((7 - var(--n)) * 100% / 6));
-		-webkit-mask-image: linear-gradient(to bottom, #000 calc((6 - var(--n)) * 100% / 6), transparent calc((7 - var(--n)) * 100% / 6));
-	}
-	/* macOS only: WebView2 (Windows) can paint stacked masked backdrop
-	   filters over a scroller as an opaque layer, blanking the transcript. */
-	:global(:root[data-glass][data-os='macos']) .edge-blur {
-		display: block;
-	}
-	/* The transcript ends clear of the bands: scrolled to the bottom (or
-	   top), the last (first) line rests outside the blur; only text passing
-	   under the title bar or the composer dissolves. */
-	:global(:root[data-glass][data-os='macos']) main {
-		padding-top: calc(22px + 28px);
-		padding-bottom: calc(26px + 28px);
+	/* Under glass the transcript dissolves at its top and bottom edges: the
+	   text fades out, the background behind it stays as it is (a blur band
+	   there blurred the background too and ended in a hard line above the
+	   composer). Scrolled to the bottom (or top) the last (first) line rests
+	   clear of the fade; only text passing under it dissolves. */
+	:global(:root[data-glass]) main {
+		padding-top: calc(22px + var(--edge-fade));
+		padding-bottom: calc(26px + var(--edge-fade));
+		-webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--edge-fade), #000 calc(100% - var(--edge-fade)), transparent);
+		mask-image: linear-gradient(to bottom, transparent, #000 var(--edge-fade), #000 calc(100% - var(--edge-fade)), transparent);
 	}
 	.mainwrap {
 		position: relative;
@@ -1670,6 +1641,7 @@
 		flex-direction: column;
 	}
 	main {
+		--edge-fade: 28px;
 		flex: 1;
 		min-height: 0;
 		overflow-y: auto;
