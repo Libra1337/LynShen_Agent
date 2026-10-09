@@ -309,10 +309,11 @@ body {
 	background-size: 200% 100%;
 	-webkit-background-clip: text;
 	background-clip: text;
-	/* Labels set their own colour and entrance animation in scoped styles,
-	   which outrank a global class; the sweep has to win over both. */
+	background-position: 30% 0;
+	/* Labels set their own colour in scoped styles, which outrank a global
+	   class. The gradient stands still: a sweep across it repainted the
+	   composer (and the glass behind it) every frame while Max was picked. */
 	color: transparent !important;
-	animation: sweep 3.2s linear infinite !important;
 }
 @keyframes fade {
 	from {

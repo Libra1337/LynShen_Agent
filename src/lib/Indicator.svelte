@@ -155,11 +155,13 @@
 		overflow: hidden;
 		position: relative;
 	}
+	/* The highlight moves by transform (its own width at a time), which the
+	   compositor runs; moving `left` laid the bar out again every frame. */
 	.scan::after {
 		content: '';
 		position: absolute;
 		top: 0;
-		left: -40%;
+		left: 0;
 		width: 40%;
 		height: 100%;
 		border-radius: var(--r-full);
@@ -168,10 +170,10 @@
 	}
 	@keyframes scan {
 		0% {
-			left: -40%;
+			transform: translateX(-100%);
 		}
 		100% {
-			left: 100%;
+			transform: translateX(250%);
 		}
 	}
 

@@ -1193,22 +1193,18 @@
 		font-weight: 600;
 	}
 	/* Working: a highlight sweeps across the title. */
+	/* A conversation at work breathes. Opacity only: the compositor runs it,
+	   so a turn of many minutes repaints nothing (a light sweeping through
+	   the text, as before, repainted the row, and the glass behind it, at
+	   every frame for as long as an agent worked). */
 	.sess-title.running {
-		/* Only as wide as the text, so the sweep crosses it (the marks stay right). */
 		flex: 0 1 auto;
 		margin-right: auto;
-		background: linear-gradient(100deg, var(--dim) 42%, var(--text) 50%, var(--dim) 58%) 0 0 / 250% 100%;
-		-webkit-background-clip: text;
-		background-clip: text;
-		-webkit-text-fill-color: transparent;
-		animation: title-sweep 2.2s linear infinite;
+		animation: title-breathe 1.8s var(--ease-in-out) infinite;
 	}
-	@keyframes title-sweep {
-		from {
-			background-position: 100% 0;
-		}
-		to {
-			background-position: -150% 0;
+	@keyframes title-breathe {
+		50% {
+			opacity: 0.55;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
