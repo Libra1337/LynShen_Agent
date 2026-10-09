@@ -463,6 +463,9 @@ export type MonoizeModel = {
 	providers?: MonoizeRoute[];
 	/** The window the gateway registers for the model (DA-8d); null: none registered. */
 	context_window?: number | null;
+	/** Input and output together, when the gateway records it; the window
+	 *  above is the input part and can be far smaller (DA-8d). */
+	context_total?: number | null;
 	max_output_tokens?: number | null;
 };
 export async function fetchMonoizeModels(): Promise<MonoizeModel[]> {

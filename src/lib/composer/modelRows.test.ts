@@ -352,3 +352,33 @@ describe('the ChatGPT sign-in', () => {
 		expect(rows.map((r) => r.group)).toEqual(['LynShen', 'DeepSeek']);
 	});
 });
+
+describe('a gateway model whose input window is smaller than its context', () => {
+	it('names both, so the window does not read as the model\u2019s size', () => {
+		const labels = { ...groups, ofTotal: (total: string) => `（共 ${total}）` };
+		const rows = buildModelRows({
+			models: [
+				{ model: 'glm-5.3', active: true, context_window: 128_000 },
+				{ model: 'kimi-k3', active: false, context_window: 262_144 }
+			],
+			backendId: 'lynshen',
+			provider: 'monoize',
+			providersList: [
+				{
+					id: 'monoize',
+					name: 'Monoize',
+					models: [
+						{ name: 'glm-5.3', context_window: 128_000, context_total: 1_048_576 },
+						{ name: 'kimi-k3', context_window: 262_144, context_total: 262_144 }
+					]
+				}
+			],
+			configured: ['monoize'],
+			groups: labels
+		});
+		expect(rows[0]!.detail).toContain('128K（共 1M）');
+		// A total equal to the window adds nothing.
+		expect(rows[1]!.detail).toContain('262K');
+		expect(rows[1]!.detail).not.toContain('共');
+	});
+});

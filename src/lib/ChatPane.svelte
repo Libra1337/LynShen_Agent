@@ -656,6 +656,7 @@
 			groups: {
 				lynshen: t('shell.modelGroup.lynshen'),
 				byok: t('shell.modelGroup.byok'),
+				ofTotal: (total) => t('chat.windowOfTotal', { total }),
 				routeGroup: (group) => t('chat.routeGroup', { group }),
 				routeChannel: (channel) => t('chat.routeChannel', { channel }),
 				accountClass: (accountClass) => t(`chat.accountClass.${accountClass}`)

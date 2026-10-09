@@ -58,6 +58,8 @@ export interface CatalogProvider {
 		name: string;
 		display_name?: string | null;
 		context_window?: number;
+		/** Input and output together, when it is larger than the window. */
+		context_total?: number;
 		groups?: string[];
 		routes?: ModelRoute[];
 	}[];
@@ -66,6 +68,8 @@ export interface CatalogProvider {
 export interface ModelGroupLabels {
 	lynshen: string;
 	byok: string;
+	/** "（共 {total}）" after a window smaller than the whole context. */
+	ofTotal?: (total: string) => string;
 	/** "Group {group}" / "Channel {channel}" for the route line. */
 	routeGroup?: (group: string) => string;
 	routeChannel?: (channel: string) => string;
@@ -118,9 +122,16 @@ export const fmtContext = (n?: number) =>
 /** The group header already names lynshen and the agent's own catalog; BYOK rows
  *  from several providers share one group, so they keep the provider id. */
 const detailOf = (provider: string | null, ctx?: number) => [provider, fmtContext(ctx)].filter(Boolean).join(' · ');
-/** A LynShen gateway model whose window nobody configured says so (the user can
- *  set one in the model settings) instead of showing nothing. */
-const lynshenDetail = (ctx: number | undefined, unsetWindow: string) => fmtContext(ctx) || unsetWindow;
+/** A LynShen gateway model's window: what a conversation may fill. A model
+ *  the gateway registers with a smaller input limit than its whole context
+ *  (glm-5.3: 128K of 1M) names both, so 128K does not read as the model's
+ *  size; one with no window at all says so (the user can set one in the
+ *  model settings) instead of showing nothing. */
+function lynshenDetail(ctx: number | undefined, total: number | undefined, unsetWindow: string, ofTotal?: (total: string) => string): string {
+	const window = fmtContext(ctx);
+	if (!window) return unsetWindow;
+	return total && ctx && total > ctx && ofTotal ? `${window}${ofTotal(fmtContext(total))}` : window;
+}
 
 /**
  * A Claude Code / Codex model and where it runs: `local` is the engine's own
@@ -284,9 +295,11 @@ export function buildModelRows(input: {
 		isGateway(id) ? groups.lynshen : providersList.find((p) => p.id === id)?.name || id;
 	const activeGroup = groupOf(cur);
 	/** A gateway model (lynshen, monoize) names its route; others their provider. */
-	const lineTwo = (provider: string, groupsOf: string[] | undefined, ctx: number | undefined, byok: boolean) => {
+	const lineTwo = (provider: string, groupsOf: string[] | undefined, ctx: number | undefined, byok: boolean, total?: number) => {
 		if (provider === 'lynshen' || provider === 'monoize')
-			return [routeOf(provider, groupsOf, groups), lynshenDetail(ctx, unsetWindow)].filter(Boolean).join(' · ');
+			return [routeOf(provider, groupsOf, groups), lynshenDetail(ctx, total, unsetWindow, groups.ofTotal)]
+				.filter(Boolean)
+				.join(' · ');
 		return detailOf(byok ? provider : null, ctx);
 	};
 	const activeCatalog = providersList.find((p) => p.id === cur)?.models ?? [];
@@ -307,7 +320,7 @@ export function buildModelRows(input: {
 			id: `${cur}::${m.model}`,
 			label: stripGroupSuffix(entry?.display_name || m.label || m.model),
 			vendor: m.vendor || m.model,
-			detail: lineTwo(cur, entry?.groups, m.context_window, !isGateway(cur)),
+			detail: lineTwo(cur, entry?.groups, m.context_window, !isGateway(cur), entry?.context_total),
 			active: m.active,
 			command: `/model ${m.model}`,
 			depth: undefined,
@@ -334,7 +347,7 @@ export function buildModelRows(input: {
 					id: `${pv.id}::${m.name}`,
 					label: stripGroupSuffix(m.display_name || m.name),
 					vendor: m.name,
-					detail: lineTwo(pv.id, m.groups, m.context_window, true),
+					detail: lineTwo(pv.id, m.groups, m.context_window, true, m.context_total),
 					active: false,
 					command: `@switch ${pv.id} ${m.name}`,
 					depth: undefined,

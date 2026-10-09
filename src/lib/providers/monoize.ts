@@ -14,6 +14,8 @@ export interface MonoizeModelEntry {
 	routes: MonoizeRoute[];
 	reasoning_efforts?: string[];
 	context_window?: number;
+	/** Input and output together, when the gateway records it. */
+	context_total?: number;
 	max_output_tokens?: number;
 	[key: string]: unknown;
 }
@@ -55,6 +57,7 @@ export function monoizeEntries(list: MonoizeModel[], known: { name: string }[] =
 			const kept = previous?.context_window === OLD_GUESS ? 0 : previous?.context_window;
 			const window = m.context_window || kept || catalog?.context_window || 0;
 			const output = m.max_output_tokens || previous?.max_output_tokens || catalog?.max_output_tokens;
+			const total = m.context_total || previous?.context_total || 0;
 			return {
 				...catalog,
 				...previous,
@@ -63,6 +66,7 @@ export function monoizeEntries(list: MonoizeModel[], known: { name: string }[] =
 				groups: m.groups ?? [],
 				routes: m.providers ?? [],
 				context_window: window,
+				...(total ? { context_total: total } : {}),
 				...(output ? { max_output_tokens: output } : {}),
 				...(efforts?.length ? { reasoning_efforts: efforts } : {})
 			};
