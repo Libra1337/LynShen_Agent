@@ -1,16 +1,21 @@
 import { t } from '$lib/i18n';
 import { parseSubagentResult } from '$lib/agents/subagentResult';
+import { conversationTitle, parseSessionMessage } from '$lib/sessions/sessionMessage';
 import { shortPath } from '$lib/agentProgress';
 
 /** A user turn the daemon or the engine wrote, not the user: an agent's
  *  message, a timer, a scheduled task, a question's answer, a task update,
- *  a deferred action's outcome, or a background subagent's result that
- *  started a turn (`<subagent_result …>`, see agents/subagentResult.ts). Recognised by the header line the CLI puts
+ *  a deferred action's outcome, a background subagent's result that
+ *  started a turn (`<subagent_result …>`, see agents/subagentResult.ts), or
+ *  another conversation's message (`<session_message …>`, see
+ *  sessions/sessionMessage.ts). Recognised by the header line the CLI puts
  *  first (`delivery_text` in daemon/src/hub.rs, `decision_message` in
  *  agent-core/src/actions.rs); it is plain text in every engine's transcript,
  *  so it is the one mark a reopened session keeps. */
 export type Delivery =
-	| { kind: 'message'; label: string; body: string }
+	/** `source`: the conversation another conversation's message came from
+	 *  (its session id and title), which the line opens. */
+	| { kind: 'message'; label: string; body: string; source?: { session: string; title: string } }
 	/** A deferred action that ran: shown as the tool call it was. */
 	| { kind: 'action'; label: string; name: string; output: string; failed: boolean }
 	| { kind: 'declined'; label: string };
@@ -25,6 +30,18 @@ const HEADERS: [RegExp, (m: RegExpMatchArray) => string][] = [
 ];
 
 export function parseDelivery(text: string): Delivery | null {
+	const sent = parseSessionMessage(text);
+	if (sent) {
+		const first = sent[0]!;
+		const title = conversationTitle(first.title);
+		const others = new Set(sent.map((m) => m.from)).size - 1;
+		return {
+			kind: 'message',
+			label: others ? t('chat.delivery.sessions', { title, n: others + 1 }) : t('chat.delivery.session', { title }),
+			body: sent.map((m) => m.body).filter(Boolean).join('\n\n'),
+			source: { session: first.from, title }
+		};
+	}
 	const result = parseSubagentResult(text);
 	if (result) {
 		const name = result.paths.map(shortPath).join(t('chat.delivery.and'));

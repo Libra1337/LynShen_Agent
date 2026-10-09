@@ -78,3 +78,25 @@ export function teamPatch(agents: unknown, form: Partial<Record<keyof TeamConfig
 	for (const k of BOOLS) if (typeof form[k] === 'boolean') out[k] = form[k];
 	return out;
 }
+
+// Messages between conversations (`sessions.messages`, shown with the team):
+// whether a conversation's AI may list, read and message the others, and
+// whether each message waits for the user's approval.
+export type SessionMessagesMode = 'off' | 'ask' | 'on';
+export const SESSION_MESSAGE_MODES: SessionMessagesMode[] = ['off', 'ask', 'on'];
+export const SESSION_MESSAGES_DEFAULT: SessionMessagesMode = 'on';
+
+/** `sessions.messages` as config.json holds it, the default when it has none
+ *  (or one this app does not know). */
+export function readSessionMessages(cfg: Record<string, unknown>): SessionMessagesMode {
+	const s = cfg.sessions && typeof cfg.sessions === 'object' && !Array.isArray(cfg.sessions) ? (cfg.sessions as Record<string, unknown>) : {};
+	return SESSION_MESSAGE_MODES.includes(s.messages as SessionMessagesMode) ? (s.messages as SessionMessagesMode) : SESSION_MESSAGES_DEFAULT;
+}
+
+/** The `sessions` object to write: what config.json has (its other keys
+ *  stay), with `messages` set. */
+export function sessionsPatch(sessions: unknown, mode: SessionMessagesMode): Record<string, unknown> {
+	const out: Record<string, unknown> = sessions && typeof sessions === 'object' && !Array.isArray(sessions) ? { ...(sessions as Record<string, unknown>) } : {};
+	out.messages = mode;
+	return out;
+}

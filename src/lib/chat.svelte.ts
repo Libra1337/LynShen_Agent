@@ -22,6 +22,14 @@ import { breakdownTotal, parseBreakdown, type ContextBreakdown } from './compose
 import { parseMcpServersEvent, type McpServerView } from './mcp';
 import { parseSubagentResult } from './agents/subagentResult';
 import { parseDelivery } from './delivery';
+import {
+	matchMessage,
+	parseSessionMessage,
+	readSessionMessageEvent,
+	sendTarget,
+	type SessionMessageView
+} from './sessions/sessionMessage';
+import { sessionInbox } from './sessions/inbox.svelte';
 
 /** Where a sent message is before its reply starts: accepted locally, the
  *  engine is connecting to the model gateway, connected and waiting for the
@@ -87,7 +95,8 @@ export type Msg =
 			/** The Task subagent that made this call (claude). */
 			subagent?: string;
 			/** A subagent call's arguments as the engine showed them before its
-			 *  output replaced them (the agent's name and task). */
+			 *  output replaced them (the agent's name and task; send_to_session:
+			 *  the conversation and the message). */
 			args?: string;
 	  }
 	| { kind: 'system'; text: string }
@@ -610,6 +619,12 @@ export class ChatState {
 	stopRequested = $state<Record<string, number>>({});
 	/** Best-of-N: the attempt picked in each group (pick_attempt sent). */
 	attemptPicks = $state<Record<string, string>>({});
+	/** Messages between this conversation and others (`session_message`),
+	 *  sent and received, oldest first. */
+	sessionMessages = $state<SessionMessageView[]>([]);
+	/** The message each `send_to_session` call sent, by call id → its id in
+	 *  `sessionMessages`. */
+	sendLinks = $state<Record<string, number>>({});
 	/** The engine has sent an agent trace (`agent_runs`): it answers the trace ops
 	 *  (an older LynShen engine refuses them). */
 	agentRunsSeen = $state(false);
@@ -1044,11 +1059,13 @@ export class ChatState {
 
 	/** Per-turn file-change timeline: one entry per user turn that edited files,
 	 *  newest first, with the turn's prompt and its files' ±line counts. A
-	 *  turn a subagent's result started is named by its line, not its mark. */
+	 *  turn a subagent's result or another conversation's message started is
+	 *  named by its line, not its mark. */
 	get turnTimeline(): TurnDiff[] {
 		const userTexts: string[] = [];
 		for (const m of this.messages)
-			if (m.kind === 'user') userTexts.push(parseSubagentResult(m.text) ? (parseDelivery(m.text)?.label ?? m.text) : m.text);
+			if (m.kind === 'user')
+				userTexts.push(parseSubagentResult(m.text) || parseSessionMessage(m.text) ? (parseDelivery(m.text)?.label ?? m.text) : m.text);
 		const out: TurnDiff[] = [];
 		for (const [key, bucket] of Object.entries(this.turnEdits)) {
 			const index = Number(key);
@@ -1326,6 +1343,46 @@ export class ChatState {
 		return this.agentMessages.filter((m) => m.from === path || m.to === path);
 	}
 
+	/** The message a `send_to_session` call sent, as its events report it. */
+	sendOf(callId: string): SessionMessageView | undefined {
+		const id = callId ? this.sendLinks[callId] : undefined;
+		return id === undefined ? undefined : this.sessionMessages.find((m) => m.id === id);
+	}
+
+	#nextMessageId = 1;
+
+	/** A `session_message` event: this conversation's end of a message to or
+	 *  from another one. `session` (the daemon's routing field) says which end
+	 *  this is; the event names both. */
+	#sessionMessage(ev: AgentEvent) {
+		const msg = readSessionMessageEvent(ev);
+		if (!msg) return;
+		sessionInbox.note(msg);
+		const own = str(ev.session) || this.sessionId;
+		// An end not known yet is taken for the sender's: only it has a call
+		// to link the message to.
+		const outgoing = !own || msg.from === own;
+		const known = matchMessage(this.sessionMessages, msg);
+		if (known) {
+			known.status = msg.status;
+			if (msg.fromTitle) known.fromTitle = msg.fromTitle;
+			if (msg.toTitle) known.toTitle = msg.toTitle;
+			return;
+		}
+		const id = this.#nextMessageId++;
+		this.sessionMessages.push({ ...msg, id, outgoing, at: Date.now() });
+		if (!outgoing) return;
+		// The call that sent it: the latest send_to_session not linked yet
+		// that names no other conversation (its arguments may not show).
+		const linked = new Set(Object.keys(this.sendLinks));
+		const call = this.messages.findLast((m) => {
+			if (m.kind !== 'tool' || m.name !== 'send_to_session' || !m.callId || linked.has(m.callId)) return false;
+			const target = sendTarget(m);
+			return !target || target === msg.to;
+		});
+		if (call?.kind === 'tool') this.sendLinks[call.callId] = id;
+	}
+
 	handle(ev: AgentEvent) {
 		// The engine has spoken — the child is up, so the boot animation ends.
 		this.booting = false;
@@ -1422,6 +1479,9 @@ export class ChatState {
 				// through the turn it starts.
 				const woke = parseSubagentResult(text);
 				if (woke && this.#turnStart === null) for (const path of woke.paths) this.#woke.add(path);
+				// Another conversation's message, delivered: it no longer waits.
+				const own = str(ev.session) || this.sessionId;
+				if (own) for (const m of parseSessionMessage(text) ?? []) sessionInbox.arrived(own, m.from, m.body);
 				// No send state: claude echoes after the reply, when it would stick.
 				const images = arr<string>(ev.images).filter((p) => typeof p === 'string');
 				this.messages.push({ kind: 'user', text, ...(images.length ? { images } : {}) });
@@ -1493,7 +1553,7 @@ export class ChatState {
 				const t = this.#tool(str(ev.call_id));
 				if (t) {
 					t.output = boundedOutput(str(ev.output));
-					if (SUBAGENT_CALLS.has(t.name)) t.args = t.output;
+					if (SUBAGENT_CALLS.has(t.name) || t.name === 'send_to_session') t.args = t.output;
 				}
 				break;
 			}
@@ -1878,6 +1938,11 @@ export class ChatState {
 				this.messages.push({ kind: 'agent_message', ...msg });
 				break;
 			}
+			// A message between this conversation and another one moved on
+			// (queued, delivered, replied).
+			case 'session_message':
+				this.#sessionMessage(ev);
+				break;
 			case 'merge_result': {
 				const target = str(ev.target);
 				if (!target) break;

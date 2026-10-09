@@ -217,7 +217,25 @@ const chat = {
 			failed: '执行失败',
 			agentDone: '子智能体 {name} 完成，继续处理',
 			agentFailed: '子智能体 {name} 出错，继续处理',
-			and: '、'
+			and: '、',
+			session: '来自对话「{title}」：',
+			sessions: '来自「{title}」等 {n} 个对话：',
+			openSource: '打开对话「{title}」',
+			showMessage: '展开消息',
+			sourceGone: '找不到这个对话，它可能已被删除。'
+		},
+		sessionTools: {
+			list: '列出对话',
+			read: '读取对话',
+			send: '发给对话',
+			count: '{n} 个',
+			sendTo: '发给「{title}」',
+			sendToUnknown: '发给另一个对话',
+			status: { queued: '排队中', delivered: '已送达', replied: '已回复' },
+			message: '消息',
+			reply: '回复',
+			queuedFrom: '「{title}」发来的消息在排队',
+			queuedN: '{n} 条消息在排队'
 		},
 		retry: {
 			title: '请求失败，正在重试',
@@ -591,7 +609,25 @@ const chat = {
 			failed: 'failed',
 			agentDone: 'Subagent {name} finished, continuing',
 			agentFailed: 'Subagent {name} failed, continuing',
-			and: ', '
+			and: ', ',
+			session: 'From “{title}”:',
+			sessions: 'From {n} conversations, “{title}” first:',
+			openSource: 'Open “{title}”',
+			showMessage: 'Show the message',
+			sourceGone: 'That conversation is gone. It may have been deleted.'
+		},
+		sessionTools: {
+			list: 'Listed conversations',
+			read: 'Read conversation',
+			send: 'Messaged conversation',
+			count: '{n} found',
+			sendTo: 'To “{title}”',
+			sendToUnknown: 'To another conversation',
+			status: { queued: 'Queued', delivered: 'Delivered', replied: 'Replied' },
+			message: 'Message',
+			reply: 'Reply',
+			queuedFrom: 'A message from “{title}” is waiting',
+			queuedN: '{n} messages are waiting'
 		},
 		retry: {
 			title: 'Request failed, retrying',

@@ -336,6 +336,19 @@
 		showDesk = false;
 		projectPageId = null;
 	}
+	/** Show a conversation another one's message came from: its tab when it
+	 *  is listed here, else the daemon's record of it (opened in its
+	 *  project), read again once when this client has not heard of it. */
+	async function openSessionById(session: string) {
+		const known = () =>
+			store.allSessions.some((s) => s.chat.sessionId === session) || agentDirectory.sessions.some((s) => s.session === session);
+		if (!known()) await agentDirectory.refreshSessions();
+		if (!known()) {
+			toast.error(t('chat.delivery.sourceGone'));
+			return;
+		}
+		openDaemonSession(session);
+	}
 	let showQuickOpen = $state(false);
 
 	/** Logged out of the LynShen account (Settings → Account or the account
@@ -1594,6 +1607,7 @@
 													onOpenRequirement={openRequirements}
 													onOpenTrace={() => openPanelTile('agents')}
 													onOpenTeam={() => openPanelTile('team')}
+													onOpenSession={openSessionById}
 												/>
 												{#snippet failed(error, reset)}
 													<div class="pane-error">
@@ -1709,6 +1723,7 @@
 								onOpenSettings={openSettings}
 								onOpenAgent={openDesk}
 								onOpenRequirement={openRequirements}
+								onOpenSession={openSessionById}
 							/>
 						{:else}
 							<div class="gone">{t('shell.chatGone')}</div>

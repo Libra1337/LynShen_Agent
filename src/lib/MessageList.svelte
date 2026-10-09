@@ -15,6 +15,7 @@
 	import { attemptGroups, SPAWN_TOOLS, spawnAgentRow, WAIT_TOOLS, type AgentRow } from '$lib/agentProgress';
 	import DeliveryNotice from '$lib/DeliveryNotice.svelte';
 	import { parseDelivery } from '$lib/delivery';
+	import { sendCardProps, sendCardView, type SessionMessageView } from '$lib/sessions/sessionMessage';
 	import { parseToolOutput, toolIcon, toolTarget, toolVerb } from '$lib/toolSummary';
 	import Indicator from '$lib/Indicator.svelte';
 	import CallTimer from '$lib/CallTimer.svelte';
@@ -65,6 +66,8 @@
 		onOpenPlan,
 		planMode = 'edits',
 		loadImage,
+		sendOf,
+		onOpenSession,
 		mark = $bindable(-1)
 	}: {
 		messages: Msg[];
@@ -125,6 +128,11 @@
 		planMode?: ApprovalMode;
 		/** Reads a sent image where the desktop can't open its path (the remote page). */
 		loadImage?: (path: string) => Promise<string>;
+		/** The message a send_to_session call sent (ChatState.sendOf). */
+		sendOf?: (callId: string) => SessionMessageView | undefined;
+		/** Opens a conversation by its session id (another conversation's
+		 *  message opens the one it came from). */
+		onOpenSession?: (session: string) => void;
 		/** Ordinal of the user message in view: at or above the upper third. */
 		mark?: number;
 	} = $props();
@@ -468,7 +476,9 @@
 		};
 		for (const m of messages) {
 			if (!hasContent(m)) continue;
-			if (m.kind === 'tool' && !isAgentCall(m)) run.push(m);
+			// A message to another conversation keeps a row of its own: its
+			// state changes after the run.
+			if (m.kind === 'tool' && !isAgentCall(m) && m.name !== 'send_to_session') run.push(m);
 			else flush();
 		}
 		flush();
@@ -533,7 +543,7 @@
 			{@const delivery = parseDelivery(m.text)}
 			{@const drop = userOrdinal.size - (userOrdinal.get(m) ?? 0)}
 			{#if delivery}
-				<DeliveryNotice {delivery} />
+				<DeliveryNotice {delivery} {onOpenSession} />
 			{:else}
 			<div class="row user">
 				<button class="uedit rewind" onclick={() => onRewind(m.text, userOrdinal.get(m) ?? 0)} aria-label={t('chat.rewindTitleN', { n: drop })} title={t('chat.rewindTitleN', { n: drop })}>
@@ -640,6 +650,9 @@
 				{:else}
 					<SubagentCard name={m.name} callId={m.callId} output={m.output} args={m.args} running={m.running} isError={m.isError} rows={agents} onOpen={onOpenAgent} onViewChanges={onAgentChanges} onMerge={onMergeAgent} onStop={onStopAgent} />
 				{/if}
+			{:else if m.name === 'send_to_session'}
+				{@const card = sendCardProps(sendCardView(m, sendOf?.(m.callId)), m.isError)}
+				<ToolCard name={m.name} output={m.output} running={m.running} isError={m.isError} subagent={m.subagent} heading={card.heading} badge={card.badge} sections={card.sections} />
 			{:else}
 				<ToolCard name={m.name} output={m.output} running={m.running} isError={m.isError} subagent={m.subagent} trace={traceOf?.(m) ?? undefined} />
 			{/if}

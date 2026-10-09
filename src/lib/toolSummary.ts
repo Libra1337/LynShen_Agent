@@ -15,6 +15,9 @@ import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
 import PlugIcon from 'phosphor-svelte/lib/PlugIcon';
 import WrenchIcon from 'phosphor-svelte/lib/WrenchIcon';
 import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
+import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
+import { t } from '$lib/i18n';
 
 const VERBS: Record<string, string> = {
 	read: 'Read',
@@ -70,10 +73,22 @@ const ICONS: Record<string, typeof WrenchIcon> = {
 	close_agent: RobotIcon,
 	agent_wait: RobotIcon,
 	TodoWrite: ListChecksIcon,
-	update_plan: ListChecksIcon
+	update_plan: ListChecksIcon,
+	list_sessions: ChatsIcon,
+	read_session: ChatsIcon,
+	send_to_session: PaperPlaneTiltIcon
 };
 
-export const toolVerb = (name: string) => VERBS[name] ?? name;
+// The tools that reach other conversations say what they did in the
+// interface language (a send card is titled by the conversation it wrote
+// to, see sessions/sessionMessage.ts sendCardProps).
+const LOCAL_VERBS: Record<string, string> = {
+	list_sessions: 'chat.sessionTools.list',
+	read_session: 'chat.sessionTools.read',
+	send_to_session: 'chat.sessionTools.send'
+};
+
+export const toolVerb = (name: string) => (LOCAL_VERBS[name] ? t(LOCAL_VERBS[name]) : (VERBS[name] ?? name));
 
 export function toolIcon(name: string): typeof WrenchIcon {
 	return (
@@ -106,6 +121,12 @@ export function toolTarget(name: string, parsed: Record<string, unknown> | null)
 	if (name === 'bash' || name === 'exec_command' || name === 'ripgrep') {
 		const cmd = unwrapShell(str(parsed.command) || str(parsed.pattern)).replace(/\s+/g, ' ');
 		return cmd.length > 64 ? cmd.slice(0, 64) + '…' : cmd;
+	}
+	if (name === 'read_session' || name === 'send_to_session')
+		return str(parsed.to_title) || str(parsed.title) || str(parsed.session_title) || str(parsed.to) || str(parsed.session);
+	if (name === 'list_sessions') {
+		const list = Array.isArray(parsed) ? parsed : parsed.sessions;
+		return Array.isArray(list) ? t('chat.sessionTools.count', { n: list.length }) : '';
 	}
 	if (typeof parsed.path === 'string') return parsed.path.split('/').pop() || parsed.path;
 	if (name === 'web_search') return str(parsed.query);

@@ -21,6 +21,7 @@
 	import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 	import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
 	import SidebarSimpleIcon from 'phosphor-svelte/lib/SidebarSimpleIcon';
+	import EnvelopeSimpleIcon from 'phosphor-svelte/lib/EnvelopeSimpleIcon';
 	import mark from '$lib/lynshen-mark.svg?raw';
 	import { SIDEBAR_RAIL_WIDTH } from '$lib/shell/sidebarState';
 	import { rowIn } from '$lib/ui/motion';
@@ -35,6 +36,7 @@
 	import SessionMark from '$lib/SessionMark.svelte';
 	import AgentAvatar from '$lib/AgentAvatar.svelte';
 	import { sessionStatus } from '$lib/sessionStatus';
+	import { queuedLabel, sessionInbox } from '$lib/sessions/inbox.svelte';
 	import { listedSessions } from '$lib/session.svelte';
 	import { lastActive, type Project, type Session } from '$lib/types';
 	import type { AgentView } from '$lib/agents.svelte';
@@ -385,6 +387,7 @@
 	{#snippet sessRow(s: Session, nested = false, selectable = false, p?: Project, where?: string)}
 		{@const status = sessionStatus(s.chat)}
 		{@const req = s.chat.sessionId ? reqs.bySession.get(s.chat.sessionId) : undefined}
+		{@const waiting = queuedLabel(sessionInbox.queuedFor(s.chat.sessionId))}
 		<!-- Listed rows (`p` given) drag within their project and pinned group. -->
 		<button
 			in:rowIn
@@ -445,6 +448,8 @@
 				<span class="backend-chip" title={BACKEND_LABELS[s.backendId]}><BackendIcon backend={s.backendId} size={12} /></span>
 			{/if}
 			{#if s.pinned && !s.archived}<span class="pin-mark" title={t('shell.pin')}><PushPinIcon size={12} weight="fill" /></span>{/if}
+			<!-- Another conversation's message waits for this one to be free. -->
+			{#if waiting}<span class="queued-mark" title={waiting} aria-label={waiting}><EnvelopeSimpleIcon size={12} /></span>{/if}
 			<SessionMark status={status} />
 			{#if !selectable}
 			{#if !s.archived}
@@ -1019,6 +1024,11 @@
 	.pin-mark {
 		display: inline-flex;
 		color: var(--dim2);
+		flex-shrink: 0;
+	}
+	.queued-mark {
+		display: inline-flex;
+		color: var(--dim);
 		flex-shrink: 0;
 	}
 	.sess.nested {

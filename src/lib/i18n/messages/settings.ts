@@ -125,7 +125,14 @@ const settings = {
 			onlyTools: '仅限 {tools}',
 			hooksUnreadable: '读取 hooks.json 失败：{msg}。修好这个文件后再在这里修改。',
 			hooksSaveFailed: '保存钩子失败：{msg}',
-			refreshHooks: '重新读取钩子'
+			refreshHooks: '重新读取钩子',
+			messages: '跨对话消息',
+			messagesOpt: { off: '关闭', ask: '每次询问', on: '开启' },
+			messagesHint: {
+				off: 'AI 不能查看其他对话，也不能给它们发消息。',
+				ask: 'AI 每次给其他对话发消息，都要先经过你批准。',
+				on: 'AI 可以查看其他对话并给它们发消息，是否先问你由审批模式决定。'
+			}
 		},
 		shortcuts: {
 			customize: '自定义快捷键',
@@ -676,7 +683,14 @@ const settings = {
 			onlyTools: 'Only for {tools}',
 			hooksUnreadable: 'Could not read hooks.json: {msg}. Fix the file before you change it here.',
 			hooksSaveFailed: 'Could not save the hooks: {msg}',
-			refreshHooks: 'Read the hooks again'
+			refreshHooks: 'Read the hooks again',
+			messages: 'Messages between conversations',
+			messagesOpt: { off: 'Off', ask: 'Ask each time', on: 'On' },
+			messagesHint: {
+				off: 'The AI cannot see other conversations or send them messages.',
+				ask: 'You approve every message the AI sends to another conversation.',
+				on: 'The AI can see other conversations and message them. The approval mode decides when it asks you first.'
+			}
 		},
 		shortcuts: {
 			customize: 'Custom shortcuts',
