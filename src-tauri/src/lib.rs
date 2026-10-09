@@ -24,6 +24,7 @@ mod preview;
 mod provider_auth;
 mod secrets;
 mod shell_env;
+mod tool_login;
 mod tool_switch;
 
 use backend::BackendKind;
@@ -147,6 +148,9 @@ pub(crate) struct BackendStatus {
     pub(crate) found: bool,
     pub(crate) path: Option<String>,
     pub(crate) version: Option<String>,
+    /// Claude Code / Codex: signed in to an account of their own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) signed_in: Option<bool>,
 }
 
 /// Probes a backend binary: resolves it (honoring `bin_override`) and runs
@@ -174,6 +178,7 @@ fn check_backend(backend: String, bin_override: Option<String>) -> Result<Backen
             found: false,
             path: None,
             version: None,
+            signed_in: None,
         });
     };
     let mut cmd = Command::new(&path);
@@ -188,6 +193,7 @@ fn check_backend(backend: String, bin_override: Option<String>) -> Result<Backen
         found: true,
         path: Some(path.display().to_string()),
         version,
+        signed_in: tool_login::signed_in(&backend),
     })
 }
 

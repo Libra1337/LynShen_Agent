@@ -198,6 +198,7 @@ pub fn acp_agent_check(app: AppHandle, id: String) -> Result<crate::BackendStatu
             found: false,
             path: None,
             version: None,
+            signed_in: None,
         });
     };
     let mut cmd = std::process::Command::new(&path);
@@ -212,6 +213,7 @@ pub fn acp_agent_check(app: AppHandle, id: String) -> Result<crate::BackendStatu
         found: true,
         path: Some(path.display().to_string()),
         version,
+        signed_in: None,
     })
 }
 

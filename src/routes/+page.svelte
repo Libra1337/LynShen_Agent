@@ -512,7 +512,8 @@
 	/** A new conversation: in the chat, or (the TUI by default) in the TUI of
 	 *  the backend the user picks. */
 	let tuiPick = $state<Project | null>(null);
-	/** The TUIs this machine has: LynShen's always, Claude Code / Codex once found. */
+	/** The TUIs that can run here: LynShen's always, Claude Code / Codex once
+	 *  installed and signed in. */
 	let tuiBackends = $state<BackendId[]>(['lynshen']);
 	function newSession(p: Project) {
 		if (prefs.defaultSurface !== 'tui' || p.chats) return store.addSession(p);
@@ -521,7 +522,7 @@
 		for (const id of ['claude', 'codex'] as const)
 			checkBackend(id, paths[id])
 				.then((s) => {
-					if (s.found && !tuiBackends.includes(id)) tuiBackends = [id, ...tuiBackends];
+					if (s.found && s.signed_in !== false && !tuiBackends.includes(id)) tuiBackends = [id, ...tuiBackends];
 				})
 				.catch(() => {});
 	}

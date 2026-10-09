@@ -89,24 +89,24 @@
 	});
 
 	// Agent availability (best-effort) and the registered ACP agents.
-	let probe = $state<Partial<Record<BackendId, { found: boolean; version: string }>>>({});
+	let probe = $state<Partial<Record<BackendId, { found: boolean; usable: boolean; version: string }>>>({});
 	let acpAgents = $state<AcpAgent[]>([]);
 	onMount(() => {
 		if (backendLocked) return;
 		const settings = loadBackendSettings();
 		for (const id of NATIVE_BACKEND_IDS) {
 			checkBackend(id, settings.paths[id])
-				.then((s) => (probe[id] = { found: s.found, version: versionLabel(s) }))
+				.then((s) => (probe[id] = { found: s.found, usable: s.found && s.signed_in !== false, version: versionLabel(s) }))
 				.catch(() => {});
 		}
 		acpAgentsList()
 			.then((a) => (acpAgents = a))
 			.catch(() => {});
 	});
-	// Only agents this machine has: Claude Code / Codex show once their probe
-	// finds them (the session's own always shows). One agent alone is nothing
-	// to switch between, so the section goes.
-	const shownNative = $derived(NATIVE_BACKEND_IDS.filter((id) => id === 'lynshen' || id === chat.backendId || probe[id]?.found));
+	// Only agents that can run here: Claude Code / Codex show once installed
+	// and signed in to an account of their own (the session's own always
+	// shows). One agent alone is nothing to switch between, so the section goes.
+	const shownNative = $derived(NATIVE_BACKEND_IDS.filter((id) => id === 'lynshen' || id === chat.backendId || probe[id]?.usable));
 	const canSwitchAgent = $derived(shownNative.length + acpAgents.length > 1);
 	const agentTitle = (id: BackendId) => {
 		const p = probe[id];

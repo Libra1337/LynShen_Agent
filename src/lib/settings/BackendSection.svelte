@@ -220,6 +220,9 @@
 							{:else if id === 'lynshen' && appCli(st.path)}
 								<span class="bstate dim">{t('settings.backend.bundled')}</span>
 							{/if}
+							{#if st.signed_in === false}
+								<span class="bstate warn"><WarningCircleIcon size={12} /> {t('settings.backend.signedOut')}</span>
+							{/if}
 						{:else if st}
 							<span class="bstate warn"><WarningCircleIcon size={12} /> {t('settings.backend.notFound')}</span>
 						{/if}

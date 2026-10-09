@@ -110,6 +110,8 @@ export interface BackendStatus {
 	found: boolean;
 	path?: string | null;
 	version?: string | null;
+	/** Claude Code / Codex: signed in to an account of their own. */
+	signed_in?: boolean;
 }
 export function checkBackend(backend: string, binOverride?: string): Promise<BackendStatus> {
 	return invoke('check_backend', { backend, binOverride });
