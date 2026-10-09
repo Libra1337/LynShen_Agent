@@ -73,6 +73,11 @@ const settings = {
 			shortcuts: '快捷键'
 		},
 		team: {
+			v2: '工作组 v2（Beta）',
+			v2Title: '工作组 v2',
+			beta: 'Beta',
+			v2Hint: '共享任务板、后台子智能体、多份择优和完成后钩子。关掉后回到 v1：派活、合并和消息照常。',
+			v2RemoteOff: 'LynShen 已暂时关闭这项 Beta 功能',
 			fanout: '派出子智能体',
 			fanoutOpt: { off: '关闭', plan: '按计划', auto: '自动' },
 			fanoutHint: {
@@ -624,6 +629,11 @@ const settings = {
 			shortcuts: 'Shortcuts'
 		},
 		team: {
+			v2: 'Agent team v2 (Beta)',
+			v2Title: 'Agent team v2',
+			beta: 'Beta',
+			v2Hint: 'Shared task board, background subagents, best-of-N attempts and hooks after work finishes. Off, the team goes back to v1: delegating, merging and messages work as before.',
+			v2RemoteOff: 'LynShen has switched this Beta feature off for now',
 			fanout: 'Start subagents',
 			fanoutOpt: { off: 'Off', plan: 'By plan', auto: 'Auto' },
 			fanoutHint: {

@@ -14,6 +14,7 @@
 	import StopAgent from './StopAgent.svelte';
 	import AgentMessageLine from './AgentMessageLine.svelte';
 	import { confirmStop } from './confirmStop';
+	import { teamSwitch } from './teamSwitch.svelte';
 	import { roleLabel, teamNote } from './teamText';
 
 	let { chat, onOp, onOpenAgent }: { chat: ChatState; onOp: (op: Op) => void; onOpenAgent?: (id: string) => void } = $props();
@@ -142,7 +143,7 @@
 									{#if teamNote(r) || r.activity}<span class="act" class:err={r.state === 'failed'} class:warn={!!teamNote(r)}>{teamNote(r) || r.activity}</span>{/if}
 								</span>
 							</button>
-							{#if r.stopping || canStop(r)}<span class="stop" class:held={r.stopping}><StopAgent row={r} onStop={stop} /></span>{/if}
+							{#if teamSwitch.on && (r.stopping || canStop(r))}<span class="stop" class:held={r.stopping}><StopAgent row={r} onStop={stop} /></span>{/if}
 						</li>
 					{/each}
 				</ul>

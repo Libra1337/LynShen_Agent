@@ -8,6 +8,8 @@ use tauri::{AppHandle, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 const CHECK_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long one source of `features.json` may take to connect, then to answer.
+const FEATURES_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Copy, PartialEq, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -176,6 +178,49 @@ pub async fn update_policy() -> String {
     .unwrap_or_default()
 }
 
+/// The LynShen update feeds (`…/latest.json`), in the order update checks try
+/// them; GitHub's is left out. The product owner's `features.json` sits next
+/// to each (the frontend derives its URL like `/policy` above).
+#[tauri::command]
+pub async fn update_feeds(app: AppHandle) -> Vec<String> {
+    manifests(&app)
+        .into_iter()
+        .filter(|(_, source)| *source == Source::LynShen)
+        .map(|(manifest, _)| manifest)
+        .collect()
+}
+
+/// A URL `feature_flags` may read: http(s), a `features.json`.
+fn features_url(url: &str) -> bool {
+    (url.starts_with("https://") || url.starts_with("http://")) && url.ends_with("/features.json")
+}
+
+/// The product owner's switches for Beta features (`{"team_v2": true}`): the
+/// first of `urls` that answers with a JSON object, each within
+/// FEATURES_TIMEOUT. None when none does (missing file, offline): the app
+/// keeps what it knew.
+#[tauri::command]
+pub async fn feature_flags(urls: Vec<String>) -> Option<serde_json::Value> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(FEATURES_TIMEOUT)
+            .timeout_read(FEATURES_TIMEOUT)
+            .build();
+        urls.iter().filter(|url| features_url(url)).find_map(|url| {
+            agent
+                .get(url)
+                .call()
+                .ok()?
+                .into_json::<serde_json::Value>()
+                .ok()
+                .filter(serde_json::Value::is_object)
+        })
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
 /// Retry failed downloads from a different source at the exact same version.
 /// Installation errors must not launch another installer.
 #[tauri::command]
@@ -257,5 +302,27 @@ mod tests {
     #[test]
     fn the_mirror_manifest_is_under_the_public_api() {
         assert!(lynshen_manifest().ends_with("/v1/public/releases/desktop/latest.json"));
+    }
+
+    #[test]
+    fn feature_flags_read_only_a_features_json() {
+        assert!(features_url(
+            "https://www.lynshen.org/v1/public/releases/desktop/features.json"
+        ));
+        assert!(features_url("http://127.0.0.1:8080/features.json"));
+        assert!(!features_url(
+            "https://www.lynshen.org/v1/public/releases/desktop/latest.json"
+        ));
+        assert!(!features_url("file:///etc/features.json"));
+        assert!(!features_url("https://example.com/features.json?x=1"));
+    }
+
+    #[test]
+    fn feature_flags_without_a_source_is_none() {
+        let flags = tauri::async_runtime::block_on(feature_flags(vec![
+            "file:///features.json".to_string(),
+            "https://www.lynshen.org/v1/public/releases/desktop/latest.json".to_string(),
+        ]));
+        assert_eq!(flags, None);
     }
 }

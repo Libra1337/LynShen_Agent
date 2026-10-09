@@ -7,6 +7,7 @@
 
 	let {
 		title,
+		tag,
 		description,
 		id,
 		stacked = false,
@@ -14,6 +15,8 @@
 		children
 	}: {
 		title?: string;
+		/** A small label after the title (`Beta`). */
+		tag?: string;
 		description?: string;
 		id?: string;
 		stacked?: boolean;
@@ -26,7 +29,7 @@
 <div class="row" class:stacked id={id ? `set-${id}` : undefined}>
 	{#if title || description || detail}
 		<div class="txt">
-			{#if title}<div class="title">{title}</div>{/if}
+			{#if title}<div class="title">{title}{#if tag}<span class="tag">{tag}</span>{/if}</div>{/if}
 			{#if description}<div class="desc">{description}</div>{/if}
 			{#if detail}{@render detail()}{/if}
 		</div>
@@ -63,6 +66,17 @@
 	.title {
 		font-size: var(--fs-sm);
 		color: var(--text);
+	}
+	.tag {
+		display: inline-block;
+		margin-left: 8px;
+		padding: 0 6px;
+		border-radius: var(--r-xs);
+		background: var(--surface2);
+		font-size: var(--fs-2xs);
+		line-height: 1.6;
+		vertical-align: 1px;
+		color: var(--dim);
 	}
 	.desc {
 		max-width: 52ch;

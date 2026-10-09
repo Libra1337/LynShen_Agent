@@ -45,6 +45,9 @@ type PrefsShape = {
 	 *  menus, floating cards) let through, 0–100: 0 is solid, higher is
 	 *  clearer glass with more blur. */
 	glass: number;
+	/** This machine's switch for agent team v2 (Beta); the engine gets it
+	 *  together with LynShen's remote switch (agents/teamSwitch.svelte.ts). */
+	teamV2: boolean;
 };
 
 export const BACKGROUND_STRENGTHS = ['faint', 'medium', 'strong'] as const;
@@ -67,7 +70,8 @@ const DEFAULTS: PrefsShape = {
 	backgroundImage: '',
 	backgroundStrength: 'medium',
 	backgroundStamp: 0,
-	glass: 40
+	glass: 40,
+	teamV2: true
 };
 
 /** A glass level within 0–100 (whole numbers); anything else is the default. */
@@ -154,6 +158,7 @@ class PrefsStore {
 	backgroundStrength = $state<BackgroundStrength>(DEFAULTS.backgroundStrength);
 	backgroundStamp = $state(DEFAULTS.backgroundStamp);
 	glass = $state(DEFAULTS.glass);
+	teamV2 = $state(DEFAULTS.teamV2);
 
 	init() {
 		const p = load();
@@ -173,6 +178,7 @@ class PrefsStore {
 		this.backgroundStrength = BACKGROUND_STRENGTHS.includes(p.backgroundStrength) ? p.backgroundStrength : DEFAULTS.backgroundStrength;
 		this.backgroundStamp = Number.isFinite(p.backgroundStamp) ? p.backgroundStamp : 0;
 		this.glass = glassLevel(p.glass);
+		this.teamV2 = p.teamV2 !== false;
 		this.#applyVibrancy();
 		this.#applyBackground();
 		// Asking the system for less transparency turns the glass solid.
@@ -206,7 +212,8 @@ class PrefsStore {
 					backgroundImage: this.backgroundImage,
 					backgroundStrength: this.backgroundStrength,
 					backgroundStamp: this.backgroundStamp,
-					glass: this.glass
+					glass: this.glass,
+					teamV2: this.teamV2
 				})
 			);
 		} catch {
@@ -274,6 +281,11 @@ class PrefsStore {
 	setBackgroundStrength(v: BackgroundStrength) {
 		this.backgroundStrength = v;
 		this.#applyBackground();
+		this.#save();
+	}
+
+	setTeamV2(v: boolean) {
+		this.teamV2 = v;
 		this.#save();
 	}
 

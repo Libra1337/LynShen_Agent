@@ -93,6 +93,7 @@ export const ROWS: SearchRow[] = [
 	{ section: 'agents', id: 'shell-env', titleKey: 'settings.backend.shellEnvLabel', descKey: 'settings.backend.shellEnvHint' },
 	{ section: 'agents', id: 'backend-list', titleKey: 'settings.section.agents' },
 	{ section: 'agents', id: 'dependencies', titleKey: 'setup.deps.title' },
+	{ section: 'team', id: 'team-v2', titleKey: 'settings.team.v2', descKey: 'settings.team.v2Hint' },
 	{ section: 'team', id: 'team-fanout', titleKey: 'settings.team.fanout', descKey: 'settings.team.fanoutHint.plan' },
 	{ section: 'team', id: 'team-wake', titleKey: 'settings.team.wakeOnResult', descKey: 'settings.team.wakeOnResultHint' },
 	{ section: 'team', id: 'team-review', titleKey: 'settings.team.reviewOnComplete', descKey: 'settings.team.reviewOnCompleteHint' },

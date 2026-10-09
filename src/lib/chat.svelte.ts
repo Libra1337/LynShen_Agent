@@ -2153,6 +2153,17 @@ export class ChatState {
 					}
 					break;
 				}
+				// Agent team v2 switched off: a stop or pick sent just before
+				// comes back undone, and nothing failed.
+				const off = /^(close_agent|pick_attempt) is not available: agent team v2 /.exec(str(ev.message));
+				if (off) {
+					if (off[1] === 'pick_attempt') {
+						for (const a of Object.values(this.team)) if (a.attemptGroup && a.attemptGroup in this.attemptPicks) a.pending = null;
+						this.attemptPicks = {};
+					} else this.stopRequested = {};
+					this.messages.push({ kind: 'system', text: t('chat.team.v2Off') });
+					break;
+				}
 				this.retry = null;
 				// A turn was being sent or run (not, say, a refused command).
 				const started = this.#turnStart !== null;

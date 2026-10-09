@@ -324,7 +324,8 @@ const chat = {
 			stopping: '正在停止',
 			stopTitle: '停止 {name}？',
 			stopMessage: '{name} 有 {n} 个文件的改动还没有合并。停止后它不再继续，改动留在它的 worktree 里，之后仍可合并或丢弃。',
-			stopUnsupported: '当前引擎还不能停止单个子智能体，请更新 LynShen 后再试。'
+			stopUnsupported: '当前引擎还不能停止单个子智能体，请更新 LynShen 后再试。',
+			v2Off: '工作组 v2 已关闭，这个操作没有执行。'
 		},
 		// Best-of-N: several attempts at one task, one of them merged
 		attempts: {
@@ -698,7 +699,8 @@ const chat = {
 			stopping: 'Stopping',
 			stopTitle: 'Stop {name}?',
 			stopMessage: '{name} has changes to {n} files that are not merged. It stops working; the changes stay in its worktree, where you can still merge or discard them.',
-			stopUnsupported: 'This engine cannot stop one subagent yet. Update LynShen and try again.'
+			stopUnsupported: 'This engine cannot stop one subagent yet. Update LynShen and try again.',
+			v2Off: 'Agent team v2 is off. Nothing was done.'
 		},
 		// Best-of-N: several attempts at one task, one of them merged
 		attempts: {

@@ -51,6 +51,7 @@
 	import { loadBackendSettings } from '$lib/backends/settings';
 	import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 	import { updater } from '$lib/updater.svelte';
+	import { teamSwitch } from '$lib/agents/teamSwitch.svelte';
 	import { checkDaemonVersion } from '$lib/daemonVersion';
 	import UpdatePrompt from '$lib/UpdatePrompt.svelte';
 	import { browser, type WebRef } from '$lib/browser.svelte';
@@ -1359,9 +1360,14 @@
 			// On launch a newer version asks to update now or later (UpdatePrompt);
 			// every 10 minutes after that one found later downloads in the
 			// background. The relaunch is the user's unless the server requires
-			// the version.
+			// the version. LynShen's Beta switches (features.json next to the
+			// feed) are read at the same times.
+			void teamSwitch.refresh();
 			const updateTimer = setTimeout(() => updater.checkOnLaunch(), 3000);
-			const updateEvery = setInterval(() => updater.check(true, true), 10 * 60 * 1000);
+			const updateEvery = setInterval(() => {
+				void updater.check(true, true);
+				void teamSwitch.refresh();
+			}, 10 * 60 * 1000);
 			cleanups.push(() => clearTimeout(updateTimer), () => clearInterval(updateEvery));
 			loadProviders();
 			readAuthProviders()
