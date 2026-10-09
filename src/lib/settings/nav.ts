@@ -17,6 +17,7 @@ export type SectionKey =
 	| 'mcp'
 	| 'market'
 	| 'agents'
+	| 'team'
 	| 'acp'
 	| 'import'
 	| 'daemon'
@@ -25,7 +26,7 @@ export type SectionKey =
 export const GROUPS: { key: string; sections: SectionKey[] }[] = [
 	{ key: 'app', sections: ['general', 'shortcuts', 'account', 'usage', 'voice'] },
 	{ key: 'models', sections: ['providers', 'models', 'network'] },
-	{ key: 'agents', sections: ['agents', 'acp', 'mcp', 'market', 'import'] },
+	{ key: 'agents', sections: ['agents', 'team', 'acp', 'mcp', 'market', 'import'] },
 	{ key: 'system', sections: ['daemon', 'updates'] }
 ];
 
@@ -92,6 +93,12 @@ export const ROWS: SearchRow[] = [
 	{ section: 'agents', id: 'shell-env', titleKey: 'settings.backend.shellEnvLabel', descKey: 'settings.backend.shellEnvHint' },
 	{ section: 'agents', id: 'backend-list', titleKey: 'settings.section.agents' },
 	{ section: 'agents', id: 'dependencies', titleKey: 'setup.deps.title' },
+	{ section: 'team', id: 'team-fanout', titleKey: 'settings.team.fanout', descKey: 'settings.team.fanoutHint.plan' },
+	{ section: 'team', id: 'team-max-live', titleKey: 'settings.team.maxLive', descKey: 'settings.team.maxLiveHint' },
+	{ section: 'team', id: 'team-max-depth', titleKey: 'settings.team.maxDepth', descKey: 'settings.team.maxDepthHint' },
+	{ section: 'team', id: 'team-budget', titleKey: 'settings.team.budget', descKey: 'settings.team.budgetHint' },
+	{ section: 'team', id: 'team-keep-worktrees', titleKey: 'settings.team.keepDays', descKey: 'settings.team.keepDaysHint' },
+	{ section: 'team', id: 'team-roles', titleKey: 'settings.team.roles', descKey: 'settings.team.rolesHint' },
 	{ section: 'acp', id: 'acp-agents', titleKey: 'settings.section.acp' },
 	{ section: 'import', id: 'import-scan', titleKey: 'settings.import.title', descKey: 'settings.import.intro' },
 	{ section: 'daemon', id: 'relay', titleKey: 'settings.backend.relayToggle', descKey: 'settings.backend.relayHint' },

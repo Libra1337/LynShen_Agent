@@ -13,13 +13,23 @@
 
 	// `files` is the session-tracked set of agent-edited paths; onRevert removes one.
 	// `agentDiffs`: the agent's own edits per project-relative path, so a
-	// revert undoes only them and keeps the user's changes.
+	// revert undoes only them and keeps the user's changes. `readonly` (a
+	// subagent's worktree, `title` naming it): the diffs only, no revert or edit.
 	let {
 		cwd = '',
 		files = [],
 		agentDiffs = {},
-		onRevert
-	}: { cwd?: string; files?: string[]; agentDiffs?: Record<string, string[]>; onRevert?: (p: string) => void } = $props();
+		onRevert,
+		readonly = false,
+		title = ''
+	}: {
+		cwd?: string;
+		files?: string[];
+		agentDiffs?: Record<string, string[]>;
+		onRevert?: (p: string) => void;
+		readonly?: boolean;
+		title?: string;
+	} = $props();
 	/** The recorded diffs for a listed path (absolute or project-relative). */
 	function diffsOf(path: string): string[] {
 		const root = cwd.replace(/\/+$/, '');
@@ -140,7 +150,7 @@
 <div class="changes">
 	<div class="bar">
 		<GitDiffIcon size={14} class="ccol" />
-		<span class="title">{t('dock.changes.title')} <span class="count">{files.length}</span></span>
+		<span class="title">{title || t('dock.changes.title')} <span class="count">{files.length}</span></span>
 		<IconButton size="sm" onclick={refresh} label="refresh"><ArrowsClockwiseIcon size={13} /></IconButton>
 	</div>
 	{#if error}
@@ -162,8 +172,10 @@
 						<span class="rdir">{f}</span>
 					</button>
 					{#if s}<span class="stat"><span class="add">+{s.add}</span> <span class="del">−{s.del}</span></span>{/if}
-					<IconButton size="sm" onclick={() => openInEditor(f)} label={t('editor.openInEditor')} title={t('editor.openInEditor')}><NotePencilIcon size={13} /></IconButton>
-					<IconButton size="sm" onclick={() => revert(f)} disabled={busy} label={t('dock.changes.revert')} title={t('dock.changes.revertFile')}><ArrowUUpLeftIcon size={13} /></IconButton>
+					{#if !readonly}
+						<IconButton size="sm" onclick={() => openInEditor(f)} label={t('editor.openInEditor')} title={t('editor.openInEditor')}><NotePencilIcon size={13} /></IconButton>
+						<IconButton size="sm" onclick={() => revert(f)} disabled={busy} label={t('dock.changes.revert')} title={t('dock.changes.revertFile')}><ArrowUUpLeftIcon size={13} /></IconButton>
+					{/if}
 				</div>
 			{/each}
 		</div>

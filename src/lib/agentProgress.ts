@@ -3,7 +3,7 @@
 // the subagent cards in the message list read them. Pure: the components pass
 // in the chat's state and a clock.
 
-import type { AgentRun, PlanStep, SubagentInfo, WorkflowRun } from './chat.svelte';
+import type { AgentRun, PlanStep, SubagentInfo, TeamAgent, TeamBudget, WorkflowRun } from './chat.svelte';
 import { runState, type RunState } from './agentTrace';
 
 export type StepState = 'pending' | 'active' | 'done' | 'skipped';
@@ -29,7 +29,8 @@ export function stepState(status: string): StepState {
 }
 
 export interface PlanSummary {
-	steps: { text: string; state: StepState }[];
+	/** `agent`: the path of the subagent that owns the step ('' for none). */
+	steps: { text: string; state: StepState; agent: string; files: string[] }[];
 	/** Steps done or skipped. */
 	done: number;
 	total: number;
@@ -38,8 +39,17 @@ export interface PlanSummary {
 	current: number;
 }
 
-export function planSummary(plan: PlanStep[]): PlanSummary {
-	const steps = plan.map((p) => ({ text: p.step, state: stepState(p.status) }));
+/** The plan's steps and progress. A step's owner is the agent the plan
+ *  names, else the team agent that reports working on it (`plan_step`: the
+ *  step's text or its 1-based number). */
+export function planSummary(plan: PlanStep[], team: Record<string, Pick<TeamAgent, 'planStep'>> = {}): PlanSummary {
+	const indexOf = (key: string) => (/^\d+$/.test(key) ? Number(key) - 1 : plan.findIndex((p) => p.step.trim() === key));
+	const byStep = new Map<number, string>();
+	for (const [path, a] of Object.entries(team)) {
+		const at = a.planStep === null ? -1 : indexOf(a.planStep);
+		if (at >= 0 && !byStep.has(at)) byStep.set(at, path);
+	}
+	const steps = plan.map((p, i) => ({ text: p.step, state: stepState(p.status), agent: p.agent || byStep.get(i) || '', files: p.files ?? [] }));
 	const done = steps.filter((s) => s.state === 'done' || s.state === 'skipped').length;
 	let current = steps.findIndex((s) => s.state === 'active');
 	if (current < 0 && done < steps.length && done > 0) current = steps.findIndex((s) => s.state === 'pending');
@@ -69,6 +79,13 @@ export interface AgentRow {
 	workflow?: boolean;
 	/** Workflow agents finished out of all. */
 	progress?: { done: number; total: number };
+	/** The engine's own word for its state: `conflict` and `budget_exhausted`
+	 *  say more than `state`. */
+	status?: string;
+	/** Its role in the agent team ('' for none). */
+	role?: string;
+	/** What the agent team knows of it: plan step, worktree, merge. */
+	team?: TeamAgent;
 }
 
 const firstLine = (s: string) => s.split('\n').find((l) => l.trim())?.trim() ?? '';
@@ -84,12 +101,14 @@ export interface RowInput {
 	/** Only runs started since (ms), besides the running ones and the ones the
 	 *  lifecycle still lists; 0 keeps every run. */
 	since?: number;
+	/** The agent team by agent path (roles, worktrees, merges). */
+	team?: Record<string, TeamAgent>;
 }
 
 /** The subagents to show, oldest first: the agent trace's runs (when the engine
  *  sends one), joined with what their lifecycle events say, then the
  *  subagents only the lifecycle (or a spawn call) reports. */
-export function agentRows({ runs, subagents, lastTool, since = 0 }: RowInput): AgentRow[] {
+export function agentRows({ runs, subagents, lastTool, since = 0, team = {} }: RowInput): AgentRow[] {
 	const rows: AgentRow[] = [];
 	const seen = new Set<string>();
 	// A few seconds of slack: the engine stamps a run with its own clock.
@@ -129,6 +148,7 @@ export function agentRows({ runs, subagents, lastTool, since = 0 }: RowInput): A
 			label: shortPath(label),
 			model: a.model || life?.model || '',
 			state,
+			...teamOf(a.id, team, TEAM_STATUS.has(life?.status ?? '') ? life!.status : a.state || life?.status || '', life?.role),
 			startedAt: a.startedAt || life?.startedAt || 0,
 			durationMs: a.durationMs,
 			endedAt: life?.endedAt ?? 0,
@@ -148,6 +168,7 @@ export function agentRows({ runs, subagents, lastTool, since = 0 }: RowInput): A
 			label: shortPath(label),
 			model: life.model ?? '',
 			state,
+			...teamOf(id, team, life.status, life.role),
 			startedAt: life.startedAt ?? 0,
 			durationMs: life.endedAt && life.startedAt ? life.endedAt - life.startedAt : 0,
 			endedAt: life.endedAt ?? 0,
@@ -159,6 +180,17 @@ export function agentRows({ runs, subagents, lastTool, since = 0 }: RowInput): A
 		});
 	}
 	return rows;
+}
+
+/** Lifecycle words the agent trace does not know. */
+const TEAM_STATUS = new Set(['conflict', 'merged', 'discarded', 'budget_exhausted']);
+
+/** What a row says of the agent team: the engine's state word (the
+ *  lifecycle's `conflict` / `budget_exhausted` win over the trace's), the
+ *  role and the team entry. */
+function teamOf(id: string, team: Record<string, TeamAgent>, status: string, role = ''): Pick<AgentRow, 'status' | 'role' | 'team'> {
+	const entry = team[id];
+	return { status, role: entry?.role || role, ...(entry ? { team: entry } : {}) };
 }
 
 /** A LynShen agent path (`/root/scan_auth`) by its own name. */
@@ -306,4 +338,96 @@ export function shortElapsed(ms: number): string {
 	const m = Math.floor(s / 60);
 	if (m < 60) return `${m}m${String(s % 60).padStart(2, '0')}s`;
 	return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m`;
+}
+
+/** A token count as the progress card shows it: 950, 18.4k, 120k, 1.2M. */
+export function compactTokens(n: number): string {
+	const v = Math.max(0, Math.round(n));
+	if (v >= 1_000_000) return `${trimZero((v / 1_000_000).toFixed(1))}M`;
+	if (v >= 100_000) return `${Math.round(v / 1000)}k`;
+	if (v >= 1000) return `${trimZero((v / 1000).toFixed(1))}k`;
+	return String(v);
+}
+const trimZero = (s: string) => s.replace(/\.0$/, '');
+
+/** The progress card's one-line summary: steps done, subagents (running ones
+ *  while any run), and the team's tokens against its budget when it has one. */
+export interface TeamSummary {
+	steps: { done: number; total: number } | null;
+	agents: number;
+	running: number;
+	/** `warn` from 80% of the limit, `over` once it is used up. */
+	budget: { used: string; limit: string; level: 'ok' | 'warn' | 'over' } | null;
+}
+
+export function teamSummary(plan: PlanSummary, rows: AgentRow[], budget: TeamBudget | null, showPlan: boolean): TeamSummary {
+	const limit = budget && budget.limit > 0 ? budget.limit : 0;
+	return {
+		steps: showPlan && plan.total ? { done: plan.done, total: plan.total } : null,
+		agents: rows.length,
+		running: rows.filter((r) => r.state === 'running' || r.state === 'queued').length,
+		budget:
+			budget && limit
+				? {
+						used: compactTokens(budget.used),
+						limit: compactTokens(limit),
+						level: budget.used >= limit ? 'over' : budget.used >= limit * 0.8 ? 'warn' : 'ok'
+					}
+				: null
+	};
+}
+
+/** Where a worktree agent's changes are: none to merge, ready, a merge on
+ *  its way, merged or dropped, or a merge that conflicted or failed. */
+export type MergeState = 'none' | 'ready' | 'pending' | 'applied' | 'discarded' | 'conflict' | 'failed';
+
+export interface MergeView {
+	state: MergeState;
+	/** Files it changed (merged ones once applied). */
+	files: string[];
+	conflicts: string[];
+	error: string;
+	/** Its changes can be viewed, merged or dropped now: it no longer runs,
+	 *  and they are neither merged nor dropped nor on their way. */
+	actionable: boolean;
+}
+
+export function mergeView(row: Pick<AgentRow, 'state' | 'status' | 'team'>): MergeView {
+	const a = row.team;
+	const none: MergeView = { state: 'none', files: [], conflicts: [], error: '', actionable: false };
+	if (!a?.worktree) return none;
+	const idle = row.state !== 'running' && row.state !== 'queued';
+	const view = (state: MergeState, actionable: boolean, extra: Partial<MergeView> = {}): MergeView => ({
+		state,
+		files: a.files,
+		conflicts: [],
+		error: '',
+		actionable,
+		...extra
+	});
+	if (a.pending) return view('pending', false);
+	const m = a.merge;
+	if (m?.ok) return view(m.action === 'apply' ? 'applied' : 'discarded', false, m.files.length ? { files: m.files } : {});
+	// The model merged or discarded it itself (merge_agent as a tool call).
+	if (row.status === 'merged') return view('applied', false);
+	if (row.status === 'discarded') return view('discarded', false);
+	if ((m && m.conflicts.length) || row.status === 'conflict') return view('conflict', idle, { conflicts: m?.conflicts ?? [] });
+	if (m) return view('failed', idle, { error: m.error });
+	return a.files.length ? view('ready', idle) : none;
+}
+
+/** The paths `git status --porcelain` lists (a rename by its new name, a
+ *  quoted path unquoted): what a worktree agent changed, when the engine
+ *  does not say. */
+export function porcelainFiles(out: string): string[] {
+	const files: string[] = [];
+	for (const line of out.split('\n')) {
+		if (line.length < 4 || line.startsWith('##')) continue;
+		let path = line.slice(3);
+		const arrow = path.indexOf(' -> ');
+		if (arrow >= 0) path = path.slice(arrow + 4);
+		if (path.startsWith('"') && path.endsWith('"')) path = path.slice(1, -1).replace(/\\(["\\])/g, '$1');
+		if (path && !files.includes(path)) files.push(path);
+	}
+	return files;
 }

@@ -77,7 +77,8 @@
 	import Button from '$lib/ui/Button.svelte';
 	import TaskStrip from '$lib/TaskStrip.svelte';
 	import ProgressCard from '$lib/agents/ProgressCard.svelte';
-	import { agentRows, type AgentRow } from '$lib/agentProgress';
+	import { agentRows, porcelainFiles, type AgentRow } from '$lib/agentProgress';
+	import { agentChanges } from '$lib/agents/agentChanges.svelte';
 	import { parseToolOutput, toolTarget, toolVerb } from '$lib/toolSummary';
 	import { isAbsolutePath, joinPath, parseFileHref, pathExt } from '$lib/fileRefs';
 	import type { Msg, ModelOption } from '$lib/chat.svelte';
@@ -475,7 +476,7 @@
 		if (!q) return [];
 		const hits: number[] = [];
 		chat.messages.forEach((m, i) => {
-			const text = m.kind === 'tool' ? `${m.name} ${m.output}` : 'text' in m ? m.text : '';
+			const text = m.kind === 'tool' ? `${m.name} ${m.output}` : m.kind === 'agent_message' ? m.summary : 'text' in m ? m.text : '';
 			if (text.toLowerCase().includes(q)) hits.push(i);
 		});
 		return hits;
@@ -509,13 +510,42 @@
 		const m = chat.subagentLastTool[label];
 		return m ? `${toolVerb(m.name)} ${toolTarget(m.name, parseToolOutput(m.output))}`.trim() : '';
 	};
-	const allAgents = $derived(agentRows({ runs: chat.agentRuns, subagents: chat.subagents, lastTool }));
+	const allAgents = $derived(agentRows({ runs: chat.agentRuns, subagents: chat.subagents, lastTool, team: chat.team }));
 	const turnAgents = $derived(
-		agentRows({ runs: chat.agentRuns, subagents: chat.subagents, lastTool, since: chat.turnStartedAt || Number.MAX_SAFE_INTEGER })
+		agentRows({ runs: chat.agentRuns, subagents: chat.subagents, lastTool, team: chat.team, since: chat.turnStartedAt || Number.MAX_SAFE_INTEGER })
 	);
 	function openAgent(row: AgentRow) {
 		openTrace(row.workflow ? null : row.id);
 	}
+	// The agent team: a worktree agent's changes open in the Changes panel at
+	// its workdir; merging or dropping them is the engine's (merge_agent).
+	function viewAgentChanges(row: AgentRow) {
+		agentChanges.open(session.id, row.id);
+	}
+	function mergeAgent(row: AgentRow, action: 'apply' | 'discard') {
+		send(chat.mergeAgent(row.id, action));
+	}
+	// A finished worktree agent whose changed files the engine did not name:
+	// read them from its worktree once (git status there).
+	const scannedWorktrees = new Set<string>();
+	$effect(() => {
+		for (const r of allAgents) {
+			const a = r.team;
+			if (!a?.worktree || !a.workdir || a.files.length || a.merge || a.pending) continue;
+			if (r.state === 'running' || r.state === 'queued' || scannedWorktrees.has(a.workdir)) continue;
+			scannedWorktrees.add(a.workdir);
+			const id = r.id;
+			git(['status', '--porcelain'], a.workdir)
+				.then((out) => {
+					const files = porcelainFiles(out);
+					const entry = chat.team[id];
+					if (files.length && entry && !entry.files.length) entry.files = files;
+				})
+				.catch(() => {
+					/* the worktree is gone or not a repository */
+				});
+		}
+	});
 
 	// Plan mode: a proposed plan runs once approved, in the mode picked on its
 	// card; revising it sends the next message as the user's feedback.
@@ -1245,7 +1275,7 @@
 	<ProgressCard {chat} sessionId={session.id} rows={turnAgents} onOpen={traceable ? openAgent : undefined} />
 	<main bind:this={scroller} onscroll={onScroll} onwheel={onWheel}>
 		<div bind:this={contentEl}>
-			<MessageList bind:this={messageList} bind:mark messages={chat.messages} {streamingMsg} {streamingReasoning} phase={chat.phase} call={chat.call} compactionTokens={chat.compactionTokens} retry={chat.retry} autoRetry={chat.autoRetry} onAutoRetryNow={() => autoRetry.now(chat)} onAutoRetryCancel={() => autoRetry.cancel(chat)} {findActive} {scroller} onEdit={editMessage} onCite={citeText} onNote={noteRequirement} onRewind={rewindToMessage} onFile={openChatFile} onDismiss={(m) => (chat.messages = chat.messages.filter((x) => x !== m))} backend={chat.backendId} provider={chat.provider ?? ''} onErrorAction={fixError} traceOf={traceable ? traceOf : undefined} agents={allAgents} onOpenAgent={traceable ? openAgent : undefined} onPlan={planAction} onOpenPlan={(id) => planPages.open(session.id, id)} {planMode} />
+			<MessageList bind:this={messageList} bind:mark messages={chat.messages} {streamingMsg} {streamingReasoning} phase={chat.phase} call={chat.call} compactionTokens={chat.compactionTokens} retry={chat.retry} autoRetry={chat.autoRetry} onAutoRetryNow={() => autoRetry.now(chat)} onAutoRetryCancel={() => autoRetry.cancel(chat)} {findActive} {scroller} onEdit={editMessage} onCite={citeText} onNote={noteRequirement} onRewind={rewindToMessage} onFile={openChatFile} onDismiss={(m) => (chat.messages = chat.messages.filter((x) => x !== m))} backend={chat.backendId} provider={chat.provider ?? ''} onErrorAction={fixError} traceOf={traceable ? traceOf : undefined} agents={allAgents} onOpenAgent={traceable ? openAgent : undefined} onAgentChanges={viewAgentChanges} onMergeAgent={mergeAgent} onPlan={planAction} onOpenPlan={(id) => planPages.open(session.id, id)} {planMode} />
 		</div>
 		{#if chat.booting && chat.engineState !== 'exited'}
 			<div class="welcome spawning">

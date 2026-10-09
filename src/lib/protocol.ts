@@ -76,6 +76,9 @@ export type Op =
 	// claude: the agent trace (Workflows, Task subagents) and one subagent's conversation.
 	| { op: 'agent_runs' }
 	| { op: 'subagent_transcript'; agent_id: string }
+	// lynshen agent team: merge a subagent's worktree into the project, or drop
+	// it; answered with `merge_result`.
+	| { op: 'merge_agent'; target: string; action: 'apply' | 'discard' }
 	// lynshen plan mode: run a proposed plan in `mode`, or revise it with `feedback`.
 	| {
 			op: 'approve_plan';

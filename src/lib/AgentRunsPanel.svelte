@@ -10,6 +10,8 @@
 	import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
 	import { t } from '$lib/i18n';
 	import AgentTranscript from '$lib/agents/AgentTranscript.svelte';
+	import AgentMessageLine from '$lib/agents/AgentMessageLine.svelte';
+	import { roleLabel } from '$lib/agents/teamText';
 	import type { AgentRun, ChatState, WorkflowRun } from '$lib/chat.svelte';
 	import type { Op } from '$lib/protocol';
 	import {
@@ -124,7 +126,7 @@
 		{@render stateIcon(a.state)}
 		<span class="aname">
 			<span class="alabel">{a.label || a.id}</span>
-			<span class="asub">{[a.type, shortModel(a.model)].filter(Boolean).join(' · ')}</span>
+			<span class="asub">{[chat.team[a.id]?.role ? roleLabel(chat.team[a.id]!.role) : a.type, shortModel(a.model)].filter(Boolean).join(' · ')}</span>
 		</span>
 		<span class="track">
 			{#if bar}<span class="bar {s}" style:left="{bar.left}%" style:width="{bar.width}%"></span>{/if}
@@ -174,6 +176,13 @@
 					{#if life.model}<span>{shortModel(life.model)}</span>{/if}
 					<span>{t(`dock.agents.state.${runState(life.status)}`)}</span>
 				</div>
+			</div>
+		{/if}
+		<!-- The messages it sent and received in the agent team. -->
+		{@const mail = chat.messagesOf(chat.agentFocus)}
+		{#if mail.length}
+			<div class="mail">
+				{#each mail as m, i (i)}<AgentMessageLine from={m.from} to={m.to} summary={m.summary} />{/each}
 			</div>
 		{/if}
 		{#key chat.agentFocus}
@@ -499,6 +508,12 @@
 	}
 	.focus-head {
 		padding: 4px 18px 8px;
+	}
+	.mail {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 0 18px 8px;
 	}
 	.ftitle {
 		display: flex;

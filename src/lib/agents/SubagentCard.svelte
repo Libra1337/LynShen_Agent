@@ -1,22 +1,33 @@
 <script lang="ts">
 	// A subagent call in the conversation: a spawn (spawn_agent, claude's Task /
-	// Agent) as the agent it started — name, the task's first line, its state
-	// and its latest action — and a wait as the agents it waits on with
-	// theirs. A click shows the agent's own conversation.
+	// Agent) as the agent it started — name, role, model, the task's first
+	// line, its state, time, changed files and latest action — and a wait as
+	// the agents it waits on with theirs. A click shows the agent's own
+	// conversation. An agent that wrote in a worktree of its own offers its
+	// changes: view them, merge them into the project, or drop them.
 	import RobotIcon from 'phosphor-svelte/lib/RobotIcon';
+	import GitDiffIcon from 'phosphor-svelte/lib/GitDiffIcon';
+	import GitMergeIcon from 'phosphor-svelte/lib/GitMergeIcon';
+	import WarningIcon from 'phosphor-svelte/lib/WarningIcon';
+	import CircleNotchIcon from 'phosphor-svelte/lib/CircleNotchIcon';
 	import HourglassMediumIcon from 'phosphor-svelte/lib/HourglassMediumIcon';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
 	import { t } from '$lib/i18n';
 	import {
 		agentOfCall,
+		mergeView,
 		shortPath,
 		spawnPayload,
 		WAIT_TOOLS,
 		waitTargets,
-		type AgentRow
+		type AgentRow,
+		type MergeView
 	} from '$lib/agentProgress';
+	import Button from '$lib/ui/Button.svelte';
+	import { confirm } from '$lib/ui/confirm.svelte';
 	import StateIcon from './StateIcon.svelte';
 	import Elapsed from './Elapsed.svelte';
+	import { roleLabel, teamNote } from './teamText';
 
 	let {
 		name,
@@ -26,7 +37,9 @@
 		running,
 		isError,
 		rows,
-		onOpen
+		onOpen,
+		onViewChanges,
+		onMerge
 	}: {
 		name: string;
 		callId: string;
@@ -37,6 +50,10 @@
 		/** Every subagent of the conversation (see agentRows). */
 		rows: AgentRow[];
 		onOpen?: (row: AgentRow) => void;
+		/** Shows a worktree agent's changes (the Changes panel at its workdir). */
+		onViewChanges?: (row: AgentRow) => void;
+		/** Sends merge_agent for it: `apply` merges, `discard` drops its worktree. */
+		onMerge?: (row: AgentRow, action: 'apply' | 'discard') => void;
 	} = $props();
 
 	const wait = $derived(WAIT_TOOLS.has(name));
@@ -51,7 +68,37 @@
 	const label = $derived(agent?.label || shortPath(payload.name || payload.path) || t('chat.subagentCard.spawn'));
 	const task = $derived((payload.task || agent?.prompt || '').split('\n').find((l) => l.trim())?.trim() ?? '');
 	const state = $derived(agent?.state ?? (isError ? 'failed' : running ? 'running' : 'unknown'));
-	const activity = $derived(isError ? errorLine(output) : running && !agent ? t('chat.subagentCard.starting') : agent?.activity || '');
+	// Its worktree changes and what became of them.
+	const merge = $derived<MergeView | null>(agent ? mergeView(agent) : null);
+	// A conflict shows under the card with its files, not in the activity line.
+	const note = $derived(agent && merge?.state !== 'conflict' ? teamNote(agent) : '');
+	const activity = $derived(isError ? errorLine(output) : running && !agent ? t('chat.subagentCard.starting') : note || agent?.activity || '');
+	const fileCount = $derived(merge && merge.state !== 'none' ? merge.files.length : (agent?.team?.files.length ?? 0));
+	function mergeLabel(m: MergeView): string {
+		switch (m.state) {
+			case 'ready':
+				return t('chat.team.ready', { n: m.files.length });
+			case 'pending':
+				return t(agent?.team?.pending === 'discard' ? 'chat.team.discarding' : 'chat.team.merging');
+			case 'applied':
+				return t('chat.team.applied', { n: m.files.length });
+			case 'discarded':
+				return t('chat.team.discarded');
+			case 'failed':
+				return m.error ? t('chat.team.failedWhy', { error: m.error }) : t('chat.team.failed');
+			default:
+				return '';
+		}
+	}
+	async function discard(row: AgentRow, files: number) {
+		const ok = await confirm({
+			title: t('chat.team.discardTitle', { name: row.label }),
+			message: t('chat.team.discardMessage', { name: row.label, n: files }),
+			confirmLabel: t('chat.team.discard'),
+			danger: true
+		});
+		if (ok) onMerge?.(row, 'discard');
+	}
 
 	// The agents a wait names, with their state now (the trace's, else the
 	// wait's own answer).
@@ -100,21 +147,56 @@
 		{/if}
 	</div>
 {:else}
-	<button class="sa spawn" class:link={!!onOpen && !!agent} disabled={!onOpen || !agent} onclick={() => agent && onOpen?.(agent)} aria-label={t('chat.progress.open', { name: label })}>
-		<span class="ico"><RobotIcon size={15} /></span>
-		<span class="col">
-			<span class="line">
-				<span class="name">{label}</span>
-				{#if agent?.model}<span class="model">{agent.model.replace(/^claude-/, '')}</span>{/if}
-				<span class="grow"></span>
-				{#if agent}<Elapsed row={agent} />{/if}
-				<StateIcon state={state} size={14} label={state === 'unknown' ? '' : t(`dock.agents.state.${state}`)} />
+	<div class="sa box" class:link={!!onOpen && !!agent}>
+		<button class="spawn" disabled={!onOpen || !agent} onclick={() => agent && onOpen?.(agent)} aria-label={t('chat.progress.open', { name: label })}>
+			<span class="ico"><RobotIcon size={15} /></span>
+			<span class="col">
+				<span class="line">
+					<span class="name">{label}</span>
+					{#if agent?.role}<span class="role" title={t('chat.team.roleTitle', { role: agent.role })}>{roleLabel(agent.role)}</span>{/if}
+					{#if agent?.model}<span class="model">{agent.model.replace(/^claude-/, '')}</span>{/if}
+					<span class="grow"></span>
+					{#if fileCount}<span class="files" title={t('chat.team.filesTitle')}>{t('chat.team.filesN', { n: fileCount })}</span>{/if}
+					{#if agent}<Elapsed row={agent} />{/if}
+					<StateIcon state={state} size={14} label={state === 'unknown' ? '' : t(`dock.agents.state.${state}`)} />
+				</span>
+				{#if task}<span class="task">{task}</span>{/if}
+				{#if activity}<span class="act" class:err={state === 'failed'} class:warn={!!note}>{activity}</span>{/if}
 			</span>
-			{#if task}<span class="task">{task}</span>{/if}
-			{#if activity}<span class="act" class:err={state === 'failed'}>{activity}</span>{/if}
-		</span>
-		{#if onOpen && agent}<span class="go"><CaretRightIcon size={13} /></span>{/if}
-	</button>
+			{#if onOpen && agent}<span class="go"><CaretRightIcon size={13} /></span>{/if}
+		</button>
+		{#if agent && merge && merge.state !== 'none'}
+			{@const m = merge}
+			<div class="team">
+				{#if m.state === 'conflict'}
+					<div class="cbox" role="alert">
+						<span class="ctitle"><WarningIcon size={13} />{t('chat.team.conflict')}</span>
+						{#if m.conflicts.length}
+							<ul class="cfiles">
+								{#each m.conflicts as f (f)}<li>{f}</li>{/each}
+							</ul>
+						{/if}
+					</div>
+				{/if}
+				<div class="actions">
+					<span class="mstate {m.state}">
+						{#if m.state === 'pending'}<CircleNotchIcon size={12} class="spin" />{/if}
+						{mergeLabel(m)}
+					</span>
+					<span class="grow"></span>
+					<Button size="sm" variant="ghost" disabled={!m.actionable || !onViewChanges} onclick={() => onViewChanges?.(agent)}>
+						<GitDiffIcon size={13} />{t('chat.team.viewChanges')}
+					</Button>
+					<Button size="sm" variant="secondary" disabled={!m.actionable || !onMerge} onclick={() => onMerge?.(agent, 'apply')}>
+						<GitMergeIcon size={13} />{t('chat.team.merge')}
+					</Button>
+					<Button size="sm" variant="ghost" disabled={!m.actionable || !onMerge} onclick={() => discard(agent, m.files.length)}>
+						{t('chat.team.discard')}
+					</Button>
+				</div>
+			</div>
+		{/if}
+	</div>
 {/if}
 
 <style>
@@ -126,22 +208,30 @@
 		box-shadow: inset 0 0 0 1px var(--hairline);
 		color: var(--text);
 	}
+	.box {
+		flex-direction: column;
+		width: 100%;
+		overflow: hidden;
+		transition: background var(--t-fast) var(--ease-out);
+	}
+	.box.link:has(.spawn:hover) {
+		background: var(--surface2);
+	}
 	.spawn {
+		display: flex;
 		align-items: flex-start;
 		gap: 10px;
 		width: 100%;
 		padding: 10px 12px;
 		border: none;
+		background: none;
+		color: inherit;
 		text-align: left;
 		font: inherit;
 		cursor: default;
-		transition: background var(--t-fast) var(--ease-out);
 	}
-	.spawn.link {
+	.box.link .spawn {
 		cursor: pointer;
-	}
-	.spawn.link:hover {
-		background: var(--surface2);
 	}
 	.wait {
 		flex-direction: column;
@@ -191,6 +281,81 @@
 		font-size: var(--fs-2xs);
 		color: var(--dim2);
 	}
+	.role {
+		flex: none;
+		padding: 0 6px;
+		border-radius: var(--r-xs);
+		background: var(--surface2);
+		font-size: var(--fs-2xs);
+		line-height: 1.6;
+		color: var(--dim);
+	}
+	.files {
+		flex: none;
+		font-family: var(--font-mono);
+		font-size: var(--fs-2xs);
+		font-variant-numeric: tabular-nums;
+		color: var(--dim);
+	}
+	.team {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 0 12px 10px 37px;
+	}
+	.actions {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+	}
+	.mstate {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: var(--fs-2xs);
+		color: var(--dim);
+	}
+	.mstate.applied {
+		color: var(--ok);
+	}
+	.mstate.conflict {
+		color: var(--warn);
+	}
+	.mstate.failed {
+		color: var(--err);
+	}
+	.cbox {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 8px 10px;
+		border-radius: var(--r-md);
+		background: color-mix(in oklab, var(--warn) 10%, transparent);
+		color: var(--warn);
+		font-size: var(--fs-xs);
+	}
+	.ctitle {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-weight: 500;
+	}
+	.cfiles {
+		margin: 0;
+		padding: 0 0 0 19px;
+		list-style: none;
+		font-family: var(--font-mono);
+		font-size: var(--fs-2xs);
+		color: var(--text);
+	}
+	.cfiles li {
+		overflow-wrap: anywhere;
+	}
 	.grow {
 		flex: 1;
 	}
@@ -210,6 +375,9 @@
 	}
 	.act.err {
 		color: var(--err);
+	}
+	.act.warn {
+		color: var(--warn);
 	}
 	.tag {
 		font-size: var(--fs-2xs);
