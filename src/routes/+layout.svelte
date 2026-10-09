@@ -5,6 +5,7 @@
 	import { initTheme } from '$lib/theme.svelte';
 	import { prefs, applyPlatformClass } from '$lib/prefs.svelte';
 	import { getLocale, setLocale } from '$lib/i18n';
+	import { initShortcuts } from '$lib/shortcuts';
 	import IconContext from 'phosphor-svelte/lib/IconContext';
 	import ContextMenuHost from '$lib/ui/ContextMenuHost.svelte';
 	import TooltipHost from '$lib/ui/TooltipHost.svelte';
@@ -13,6 +14,8 @@
 	// chrome (macOS traffic-light insets vs a native Windows/Linux title bar) is
 	// styled correctly from the very first frame.
 	if (browser) applyPlatformClass();
+	// This computer's shortcut changes, before anything shows a key.
+	if (browser) initShortcuts();
 
 	let { children } = $props();
 	onMount(() => {

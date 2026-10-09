@@ -1826,7 +1826,13 @@
 		/>
 	{/if}
 	{#if showShortcuts}
-		<ShortcutsDialog onClose={() => (showShortcuts = false)} />
+		<ShortcutsDialog
+			onClose={() => (showShortcuts = false)}
+			onCustomize={() => {
+				showShortcuts = false;
+				openSettings('shortcuts');
+			}}
+		/>
 	{/if}
 </div>
 

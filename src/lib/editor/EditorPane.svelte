@@ -23,6 +23,7 @@
 	import Notice from '$lib/ui/Notice.svelte';
 	import { confirm } from '$lib/ui/confirm.svelte';
 	import { t } from '$lib/i18n';
+	import { shortcutLabel, withShortcut } from '$lib/shortcuts';
 	import { themeState } from '$lib/theme.svelte';
 	import { editorStore, type EditorTab } from './editorStore.svelte';
 	import { languageFor } from './language';
@@ -381,7 +382,7 @@
 		</div>
 		<div class="eactions">
 			<IconButton size="sm" label={t('editor.save')} title="{t('editor.save')} ⌘S" disabled={!active?.dirty} onclick={saveActive}><FloppyDiskIcon size={14} /></IconButton>
-			<IconButton size="sm" label={t('editor.closePane')} title={t('editor.closePane')} onclick={() => (store.visible = false)}><SidebarSimpleIcon size={14} /></IconButton>
+			<IconButton size="sm" label={t('editor.closePane')} title={withShortcut(t('editor.closePane'), 'audit')} onclick={() => (store.visible = false)}><SidebarSimpleIcon size={14} /></IconButton>
 		</div>
 	</div>
 
@@ -433,7 +434,7 @@
 	{:else}
 		<div class="eempty">
 			<p>{t('editor.empty')}</p>
-			<span>{t('editor.emptyHint')}</span>
+			<span>{shortcutLabel('quickOpen') ? t('editor.emptyHintKeys', { keys: shortcutLabel('quickOpen') }) : t('editor.emptyHint')}</span>
 		</div>
 	{/if}
 </div>

@@ -1,14 +1,16 @@
 <script lang="ts">
-	// Every keyboard shortcut (⌘/), grouped as in shortcuts.ts.
+	// Every keyboard shortcut (⌘/), grouped as in shortcuts.ts, with the keys
+	// in use on this computer; Settings → 快捷键 changes them.
 	import Modal from '$lib/ui/Modal.svelte';
-	import { SHORTCUTS, shortcutLabel, type ShortcutId } from '$lib/shortcuts';
+	import Button from '$lib/ui/Button.svelte';
+	import { SHORTCUTS, SHORTCUT_GROUPS, SHORTCUT_IDS, shortcutLabel } from '$lib/shortcuts';
 	import { t } from '$lib/i18n';
 
-	let { onClose }: { onClose: () => void } = $props();
+	let { onClose, onCustomize }: { onClose: () => void; /** Open Settings → 快捷键. */ onCustomize: () => void } = $props();
 
-	const groups = (['general', 'session', 'composer'] as const).map((group) => ({
+	const groups = SHORTCUT_GROUPS.map((group) => ({
 		group,
-		ids: (Object.keys(SHORTCUTS) as ShortcutId[]).filter((id) => SHORTCUTS[id].group === group)
+		ids: SHORTCUT_IDS.filter((id) => SHORTCUTS[id].group === group)
 	}));
 </script>
 
@@ -18,13 +20,17 @@
 		<section>
 			<h3>{t(`shell.shortcuts.${g.group}`)}</h3>
 			{#each g.ids as id (id)}
+				{@const keys = shortcutLabel(id)}
 				<div class="row">
 					<span>{t(`shell.shortcuts.${id}`)}</span>
-					<kbd>{shortcutLabel(id)}</kbd>
+					{#if keys}<kbd>{keys}</kbd>{:else}<span class="none" aria-label={t('shell.shortcuts.none')}>—</span>{/if}
 				</div>
 			{/each}
 		</section>
 	{/each}
+	{#snippet footer()}
+		<Button size="sm" onclick={onCustomize}>{t('shell.shortcuts.customize')}</Button>
+	{/snippet}
 </Modal>
 
 <style>
@@ -56,6 +62,10 @@
 		background: var(--surface);
 		color: var(--dim);
 		font-family: inherit;
+		font-size: var(--fs-xs);
+	}
+	.none {
+		color: var(--dim);
 		font-size: var(--fs-xs);
 	}
 </style>

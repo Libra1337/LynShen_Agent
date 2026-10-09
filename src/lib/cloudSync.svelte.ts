@@ -1,8 +1,8 @@
 // Settings synced between the computers of a LynShen account
 // (GET/PUT /v1/oauth/settings). Only basic preferences: interface, default
 // backend, model defaults, network and voice settings. Keys, custom
-// providers, paths, window sizes, projects, MCP, skills, agents and
-// schedules stay on each computer.
+// providers, paths, window sizes, keyboard shortcuts, projects, MCP,
+// skills, agents and schedules stay on each computer.
 //
 // Per key, the last value synced here is remembered (`lynshen-cloud-sync`):
 // a local value that differs from it was changed here and is pushed; else a

@@ -3,8 +3,11 @@
 // each section renders (SettingsRow / SettingsSection `id`s). Keep ROWS in
 // sync with the rows in SettingsPage and the section components.
 
+import { SHORTCUT_IDS } from '$lib/shortcuts';
+
 export type SectionKey =
 	| 'general'
+	| 'shortcuts'
 	| 'account'
 	| 'usage'
 	| 'voice'
@@ -20,7 +23,7 @@ export type SectionKey =
 	| 'updates';
 
 export const GROUPS: { key: string; sections: SectionKey[] }[] = [
-	{ key: 'app', sections: ['general', 'account', 'usage', 'voice'] },
+	{ key: 'app', sections: ['general', 'shortcuts', 'account', 'usage', 'voice'] },
 	{ key: 'models', sections: ['providers', 'models', 'network'] },
 	{ key: 'agents', sections: ['agents', 'acp', 'mcp', 'market', 'import'] },
 	{ key: 'system', sections: ['daemon', 'updates'] }
@@ -56,6 +59,9 @@ export const ROWS: SearchRow[] = [
 	{ section: 'general', id: 'html-open', titleKey: 'settings.behavior.htmlOpen' },
 	{ section: 'general', id: 'feedback', titleKey: 'settings.help.feedback' },
 	{ section: 'general', id: 'telemetry', titleKey: 'settings.help.telemetry', descKey: 'settings.help.telemetryHint' },
+	{ section: 'shortcuts', id: 'shortcuts-reset', titleKey: 'settings.shortcuts.customize', descKey: 'settings.shortcuts.hint' },
+	// One row per action (ShortcutsSection), titled as in the ⌘/ list.
+	...SHORTCUT_IDS.map((id): SearchRow => ({ section: 'shortcuts', id: `shortcut-${id}`, titleKey: `shell.shortcuts.${id}` })),
 	{ section: 'account', id: 'account-login', titleKey: 'settings.page.lynshenAccount' },
 	{ section: 'account', id: 'account-balance', titleKey: 'settings.usage.balance' },
 	{ section: 'account', id: 'account-models', titleKey: 'settings.monoize.square' },
