@@ -23,12 +23,22 @@
 		return el.dataset.tip ?? '';
 	}
 
+	/** The right edge of what shows of `el`: the collapsed rail keeps rows at
+	 *  their expanded width and clips them, so the element's own edge can be
+	 *  far right of anything visible. */
+	function visibleRight(el: HTMLElement, right: number): number {
+		for (let p = el.parentElement; p; p = p.parentElement) {
+			if (getComputedStyle(p).overflowX !== 'visible') right = Math.min(right, p.getBoundingClientRect().right);
+		}
+		return right;
+	}
+
 	// `data-tip-side="right"` (the collapsed sidebar's icons) shows the tip
 	// beside the element instead of below it.
 	function show(el: HTMLElement, text: string) {
 		const r = el.getBoundingClientRect();
 		if (el.dataset.tipSide === 'right') {
-			tip = { text, x: r.right + 8, y: r.top + r.height / 2, side: 'right' };
+			tip = { text, x: visibleRight(el, r.right) + 8, y: r.top + r.height / 2, side: 'right' };
 			return;
 		}
 		const above = r.bottom + 40 > window.innerHeight;
