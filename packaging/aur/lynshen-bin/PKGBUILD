@@ -1,0 +1,45 @@
+# Maintainer: Libra1337 <https://github.com/Libra1337>
+# LynShen Desktop for Arch Linux, from the release's Debian package.
+pkgname=lynshen-bin
+pkgver=0.4.32
+pkgrel=1
+pkgdesc='LynShen Desktop: a coding agent workspace for LynShen, Claude Code and Codex'
+arch=('x86_64')
+url='https://www.lynshen.org'
+license=('Apache-2.0')
+# The welcome page needs Node.js, npm and Git; shell commands run under bubblewrap.
+depends=(
+  'bubblewrap'
+  'cairo'
+  'dbus'
+  'gcc-libs'
+  'gdk-pixbuf2'
+  'git'
+  'glib2'
+  'glibc'
+  'gtk3'
+  'hicolor-icon-theme'
+  'libayatana-appindicator'
+  'libsoup3'
+  'nodejs'
+  'npm'
+  'webkit2gtk-4.1'
+)
+optdepends=(
+  'desktop-file-utils: register lynshen:// links'
+  'noto-fonts-cjk: Chinese, Japanese and Korean text'
+  'xdg-utils: open lynshen:// links in the app'
+)
+provides=('lynshen-desktop')
+conflicts=('lynshen-desktop')
+options=('!strip' '!debug')
+source=("LynShen_${pkgver}_amd64.deb::https://github.com/Libra1337/LynShen_Agent/releases/download/v${pkgver}/LynShen_${pkgver}_amd64.deb")
+noextract=("LynShen_${pkgver}_amd64.deb")
+sha256sums=('c874d47029d45c66fc2a209c655a5ab1274ea7fba65bd7b0e7e36ffea17fed85')
+
+package() {
+  bsdtar -xOf "LynShen_${pkgver}_amd64.deb" data.tar.gz | bsdtar -xf - -C "${pkgdir}"
+  # The app keeps itself current through the AUR; it bundles the engine
+  # (/usr/bin/lynshen-cli) it copies to ~/.lynshen/bin on start.
+  chmod 755 "${pkgdir}/usr/bin/LynShen" "${pkgdir}/usr/bin/lynshen-cli"
+}
