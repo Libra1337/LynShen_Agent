@@ -48,7 +48,7 @@ LynShen 账号在 [LynShen Console](https://www.lynshen.org)（LynShen 官网）
 - 每个会话用一个智能体：LynShen 引擎、Claude Code、Codex，或在「设置 → 外部智能体（ACP）」里添加的 ACP 智能体（例如 `gemini --experimental-acp`）。
 - Claude Code 和 Codex 会话可以用本机已有的登录，也可以走 LynShen 网关，用 LynShen 账号的额度。
 - 不属于任何项目的对话（独立对话）各有一个文件夹，在 `~/Documents/LynShen`（文稿/LynShen）下，按日期和第一条消息命名，不同对话的文件不会混在一起。
-- 可以导入 Claude Code 和 Codex 自己保存的历史对话，在 LynShen 里接着聊。导入时应用复制一份，原文件不变。
+- 「设置 → 从其他工具导入」一次扫描本机的 Claude Code、Codex、opencode、zcode 和 omp，列出它们的历史对话、技能和 MCP 服务器，勾选后一键导入。对话导入后在 LynShen 里接着聊。应用只复制，不改原文件。
 - 想用智能体原本的终端界面时，可以在标签页里运行真正的 `lynshen`、`codex` 或 `claude` TUI。从命令面板（`⌘K`）或面板的「+」菜单打开。
 
 **审批和计划**
@@ -68,7 +68,7 @@ LynShen 账号在 [LynShen Console](https://www.lynshen.org)（LynShen 官网）
 **模型、技能和其他**
 
 - 模型来源：LynShen 网关（登录 LynShen 账号）、你自己的 API Key，或智能体自己的登录。在「设置 → 提供商」里管理。
-- 生图：智能体可以画图和改图。生图模型在「设置 → 模型与推理」里选。
+- 生图：智能体可以画图和改图。在模型菜单里选一个生图模型（名字带 image 之类的），它就成为生图模型，对话模型不变。
 - 技能市场：「设置 → 技能市场」，从 Anthropic 和社区仓库（Ikaleio、Superpowers、Composio）安装技能。Claude Code 会话装到 `~/.claude/skills`，其他会话装到 `~/.lynshen/skills`。
 - MCP 服务器：「设置 → MCP 服务器」。
 - 语音输入、截屏和录屏，结果作为消息附件发给智能体。录屏需要 FFmpeg。
@@ -194,7 +194,7 @@ LynShen Desktop is a desktop app for working with coding agents. One window hold
 
 **First launch.** A setup guide checks Node.js and Git, signs you in to LynShen through the browser (or takes your own API key), and asks for a default agent and model. The app gets a 30-day credential for this device, not your password. Claude Code and Codex are optional and install from their official sources.
 
-**What you get.** Sessions on several agents, plan mode, approvals with keyboard shortcuts, files, git (with pull requests and worktree tasks), a terminal, a browser whose elements you can reference in a message, image generation, a skills marketplace, MCP servers, and voice and screen capture. Every session runs in the local `lynshen daemon`, so it keeps going when the window closes. You can follow and drive it from your phone through an end-to-end encrypted relay (Settings → Remote access).
+**What you get.** Sessions on several agents, plan mode, approvals with keyboard shortcuts, files, git (with pull requests and worktree tasks), a terminal, a browser whose elements you can reference in a message, image generation, a skills marketplace, MCP servers, voice and screen capture, and a one-step import of conversations, skills and MCP servers from Claude Code, Codex, opencode, zcode and omp (Settings → Import from other tools). Every session runs in the local `lynshen daemon`, so it keeps going when the window closes. You can follow and drive it from your phone through an end-to-end encrypted relay (Settings → Remote access).
 
 **Privacy.** Credentials are in `~/.lynshen/auth.json`, plain text unless `"encrypt_secrets": true` is set in `~/.lynshen/config.json`. Prompts and code go to the model provider of the session. Signed in, the daemon reports each turn's token counts, model, engine and timing to your account (no prompts, code or paths). Anonymous usage counts are on by default; turn them off in Settings → General.
 
