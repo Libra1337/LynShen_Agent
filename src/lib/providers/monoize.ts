@@ -89,6 +89,11 @@ export async function refreshMonoizeCatalog() {
 	}
 }
 
+/** The limits a gateway model's saved entry follows from the gateway. */
+function limitsOf(m: Record<string, unknown>) {
+	return { context_window: m.context_window, max_context_window: m.max_context_window, max_output_tokens: m.max_output_tokens };
+}
+
 /** A gateway model as `lynshen_models` keeps it (what the engines read). */
 function monoizeSaved(m: MonoizeModelEntry): Record<string, unknown> {
 	return {
@@ -112,7 +117,11 @@ export function pickedMonoizeModels(
 ): Record<string, unknown> {
 	const live = new Map(models.map((m) => [m.name, m]));
 	const saved = Array.isArray(cfg.lynshen_models) ? (cfg.lynshen_models as { name?: unknown }[]) : [];
-	const kept = saved.filter((m) => live.has(String(m.name)));
+	// Kept picks take the gateway's current window and output limit: stored
+	// once, they otherwise kept whatever the gateway said back then.
+	const kept = saved
+		.filter((m) => live.has(String(m.name)))
+		.map((m) => ({ ...m, ...limitsOf(monoizeSaved(live.get(String(m.name))!)) }));
 	// Put on sale since the last look: shown at once (see newlyOffered).
 	const offer = newlyOffered(models.map((m) => m.name), cfg);
 	const fresh = kept.length
@@ -120,7 +129,7 @@ export function pickedMonoizeModels(
 		: [];
 	const picked = [...kept, ...fresh];
 	const patch: Record<string, unknown> = {};
-	if (picked.length !== saved.length) patch.lynshen_models = picked;
+	if (JSON.stringify(picked) !== JSON.stringify(saved)) patch.lynshen_models = picked;
 	if (JSON.stringify(offer.seen) !== JSON.stringify(cfg.lynshen_models_seen)) patch.lynshen_models_seen = offer.seen;
 	// A Provider pinned for a model that no longer serves it would be refused
 	// (provider_unavailable): the gateway picks again once the pin is gone.

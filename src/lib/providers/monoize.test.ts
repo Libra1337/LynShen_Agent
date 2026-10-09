@@ -67,7 +67,7 @@ describe('pickedMonoizeModels', () => {
 			lynshen_models: [{ name: 'grok-4.7' }, { name: 'kimi-k3' }],
 			monoize_providers: { 'grok-4.7': 'p-x', 'glm-5.3': 'p-gone', 'kimi-k3': 'p-b' }
 		});
-		expect(patch.lynshen_models).toEqual([{ name: 'kimi-k3' }]);
+		expect((patch.lynshen_models as { name: string }[]).map((m) => m.name)).toEqual(['kimi-k3']);
 		expect((patch.models as { name: string }[]).map((m) => m.name)).toEqual(['kimi-k3']);
 		expect(patch.model).toBe('kimi-k3');
 		expect(patch.monoize_providers).toEqual({ 'kimi-k3': 'p-b' });
@@ -75,9 +75,11 @@ describe('pickedMonoizeModels', () => {
 
 	it('shows every model when nothing was picked, and leaves another provider alone', () => {
 		expect((pickedMonoizeModels(live, { provider: 'monoize', model: 'glm-5.3' }).models as unknown[]).length).toBe(2);
-		expect(
-			pickedMonoizeModels(live, { provider: 'deepseek', lynshen_models: [{ name: 'glm-5.3' }], lynshen_models_seen: ['glm-5.3', 'kimi-k3'] })
-		).toEqual({});
+		// Another provider: the engine's list and model stay; the saved pick
+		// only takes the gateway's current limits.
+		const other = pickedMonoizeModels(live, { provider: 'deepseek', lynshen_models: [{ name: 'glm-5.3' }], lynshen_models_seen: ['glm-5.3', 'kimi-k3'] });
+		expect(Object.keys(other)).toEqual(['lynshen_models']);
+		expect((other.lynshen_models as { name: string }[]).map((m) => m.name)).toEqual(['glm-5.3']);
 	});
 
 	it('shows a model put on sale since the last look, keeping a hidden one hidden', () => {
@@ -112,5 +114,22 @@ describe('pickedMonoizeModels', () => {
 		const patch = pickedMonoizeModels(models, { provider: 'monoize', model: 'gpt-image-2', lynshen_models: [] });
 		expect(patch.image_model).toBe('gpt-image-2');
 		expect(patch.model).toBe('glm-5.3');
+	});
+});
+
+describe('saved gateway picks', () => {
+	it('follow the gateway\u2019s current window', () => {
+		const models = monoizeEntries([{ id: 'claude-opus-5-5', context_window: 1_000_000, max_output_tokens: 128_000 } as never]);
+		const cfg = {
+			provider: 'monoize',
+			lynshen_models: [{ name: 'claude-opus-5-5', context_window: 0, max_context_window: 128_000, max_output_tokens: 0, reasoning_efforts: ['high'] }],
+			lynshen_models_seen: ['claude-opus-5-5']
+		};
+		const patch = pickedMonoizeModels(models, cfg);
+		expect(patch.lynshen_models).toEqual([
+			{ name: 'claude-opus-5-5', context_window: 1_000_000, max_context_window: 0, max_output_tokens: 128_000, reasoning_efforts: ['high'] }
+		]);
+		// Nothing changed since: nothing to write.
+		expect(pickedMonoizeModels(models, { ...cfg, lynshen_models: patch.lynshen_models }).lynshen_models).toBeUndefined();
 	});
 });
