@@ -89,11 +89,26 @@ fn install(bundled: &Path, dest: &Path) -> Result<(), String> {
 }
 
 /// Windows keeps a running executable locked but lets it be renamed, so the
-/// old copy (the daemon's program) moves aside first.
+/// old copy (the daemon's program) moves aside first. A copy moved aside by
+/// an earlier update may still run (a daemon that never got idle): it keeps
+/// its name and this one takes a fresh one; the ones no longer running go.
 fn replace(new: &Path, dest: &Path) -> Result<(), String> {
     if cfg!(windows) && dest.exists() {
-        let old = dest.with_extension("old.exe");
-        let _ = fs::remove_file(&old);
+        let dir = dest.parent().ok_or("no parent directory")?;
+        let stem = dest.file_stem().and_then(|s| s.to_str()).unwrap_or("lynshen");
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with(&format!("{stem}.old")) && name.ends_with(".exe") {
+                    let _ = fs::remove_file(entry.path());
+                }
+            }
+        }
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let old = dir.join(format!("{stem}.old-{stamp}.exe"));
         fs::rename(dest, &old).map_err(|e| format!("{}: {e}", dest.display()))?;
     }
     fs::rename(new, dest).map_err(|e| format!("{}: {e}", dest.display()))

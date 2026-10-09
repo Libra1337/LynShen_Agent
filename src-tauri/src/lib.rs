@@ -210,7 +210,7 @@ fn daemon_listening() -> bool {
 }
 
 /// Starts `lynshen daemon` in the background when nothing listens on its
-/// address yet, and waits (up to ~8 s) until it accepts connections and has
+/// address yet, and waits (up to ~20 s) until it accepts connections and has
 /// written its token. The daemon outlives Desktop on purpose: it keeps
 /// sessions and agents running.
 /// Serializes daemon starts: two windows or calls racing here would
@@ -256,7 +256,9 @@ fn ensure_daemon(bin_override: Option<&str>, env: &[(String, String)]) -> Result
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("could not start lynshen daemon: {e}"))?;
-    for _ in 0..40 {
+    // A program just written by an update is scanned before it first runs
+    // (Windows Defender): that alone can take several seconds.
+    for _ in 0..100 {
         std::thread::sleep(std::time::Duration::from_millis(200));
         if daemon_listening() {
             // Reap it whenever it exits, so it never lingers as a zombie.
