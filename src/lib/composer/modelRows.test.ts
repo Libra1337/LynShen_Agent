@@ -334,3 +334,21 @@ describe('gateway model rows', () => {
 		]);
 	});
 });
+
+describe('the ChatGPT sign-in', () => {
+	it('is not listed beside the LynShen gateway', () => {
+		const rows = buildModelRows({
+			models: [{ model: 'glm-5.3', active: true }],
+			backendId: 'lynshen',
+			provider: 'monoize',
+			providersList: [
+				{ id: 'monoize', name: 'Monoize', models: [{ name: 'glm-5.3' }] },
+				{ id: 'openai-codex', models: [{ name: 'gpt-5.5' }] },
+				{ id: 'deepseek', name: 'DeepSeek', models: [{ name: 'deepseek-v4-pro' }] }
+			],
+			configured: ['monoize', 'openai-codex', 'deepseek'],
+			groups: { lynshen: 'LynShen', byok: 'BYOK' }
+		});
+		expect(rows.map((r) => r.group)).toEqual(['LynShen', 'DeepSeek']);
+	});
+});

@@ -85,6 +85,9 @@ function routeOf(provider: string, groups: string[] | undefined, labels: ModelGr
 	return parts.join(' · ');
 }
 
+/** ChatGPT sign-ins made for Codex (the engine's OAuth providers). */
+const CODEX_LOGINS = new Set(['openai-codex', 'openai-codex-device']);
+
 /** Marks the Provider a pick routes through, after the model in its command. */
 export const ROUTE_MARK = '@route=';
 
@@ -320,6 +323,9 @@ export function buildModelRows(input: {
 	});
 	const otherRows: ModelRow[] = (backendId !== 'lynshen' ? [] : providersList)
 		.filter((pv) => pv.id !== cur && configured.includes(pv.id))
+		// The ChatGPT (Codex) sign-in belongs to Codex: LynShen's menu lists it
+		// only while it is the session's own provider.
+		.filter((pv) => !CODEX_LOGINS.has(pv.id))
 		// The live gateway (monoize) makes the old lynshen login a second copy.
 		.filter((pv) => !(pv.id === 'lynshen' && (cur === 'monoize' || configured.includes('monoize'))))
 		.flatMap((pv) =>
