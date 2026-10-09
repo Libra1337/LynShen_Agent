@@ -59,13 +59,14 @@ export function scrim(_node: Element, _params = {}, { direction }: Direction = {
 	};
 }
 
-/** Dialogs: in 220 ms from a little lower, smaller and blurred; out 160 ms. */
+/** Dialogs: in 220 ms from a little lower and smaller; out 160 ms. Only
+ *  opacity and transform, which the GPU composites (a dialog can be large). */
 export function sheet(_node: Element, { y = 8 } = {}, { direction }: Direction = {}): TransitionConfig {
 	const out = direction === 'out';
 	return {
 		duration: motionMs(out ? 160 : 220),
 		easing: out ? EASE_EXIT : EASE_ENTER,
-		css: (t, u) => `opacity: ${t}; transform: translateY(${u * (out ? y / 2 : y)}px) scale(${0.96 + 0.04 * t}); filter: blur(${u * 4}px)`
+		css: (t, u) => `opacity: ${t}; transform: translateY(${u * (out ? y / 2 : y)}px) scale(${0.96 + 0.04 * t})`
 	};
 }
 

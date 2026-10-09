@@ -2,6 +2,7 @@
 	import { refreshMonoizeCatalog } from '$lib/providers/monoize';
 	import { DaemonSync } from '$lib/daemonSync.svelte';
 	import { onMount, untrack } from 'svelte';
+	import { crossfade } from '$lib/ui/viewTransition';
 	import { listen } from '@tauri-apps/api/event';
 	import { invoke } from '@tauri-apps/api/core';
 	import { getCurrentWebview } from '@tauri-apps/api/webview';
@@ -206,8 +207,10 @@
 	function openHome() {
 		showSettings = false;
 		showDesk = false;
-		projectPageId = null;
-		showHome = true;
+		crossfade(() => {
+			projectPageId = null;
+			showHome = true;
+		});
 	}
 	/** A new conversation outside any project (~/Documents/LynShen), as the
 	 *  sidebar's 新对话 and the home page start it. */
@@ -258,8 +261,10 @@
 	function openProjectPage(p: Project) {
 		showDesk = false;
 		showSettings = false;
-		showHome = false;
-		projectPageId = p.id;
+		crossfade(() => {
+			showHome = false;
+			projectPageId = p.id;
+		});
 	}
 	$effect(() => {
 		void store.activeId;
@@ -1468,7 +1473,7 @@
 				collapsed={sidebarCollapsed}
 				onToggleCollapsed={toggleSidebar}
 				resizing={sbResizing}
-				onSelect={(id) => ((store.activeId = id), (projectPageId = null), (showHome = false))}
+				onSelect={(id) => crossfade(() => ((store.activeId = id), (projectPageId = null), (showHome = false)))}
 				onOpenProject={openProjectPage}
 				openProject={projectPageId}
 				onNewProject={addProject}
@@ -1518,7 +1523,7 @@
 						agents={agentDirectory.agents}
 						agentsOn={agentDirectory.status === 'on'}
 						onStart={(text) => startChat(text)}
-						onOpenSession={(id) => ((store.activeId = id), (showHome = false))}
+						onOpenSession={(id) => crossfade(() => ((store.activeId = id), (showHome = false)))}
 						onOpenProject={openProjectPage}
 						onAddProject={addProject}
 						onOpenAgent={(a) => openDesk(a.id)}
@@ -1972,6 +1977,8 @@
 		min-width: 0;
 		background: var(--bg);
 		position: relative;
+		/* Switching conversations and pages crossfades it (ui/viewTransition.ts). */
+		view-transition-name: canvas;
 	}
 	.stage {
 		flex: 1;

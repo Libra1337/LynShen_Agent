@@ -733,7 +733,7 @@
 		border-radius: var(--r-md);
 		transition: background var(--t-slow) var(--ease-out), box-shadow var(--t-slow) var(--ease-out);
 	}
-	/* New rows come in once: unblur and rise over --t-enter. Suppressed under
+	/* New rows come in once: fade and rise over --t-enter. Suppressed under
 	   windowing so rows scrolling back into the window don't replay. */
 	.mwrap.animate {
 		animation: msg-in var(--t-enter) var(--ease-enter) both;

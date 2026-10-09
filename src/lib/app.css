@@ -325,7 +325,8 @@ body {
 /* ---------- Motion system ----------
    One set of entrances for the whole app, on the --t-* durations and the
    --ease-* curves above. Pages and panes only fade and move a few pixels;
-   menus, popovers and tooltips also grow from 95% and unblur:
+   menus, popovers and tooltips also grow from 95% and unblur (small
+   surfaces only: large ones animate opacity and transform alone):
      scrim-in   backdrops behind modals                 --t-fast  --ease-enter
      sheet-in   modals and sheets                       --t-med   --ease-enter
      pop-in     popovers that open upward from an anchor --t-pop  --ease-enter
@@ -365,7 +366,6 @@ body {
 	from {
 		opacity: 0;
 		transform: translateY(6px);
-		filter: blur(4px);
 	}
 }
 @keyframes pane-in {
@@ -374,6 +374,35 @@ body {
 		transform: translateY(6px);
 	}
 }
+/* Switching conversations and pages (ui/viewTransition.ts): the canvas
+   crossfades, the old view going a little faster than the new one comes in;
+   the rest of the window does not move. Only opacity and transform: the GPU
+   composites them, so a long conversation does not stutter. */
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation: none;
+}
+::view-transition-old(canvas) {
+	animation: vt-out var(--t-fast) var(--ease-exit) both;
+}
+::view-transition-new(canvas) {
+	animation: vt-in var(--t-med) var(--ease-enter) both;
+}
+@keyframes vt-out {
+	to {
+		opacity: 0;
+	}
+}
+@keyframes vt-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+}
+:root.vt-running .lpane {
+	animation: none;
+}
+
 /* Popover surface shared by every menu and floating picker (ui/PopMenu.svelte
    and the pickers built on it): one fill, radius, shadow and row style. */
 .pop {
