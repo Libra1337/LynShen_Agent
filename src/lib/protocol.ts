@@ -42,6 +42,8 @@ export type Op =
 	| { op: 'user_message'; content: string; images?: string[] }
 	| { op: 'command'; input: string }
 	| { op: 'steer' }
+	/** Takes the queued message at `index` (with this text) back before it runs. */
+	| { op: 'unqueue'; index: number; text: string }
 	// LynShen: runs a failed turn again with no new message (SessionStore.retryTurn).
 	| { op: 'continue' }
 	| { op: 'interrupt' }

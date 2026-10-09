@@ -902,6 +902,14 @@
 		imageSeq = 0;
 		if (prefs.scrollOnSend) jumpToBottom();
 	}
+	/** Takes a queued message back before it runs: the engine drops it and
+	 *  its text returns to the message box to edit or send again. */
+	function unqueue(index: number, text: string) {
+		send({ op: 'unqueue', index, text });
+		chat.pendingMessages = chat.pendingMessages.filter((_, i) => i !== index);
+		input = input.trim() ? `${input.replace(/\s+$/, '')}\n${text}` : text;
+		composerEl?.focus();
+	}
 	function stop() {
 		autoRetry.cancel(chat);
 		send({ op: 'interrupt' });
@@ -1439,6 +1447,7 @@
 			onSubmit={submit}
 			onStop={stop}
 			onSteer={() => send({ op: 'steer' })}
+			onUnqueue={unqueue}
 			onPick={pickFiles}
 			onModel={openModelPicker}
 			onModelSelect={selectRow}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
+	import ArrowUUpLeftIcon from 'phosphor-svelte/lib/ArrowUUpLeftIcon';
 	import SquareIcon from 'phosphor-svelte/lib/SquareIcon';
 	import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 	import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
@@ -60,6 +61,7 @@
 		onSubmit,
 		onStop,
 		onSteer,
+		onUnqueue,
 		onPick,
 		images = [],
 		onImage,
@@ -98,6 +100,8 @@
 		onSubmit: () => void;
 		onStop: () => void;
 		onSteer: () => void;
+		/** Takes the queued message at `index` back into the message box. */
+		onUnqueue?: (index: number, text: string) => void;
 		onPick: () => void;
 		/** Images placed in the text as [图片 #N] tokens (N → file). */
 		images?: { n: number; path: string }[];
@@ -823,7 +827,15 @@
 		<div class="queued">
 			<span class="queued-label">{t('chat.queuedLabel', { n: chat.pendingMessages.length })}</span>
 			{#each chat.pendingMessages as q, i (i)}
-				<span class="qchip" title={q}>{q}</span>
+				<span class="qchip" title={q}
+					><span class="qtext">{q}</span
+					>{#if bcaps.unqueue && onUnqueue}<button
+							class="qtake"
+							onclick={() => onUnqueue(i, q)}
+							title={t('chat.unqueueTitle')}
+							aria-label={t('chat.unqueueTitle')}><ArrowUUpLeftIcon size={11} /></button
+						>{/if}</span
+				>
 			{/each}
 			{#if bcaps.steer}
 				<button class="qsteer" onclick={onSteer} title={t('chat.steerTitle')}><FastForwardIcon size={12} />{t('chat.steerAction')}</button>
@@ -1344,17 +1356,39 @@
 		flex-shrink: 0;
 	}
 	.qchip {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 		font-size: var(--fs-xs);
 		max-width: 260px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
 		color: var(--dim);
 		background: var(--surface2);
 		border: 1px solid var(--border);
 		border-radius: var(--r-sm);
 		padding: 3px 9px;
 		animation: rise var(--t-med) var(--ease-out);
+	}
+	.qtext {
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.qtake {
+		display: inline-flex;
+		flex-shrink: 0;
+		margin: -2px -5px -2px 0;
+		padding: 2px;
+		border: none;
+		border-radius: var(--r-xs, 4px);
+		background: none;
+		color: var(--dim);
+		cursor: pointer;
+		transition: color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+	}
+	.qtake:hover {
+		color: var(--text);
+		background: var(--surface3, var(--border));
 	}
 	.qsteer {
 		display: inline-flex;

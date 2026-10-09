@@ -50,6 +50,9 @@ export interface BackendCaps {
 	hunkApproval: boolean;
 	/** Queue-jumping a busy turn (steer op + queued-messages strip). */
 	steer: boolean;
+	/** Taking a queued message back before it runs (unqueue op): the engine
+	 *  holds the queue rather than the agent's own input stream. */
+	unqueue: boolean;
 	/** Interrupting a running turn. */
 	interrupt: boolean;
 	/** Conversation branch tree (/tree, tree_view picker). */

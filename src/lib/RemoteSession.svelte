@@ -14,6 +14,7 @@
 	import GitDiffIcon from 'phosphor-svelte/lib/GitDiffIcon';
 	import DesktopIcon from 'phosphor-svelte/lib/DesktopIcon';
 	import FastForwardIcon from 'phosphor-svelte/lib/FastForwardIcon';
+	import ArrowUUpLeftIcon from 'phosphor-svelte/lib/ArrowUUpLeftIcon';
 	import HandIcon from 'phosphor-svelte/lib/HandIcon';
 	import ClipboardTextIcon from 'phosphor-svelte/lib/ClipboardTextIcon';
 	import ShieldCheckIcon from 'phosphor-svelte/lib/ShieldCheckIcon';
@@ -387,6 +388,13 @@
 		if (!chat.busy) queued = [];
 	});
 	const waiting = $derived(chat.pendingMessages.length ? chat.pendingMessages : queued);
+	/** Takes a queued message back into the message box before it runs. */
+	function unqueue(index: number, message: string) {
+		send({ op: 'unqueue', index, text: message });
+		chat.pendingMessages = chat.pendingMessages.filter((_, i) => i !== index);
+		text = text.trim() ? `${text.replace(/\s+$/, '')}\n${message}` : message;
+		tick().then(autosize);
+	}
 
 	// The approval mode, as on the desktop: claude adds plan and auto; an
 	// agent's session follows the agent (changed on its page).
@@ -656,7 +664,16 @@
 				<div class="queued">
 					<span class="queued-label">{t('chat.queuedLabel', { n: waiting.length })}</span>
 					{#each waiting as q, i (i)}
-						<span class="qchip">{q}</span>
+						<span class="qchip"
+							><span class="qtext">{q}</span
+							>{#if bcaps.unqueue && chat.pendingMessages.length}<button
+									type="button"
+									class="qtake"
+									onclick={() => unqueue(i, q)}
+									title={t('chat.unqueueTitle')}
+									aria-label={t('chat.unqueueTitle')}><ArrowUUpLeftIcon size={12} /></button
+								>{/if}</span
+						>
 					{/each}
 					{#if bcaps.steer && chat.pendingMessages.length}
 						<button type="button" class="qsteer" onclick={() => send({ op: 'steer' })} title={t('chat.steerTitle')}
@@ -1207,14 +1224,30 @@
 		flex-shrink: 0;
 	}
 	.qchip {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
 		max-width: 180px;
 		padding: 2px 8px;
 		border-radius: var(--r-full);
 		background: var(--surface2);
 		color: var(--text);
+	}
+	.qtext {
+		min-width: 0;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+	/* A touch target over the chip's right end. */
+	.qtake {
+		display: inline-flex;
+		flex-shrink: 0;
+		margin: -6px -8px -6px 0;
+		padding: 6px 8px 6px 4px;
+		border: none;
+		background: none;
+		color: var(--dim);
 	}
 	.qsteer {
 		display: inline-flex;

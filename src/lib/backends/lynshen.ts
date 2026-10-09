@@ -14,6 +14,7 @@ export const LYNSHEN_CAPS: BackendCaps = {
 	planMode: true,
 	hunkApproval: true,
 	steer: true,
+	unqueue: true,
 	interrupt: true,
 	branchTree: true,
 	goals: true,

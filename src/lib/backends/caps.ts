@@ -10,6 +10,7 @@ export const CLAUDE_CAPS: BackendCaps = {
 	planMode: true,
 	hunkApproval: true, // MultiEdit splits into per-edit hunks (single Edit stays whole-call)
 	steer: false, // stdin is already a queue: mid-turn messages run as the next turn
+	unqueue: false, // a mid-turn message is already on Claude's stdin
 	interrupt: true, // control_request subtype interrupt
 	branchTree: false,
 	goals: false,
@@ -37,6 +38,7 @@ export const CODEX_CAPS: BackendCaps = {
 	planMode: true,
 	hunkApproval: false, // codex approvals are whole-patch accept/decline
 	steer: true, // the daemon holds mid-turn messages; turn/steer joins them to the running turn
+	unqueue: true, // ...and drops one on request before it reaches Codex
 	interrupt: true, // turn/interrupt
 	branchTree: false,
 	goals: true, // thread/goal/set|get|clear + thread/goal/updated|cleared
@@ -62,6 +64,7 @@ export const ACP_CAPS: BackendCaps = {
 	planMode: false,
 	hunkApproval: false, // permission responses are whole-call option picks
 	steer: false, // no mid-turn injection; queued messages run as the next turn
+	unqueue: false,
 	interrupt: true, // session/cancel (core protocol, all agents)
 	branchTree: false,
 	goals: false, // plan updates still render (the plan tile shows them when present)
