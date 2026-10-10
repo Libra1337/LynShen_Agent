@@ -38,7 +38,7 @@
   </div>
 {:else if mode.has('titlebar')}
   <div style="height:600px;display:flex;flex-direction:column">
-    <TitleBar leftWidth={200} title="对话" addOptions={['计划', '智能体', '文件'].map((l) => ({ key: l, label: l }))} onAdd={() => {}} />
+    <TitleBar leftWidth={200} sidebarOpen onToggleSidebar={() => {}} title="对话" addOptions={['计划', '智能体', '文件'].map((l) => ({ key: l, label: l }))} onAdd={() => {}} />
     <div data-testid="pane" style="flex:1;position:relative;isolation:isolate">{#each Array(12) as _, i (i)}<p>对话正文 {i}</p>{/each}</div>
   </div>
 {:else if projectMode}
