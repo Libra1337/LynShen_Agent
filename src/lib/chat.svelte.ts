@@ -369,6 +369,9 @@ const FINAL_AGENT = [
 	'budget_exhausted'
 ];
 
+/** Subagent transcripts a chat keeps besides the one shown. */
+const SUBAGENT_TRANSCRIPTS_KEPT = 3;
+
 /** Calls that start a subagent: their arguments name it. */
 const SUBAGENT_CALLS = new Set(['spawn_agent', 'Task', 'Agent']);
 
@@ -433,6 +436,42 @@ function agentRun(raw: Record<string, unknown>): AgentRun {
 		activity: str(raw.activity),
 		effort: str(raw.effort)
 	};
+}
+
+/** Each user turn's stats as its last reply carries them, by the turn's
+ *  place among the user messages, with the message that started it. */
+export function turnStatsByTurn(messages: Msg[]): Map<number, { text: string; stats: TurnStats }> {
+	const out = new Map<number, { text: string; stats: TurnStats }>();
+	let turn = -1;
+	let text = '';
+	for (const m of messages) {
+		if (m.kind === 'user') {
+			turn++;
+			text = m.text;
+		} else if (m.kind === 'assistant' && m.turn && turn >= 0) out.set(turn, { text, stats: m.turn });
+	}
+	return out;
+}
+
+/** Puts the stats `turnStatsByTurn` read back on each turn's last reply,
+ *  where the turn starts with the same message. */
+export function stampTurnStats(messages: Msg[], stats: Map<number, { text: string; stats: TurnStats }>) {
+	let turn = -1;
+	let text = '';
+	let last: Extract<Msg, { kind: 'assistant' }> | null = null;
+	const stamp = () => {
+		const kept = stats.get(turn);
+		if (last && kept && kept.text === text) last.turn = kept.stats;
+	};
+	for (const m of messages) {
+		if (m.kind === 'user') {
+			stamp();
+			turn++;
+			text = m.text;
+			last = null;
+		} else if (m.kind === 'assistant') last = m;
+	}
+	stamp();
 }
 
 export function countDiffLines(diff: string): { added: number; removed: number } {
@@ -815,6 +854,9 @@ export class ChatState {
 	 *  they stay listed through the next turn. */
 	#woke = new Set<string>();
 	#endedIdle = new Set<string>();
+	/** The tool outputs were let go (see `releaseOutputs`): the next
+	 *  transcript gives them back. */
+	#released = false;
 
 	constructor() {
 		try {
@@ -1048,6 +1090,50 @@ export class ChatState {
 		return ['streaming', 'connecting', 'compacting', 'steering'].includes(this.engineState);
 	}
 
+	/** Nothing is under way here and nothing waits on the user: no turn, no
+	 *  message being sent or queued, no question, retry or background work.
+	 *  Only such a chat lets go of its tool outputs (`releaseOutputs`). */
+	get settled(): boolean {
+		if (this.engineState !== 'ready' || this.booting || this.restarting || this.switching) return false;
+		if (this.pendingApproval || this.trustPrompt || this.pendingRewind || this.pendingMessages.length) return false;
+		if (this.#sending || this.#pendingUserEcho !== null || this.autoRetry || this.retry) return false;
+		if (this.bgTasks.length || Object.values(this.subagents).some((a) => !FINAL_AGENT.includes(a.status))) return false;
+		return !this.messages.some((m) => m.kind === 'tool' && m.running);
+	}
+
+	/** Lets go of what a hidden, settled chat can get back from its engine:
+	 *  the tool cards' outputs (most of a long conversation's memory), the
+	 *  subagent transcripts and background task output it fetched. The rest
+	 *  (turn stats, reasoning, notices) stays. The transcript the engine
+	 *  sends when the chat is shown again fills the outputs back in. */
+	releaseOutputs() {
+		// New message objects: a deep state proxy keeps the value an object
+		// was created with, so emptying `output` through it frees nothing.
+		this.messages = this.messages.map((m) => (m.kind === 'tool' && !m.subagent && m.output ? { ...m, output: '' } : m));
+		this.#toolsByCallId.clear();
+		this.subagentTranscripts = {};
+		this.taskOutputs = {};
+		this.#released = true;
+	}
+
+	/** The replayed transcript gives back the outputs `releaseOutputs` let go,
+	 *  when its tool calls are the ones this chat shows; false when they
+	 *  differ (the conversation moved on elsewhere), and the replay is shown
+	 *  as it is. */
+	#refill(items: Record<string, unknown>[]): boolean {
+		const tools = items.filter((it) => str(it.role) === 'tool');
+		const shown = this.messages.filter((m) => m.kind === 'tool' && !m.subagent);
+		if (tools.length !== shown.length || shown.some((m, i) => m.kind === 'tool' && m.name !== str(tools[i]!.name)))
+			return false;
+		let i = 0;
+		this.messages = this.messages.map((m) => {
+			if (m.kind !== 'tool' || m.subagent) return m;
+			const output = str(tools[i++]!.output);
+			return m.output || !output ? m : { ...m, output: boundedOutput(output) };
+		});
+		return true;
+	}
+
 	/** Meta/status notices (retrying, compaction, stderr, engine warnings, restart
 	 *  notices) — kept out of the conversation bubble stream and shown in the
 	 *  collapsible status strip instead. Real conversation (user/assistant/
@@ -1221,11 +1307,12 @@ export class ChatState {
 
 	/** Summarize a raw engine frame into one trace line and keep the last 200.
 	 *  Deliberately compact (type + the few fields that matter for tool tracking)
-	 *  so the diagnostics trace stays readable and cheap. */
-	captureFrame(raw: string) {
+	 *  so the diagnostics trace stays readable and cheap. `parsed`: the frame
+	 *  already parsed (a long transcript is not parsed twice). */
+	captureFrame(raw: string, parsed?: unknown) {
 		let summary: string;
 		try {
-			const o = JSON.parse(raw) as Record<string, unknown>;
+			const o = (parsed ?? JSON.parse(raw)) as Record<string, unknown>;
 			const type = typeof o.type === 'string' ? o.type : '?';
 			if (type === 'stream_event') {
 				const ev = (o.event ?? {}) as Record<string, unknown>;
@@ -1774,6 +1861,18 @@ export class ChatState {
 					break;
 				}
 				const items = arr<Record<string, unknown>>(ev.items);
+				// Shown again after letting go of its tool outputs: the same
+				// conversation fills them back in, and what only this chat knew
+				// (turn stats, reasoning, notices) stays.
+				const released = this.#released;
+				this.#released = false;
+				if (released && this.#refill(items)) {
+					this.#resetCurrent();
+					break;
+				}
+				// The conversation moved on elsewhere meanwhile: the replay
+				// replaces it, keeping each turn's stats where its turns match.
+				const stats = released ? turnStatsByTurn(this.messages) : null;
 				// The message array is reassigned wholesale below and restored tool
 				// entries carry no call_id, so the fast-lookup map is now stale — clear
 				// it and let #tool() fall back to scanning.
@@ -1783,7 +1882,7 @@ export class ChatState {
 				// If the snapshot already has it, its echo came with it.
 				const pending = this.#pendingUserEcho;
 				const sent = pending === null ? undefined : this.messages.findLast((m) => m.kind === 'user' && m.text === pending);
-				this.messages = items
+				const replay = items
 					.map((it): Msg | null => {
 						const role = str(it.role);
 						if (role === 'user' && str(it.content) === AUTO_CONTINUE)
@@ -1798,7 +1897,7 @@ export class ChatState {
 								kind: 'tool',
 								callId: '',
 								name: str(it.name),
-								output: str(it.output),
+								output: boundedOutput(str(it.output)),
 								running: false,
 								isError: false
 							};
@@ -1812,6 +1911,8 @@ export class ChatState {
 						return null;
 					})
 					.filter((m): m is Msg => m !== null);
+				if (stats) stampTurnStats(replay, stats);
+				this.messages = replay;
 				// The team's messages, as the panel and the agent's view list them.
 				this.agentMessages = this.messages.flatMap((m) => (m.kind === 'agent_message' ? [{ from: m.from, to: m.to, summary: m.summary, at: 0 }] : []));
 				if (pending !== null) {
@@ -2161,14 +2262,20 @@ export class ChatState {
 								callId: str(it.call_id),
 								name: str(it.name),
 								// The call's arguments name what it acted on until its output does.
-								output: str(it.output) || (it.input && typeof it.input === 'object' ? JSON.stringify(it.input) : str(it.input)),
+								output: boundedOutput(str(it.output) || (it.input && typeof it.input === 'object' ? JSON.stringify(it.input) : str(it.input))),
 								running: it.running === true,
 								isError: it.is_error === true
 							};
 						return null;
 					})
 					.filter((m): m is Msg => m !== null);
-				this.subagentTranscripts[str(ev.agent_id)] = { task, messages, error: str(ev.error) };
+				// The panel shows one at a time and asks again when it opens one:
+				// only the latest few are kept.
+				const id = str(ev.agent_id);
+				const kept = Object.keys(this.subagentTranscripts).filter((k) => k !== id && k !== this.agentFocus);
+				for (const old of kept.slice(0, Math.max(0, kept.length - SUBAGENT_TRANSCRIPTS_KEPT + 1)))
+					delete this.subagentTranscripts[old];
+				this.subagentTranscripts[id] = { task, messages, error: str(ev.error) };
 				break;
 			}
 			case 'permission_rules':
