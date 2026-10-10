@@ -347,12 +347,15 @@ export class SessionStore {
 	 *  overrides the project's last-used backend (which itself falls back to
 	 *  the settings default). `acpAgent` picks the registry agent for 'acp'
 	 *  sessions (defaults to the project's last one; without any, the session
-	 *  falls back to the native engine). */
+	 *  falls back to the native engine). `model` (native engine only) is
+	 *  picked before the conversation exists (the home page): it goes first,
+	 *  as a draft's pick does. */
 	addSession(
 		project: Project,
 		firstMessage?: string,
 		backend?: BackendId,
-		acpAgent?: { id: string; name: string }
+		acpAgent?: { id: string; name: string },
+		model?: string
 	) {
 		// Only the lynshen engine has a chat mode.
 		// Mutate the stored Svelte proxy, including when the caller just inserted
@@ -366,6 +369,11 @@ export class SessionStore {
 		}
 		const s = this.#newSession(backendId, agent);
 		this.#makeDraft(s);
+		if (model && backendId === 'lynshen') {
+			s.draftPick = { model };
+			s.chat.model = model;
+			s.chat.modelLabel = '';
+		}
 		// At the start: the sidebar lists a project's first sessions only.
 		project.sessions.unshift(s);
 		this.activeId = s.id;
@@ -769,14 +777,14 @@ export class SessionStore {
 	/** A new conversation outside any project. It gets a folder of its own
 	 *  under `~/Documents/LynShen`, made from its first message, so the files
 	 *  of different conversations never mix. */
-	async newChat(firstMessage?: string) {
+	async newChat(firstMessage?: string, model?: string) {
 		const path = await defaultWorkspaceDir(true);
 		// The folder may already be a project the user added.
 		const known = this.userProjects.find((p) => !p.home && samePath(p.path, path));
-		if (known) return this.addSession(known, firstMessage);
+		if (known) return this.addSession(known, firstMessage, undefined, undefined, model);
 		const id = this.uid();
 		this.projects.unshift({ id, name: t('shell.home.chats'), path, sessions: [], home: true, newFolder: true });
-		return this.addSession(this.projects.find((p) => p.id === id)!, firstMessage);
+		return this.addSession(this.projects.find((p) => p.id === id)!, firstMessage, undefined, undefined, model);
 	}
 
 	/** A new conversation's folder: `<date> <start of its first message>`

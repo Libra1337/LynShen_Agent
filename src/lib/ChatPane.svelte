@@ -57,6 +57,7 @@
 		type Op
 	} from '$lib/protocol';
 	import { buildModelRows, splitRoute, stripGroupSuffix, toolModels, type ToolModel } from '$lib/composer/modelRows';
+	import { configModelList } from '$lib/configModels';
 	import { confirm } from '$lib/ui/confirm.svelte';
 	import { BACKEND_LABELS, caps } from '$lib/backends';
 	import { defaultEffort } from '$lib/composer/effort';
@@ -397,10 +398,8 @@
 	/** config.json's model list as the picker shows it (what the native
 	 *  engine reports for /model), keeping what the last report knew. */
 	function configCatalog(cfg: Record<string, unknown>, known: ModelOption[]): ModelOption[] {
-		const list = Array.isArray(cfg.models) ? (cfg.models as Record<string, unknown>[]) : [];
 		const current = typeof cfg.model === 'string' ? cfg.model : '';
-		return list
-			.filter((m) => typeof m.name === 'string' && m.name)
+		return configModelList(cfg)
 			.map((m) => {
 				const name = m.name as string;
 				const prev = known.find((k) => k.model === name);

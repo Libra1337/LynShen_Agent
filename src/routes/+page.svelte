@@ -50,7 +50,7 @@
 	} from '$lib/protocol';
 	import { dispatch } from '$lib/backends/router';
 	import { caps } from '$lib/backends';
-	import { loadBackendSettings } from '$lib/backends/settings';
+	import { defaultBackendFor, loadBackendSettings } from '$lib/backends/settings';
 	import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 	import { updater } from '$lib/updater.svelte';
 	import { teamSwitch } from '$lib/agents/teamSwitch.svelte';
@@ -215,9 +215,9 @@
 	}
 	/** A new conversation outside any project (~/Documents/LynShen), as the
 	 *  sidebar's 新对话 and the home page start it. */
-	async function startChat(firstMessage?: string) {
+	async function startChat(firstMessage?: string, model?: string) {
 		try {
-			await store.newChat(firstMessage);
+			await store.newChat(firstMessage, model);
 			showHome = false;
 			projectPageId = null;
 		} catch (e) {
@@ -1524,7 +1524,8 @@
 						projects={store.userProjects}
 						agents={agentDirectory.agents}
 						agentsOn={agentDirectory.status === 'on'}
-						onStart={(text) => startChat(text)}
+						onStart={(text, model) => startChat(text, model)}
+						modelPicker={defaultBackendFor(store.home?.lastBackend) === 'lynshen'}
 						onOpenSession={(id) => crossfade(() => ((store.activeId = id), (showHome = false)))}
 						onOpenProject={openProjectPage}
 						onAddProject={addProject}

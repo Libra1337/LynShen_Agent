@@ -16,6 +16,13 @@
 	import AgentAvatar from '$lib/AgentAvatar.svelte';
 	import SessionMark from '$lib/SessionMark.svelte';
 	import { sessionStatus } from '$lib/sessionStatus';
+	import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
+	import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+	import Vendor from '$lib/Vendor.svelte';
+	import { readConfig } from '$lib/protocol';
+	import { configModelList } from '$lib/configModels';
+	import { isImageModel } from '$lib/providers/monoize';
+	import { fmtContext } from '$lib/composer/modelRows';
 
 	let {
 		projects,
@@ -26,18 +33,49 @@
 		onOpenProject,
 		onAddProject,
 		onOpenAgent,
+		modelPicker = false
 	}: {
 		projects: Project[];
 		agents?: AgentView[];
 		/** The daemon is reachable, so agents can be listed and made. */
 		agentsOn?: boolean;
-		/** A new conversation outside any project, with its first message. */
-		onStart: (text: string) => void;
+		/** A new conversation outside any project, with its first message
+		 *  and the model picked for it (none: the engine's current one). */
+		onStart: (text: string, model?: string) => void;
 		onOpenSession: (id: string) => void;
 		onOpenProject: (p: Project) => void;
 		onAddProject: () => void;
 		onOpenAgent: (agent: AgentView) => void;
+		/** New conversations run on the native engine: its models can be
+		 *  picked here, before there is a conversation to pick them in. */
+		modelPicker?: boolean;
 	} = $props();
+
+	// The engine's models as config.json lists them (what its model menu
+	// shows), the current one first chosen. Reread each time the page shows.
+	type HomeModel = { name: string; label: string; window: number };
+	let models = $state<HomeModel[]>([]);
+	let model = $state('');
+	let picked = $state(false);
+	let menuOpen = $state(false);
+	$effect(() => {
+		if (!modelPicker) return;
+		readConfig()
+			.then((cfg) => {
+				models = configModelList(cfg)
+					.filter((m) => !isImageModel(String(m.name)))
+					.map((m) => ({
+						name: String(m.name),
+						label: typeof m.display_name === 'string' && m.display_name ? m.display_name : String(m.name),
+						window: typeof m.context_window === 'number' ? m.context_window : 0
+					}));
+				const current = typeof cfg.model === 'string' ? cfg.model : '';
+				if (!picked || !models.some((m) => m.name === model))
+					model = models.some((m) => m.name === current) ? current : (models[0]?.name ?? '');
+			})
+			.catch(() => {});
+	});
+	const shownModel = $derived(models.find((m) => m.name === model));
 
 	let text = $state('');
 	let box = $state<HTMLTextAreaElement | null>(null);
@@ -48,7 +86,7 @@
 		const message = text.trim();
 		if (!message) return;
 		text = '';
-		onStart(message);
+		onStart(message, modelPicker && picked && model ? model : undefined);
 	}
 	function onKey(e: KeyboardEvent) {
 		if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -89,10 +127,43 @@
 			<textarea
 				bind:this={box}
 				bind:value={text}
+				class:below={modelPicker && !!shownModel}
 				rows="3"
 				placeholder={t('chat.composerPlaceholder')}
 				onkeydown={onKey}
 			></textarea>
+			{#if modelPicker && shownModel}
+				<div class="model-anchor">
+					<button class="model" class:on={menuOpen} onclick={() => (menuOpen = !menuOpen)} title={t('shell.home.model')} aria-haspopup="menu" aria-expanded={menuOpen}>
+						<Vendor model={shownModel.name} size={14} />
+						<span class="mname">{shownModel.label}</span>
+						<CaretDownIcon size={12} />
+					</button>
+					{#if menuOpen}
+						<button class="model-backdrop" aria-label={t('common.close')} tabindex="-1" onclick={() => (menuOpen = false)}></button>
+						<div class="pop model-menu" role="menu">
+							{#each models as m (m.name)}
+								<button
+									class="pop-row"
+									role="menuitemradio"
+									aria-checked={m.name === model}
+									onclick={() => {
+										model = m.name;
+										picked = true;
+										menuOpen = false;
+										box?.focus();
+									}}
+								>
+									<span class="pop-ico"><Vendor model={m.name} size={16} /></span>
+									<span class="pop-txt"><span class="pop-label">{m.label}</span></span>
+									{#if m.window}<span class="pop-hint">{fmtContext(m.window)}</span>{/if}
+									{#if m.name === model}<span class="pop-check"><CheckIcon size={16} /></span>{/if}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
 			<button class="send" disabled={!text.trim()} onclick={start} aria-label={t('chat.sendTitle')} title={t('chat.sendTitle')}>
 				<ArrowUpIcon size={16} weight="bold" />
 			</button>
@@ -212,6 +283,62 @@
 	}
 	textarea::placeholder {
 		color: var(--dim2);
+	}
+	textarea.below {
+		padding-bottom: 48px;
+	}
+	/* The model, at the box's bottom left (the send button is at the right). */
+	.model-anchor {
+		position: absolute;
+		left: 10px;
+		bottom: 10px;
+	}
+	.model {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		max-width: 320px;
+		height: 30px;
+		padding: 0 10px;
+		border: none;
+		border-radius: var(--r-full);
+		background: none;
+		color: var(--dim);
+		font: inherit;
+		font-size: var(--fs-sm);
+		cursor: pointer;
+		transition: background var(--t-fast) var(--ease-base), color var(--t-fast) var(--ease-base);
+	}
+	.model:hover,
+	.model.on {
+		background: var(--accent-soft);
+		color: var(--text);
+	}
+	.mname {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.model-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 80;
+		border: none;
+		background: none;
+		cursor: default;
+	}
+	.model-menu {
+		position: absolute;
+		left: 0;
+		top: calc(100% + 6px);
+		z-index: 81;
+		width: max-content;
+		min-width: 240px;
+		max-width: min(420px, calc(100vw - 32px));
+		max-height: min(360px, 60vh);
+		overflow-y: auto;
+		transform-origin: top left;
+		animation: pop-in var(--t-pop) var(--ease-enter);
 	}
 	.send {
 		position: absolute;

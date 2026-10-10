@@ -12,7 +12,11 @@ Object.assign(window, {
     invoke: async (command: string, args: any) => {
       calls.push({ command, args });
       switch (command) {
-        case 'read_config': return {provider: 'monoize', models: []};
+        // ?home: a new install signed in to the gateway, whose engine has
+        // not written its own list yet.
+        case 'read_config': return new URL(location.href).searchParams.has('home')
+          ? {provider: 'monoize', model: 'deepseek-v4.1-flash', models: [], lynshen_models: [{name: 'deepseek-v4.1-flash', context_window: 1000000}, {name: 'claude-opus-5-5', display_name: 'Claude Opus 5.5'}, {name: 'gpt-image-2'}]}
+          : {provider: 'monoize', models: []};
         case 'read_auth_providers': return loggedIn ? ['monoize'] : [];
         case 'list_providers': return [{id:'openai',base_url:'https://api.openai.com/v1',protocol:'responses',models:[{name:'gpt-5'}]}, {id:'openai-codex',base_url:'https://chatgpt.com/backend-api/codex',protocol:'openai-codex-responses',models:[{name:'gpt-5'}]}];
         case 'monoize_session': return {logged_in:loggedIn, session:loggedIn ? {user:{username:'Test user'}} : null};

@@ -91,6 +91,23 @@ describe('SessionStore lifecycle', () => {
 		]);
 	});
 
+	it('a model picked on the home page goes before the first message', async () => {
+		const store = new SessionStore();
+		const p = proj();
+		store.projects.push(p);
+		const id = store.addSession(p, 'hello', 'lynshen', undefined, 'claude-opus-5-5');
+		expect(p.sessions[0].chat.model).toBe('claude-opus-5-5');
+		await flush();
+		const lines = vi.mocked(sendLine).mock.calls.filter(([sid]) => sid === id).map(([, l]) => l);
+		expect(lines).toEqual([
+			JSON.stringify({ op: 'command', input: '/model claude-opus-5-5' }),
+			JSON.stringify({ op: 'user_message', content: 'hello' })
+		]);
+		// Another backend has other models: the pick is not sent there.
+		const other = store.addSession(p, undefined, 'claude', undefined, 'claude-opus-5-5');
+		expect(p.sessions.find((x) => x.id === other)!.draftPick).toBeUndefined();
+	});
+
 	it('ops of every backend go out as lynshen lines, approval modes in lynshen names', async () => {
 		const store = new SessionStore();
 		const p = proj();
