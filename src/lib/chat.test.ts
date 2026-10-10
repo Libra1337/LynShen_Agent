@@ -971,3 +971,128 @@ describe('boundedOutput', () => {
 		expect(JSON.parse(boundedOutput(image)).base64.length).toBe(300_000);
 	});
 });
+
+describe('letting go of tool outputs while hidden', () => {
+	/** A conversation run live here: a turn with a reasoning block, a tool
+	 *  call and its stats, then the engine idle. */
+	const live = () => {
+		const c = new ChatState();
+		c.optimisticUser('fix it');
+		c.handle({ type: 'user_message', content: 'fix it' });
+		c.handle({ type: 'connecting' });
+		c.handle({ type: 'reasoning_delta', delta: 'think' });
+		c.handle({ type: 'assistant_delta', delta: 'looking' });
+		c.handle({ type: 'tool_start', call_id: 'c1', name: 'read_file' });
+		c.handle({ type: 'tool_output', call_id: 'c1', name: 'read_file', output: 'file body' });
+		c.handle({ type: 'assistant_delta', delta: 'done' });
+		c.handle({ type: 'status', message: 'ready' });
+		c.handle({ type: 'model_status', state: 'ready', model: 'm', provider: 'p' });
+		return c;
+	};
+	const replay = (output = 'file body') => ({
+		type: 'transcript',
+		items: [
+			{ role: 'user', content: 'fix it' },
+			{ role: 'assistant', content: 'looking' },
+			{ role: 'tool', name: 'read_file', output },
+			{ role: 'assistant', content: 'done' }
+		]
+	});
+	const tool = (c: ChatState) => c.messages.find((m) => m.kind === 'tool') as { output: string; name: string };
+	const stats = (c: ChatState) => c.messages.findLast((m) => m.kind === 'assistant' && !!m.turn);
+
+	it('is settled only when nothing is under way', () => {
+		const c = live();
+		expect(c.settled).toBe(true);
+		c.handle({ type: 'connecting' });
+		expect(c.settled).toBe(false);
+		c.handle({ type: 'status', message: 'ready' });
+		c.handle({ type: 'model_status', state: 'ready' });
+		expect(c.settled).toBe(true);
+		c.optimisticUser('next');
+		expect(c.settled).toBe(false);
+	});
+
+	it('empties the tool outputs and fills them back in from the same conversation', () => {
+		const c = live();
+		const turn = stats(c);
+		expect(turn).toBeTruthy();
+		c.releaseOutputs();
+		expect(tool(c).output).toBe('');
+		expect(c.messages.some((m) => m.kind === 'reasoning')).toBe(true);
+		c.handle(replay());
+		expect(tool(c).output).toBe('file body');
+		// What only this chat knew stays: the reasoning and the turn's stats.
+		expect(c.messages.some((m) => m.kind === 'reasoning')).toBe(true);
+		expect(stats(c)).toBe(turn);
+	});
+
+	it('shows the replay when the conversation moved on, with the stats of the turns it kept', () => {
+		const c = live();
+		const before = stats(c);
+		const kept = before?.kind === 'assistant' ? before.turn : undefined;
+		c.releaseOutputs();
+		const moved = replay();
+		moved.items.push({ role: 'user', content: 'more' }, { role: 'tool', name: 'bash', output: 'ok' }, { role: 'assistant', content: 'fine' });
+		c.handle(moved);
+		expect(c.messages.map((m) => m.kind)).toEqual(['user', 'assistant', 'tool', 'assistant', 'user', 'tool', 'assistant']);
+		expect(tool(c).output).toBe('file body');
+		const first = c.messages[3];
+		expect(first?.kind === 'assistant' && first.turn).toEqual(kept);
+		const last = c.messages[6];
+		expect(last?.kind === 'assistant' && last.turn).toBeFalsy();
+	});
+
+	it('shows the replay when the conversation was rewound with the same tool calls', () => {
+		const c = live();
+		c.releaseOutputs();
+		const rewound = replay('other body');
+		rewound.items[0] = { role: 'user', content: 'fix it differently' };
+		c.handle(rewound);
+		expect(c.messages.some((m) => m.kind === 'reasoning')).toBe(false);
+		expect(tool(c).output).toBe('other body');
+		expect(userTexts(c)).toEqual(['fix it differently']);
+		const changed = live();
+		changed.releaseOutputs();
+		const reply = replay();
+		reply.items[1] = { role: 'assistant', content: 'looking elsewhere' };
+		changed.handle(reply);
+		expect(changed.messages.some((m) => m.kind === 'reasoning')).toBe(false);
+	});
+
+	it('fills in a conversation whose message was sent while a turn ran', () => {
+		const c = live();
+		// Sent mid-turn: the bubble shows before the reply it waited behind.
+		c.messages.splice(1, 0, { kind: 'user', text: 'and then this' });
+		c.messages.push({ kind: 'assistant', text: 'user said: and then this' });
+		c.releaseOutputs();
+		const queued = replay();
+		queued.items.push({ role: 'user', content: 'and then this' }, { role: 'assistant', content: 'user said: and then this' });
+		c.handle(queued);
+		expect(tool(c).output).toBe('file body');
+		expect(c.messages.some((m) => m.kind === 'reasoning')).toBe(true);
+	});
+
+	it('replays as before when nothing was let go', () => {
+		const c = live();
+		c.handle(replay());
+		expect(c.messages.some((m) => m.kind === 'reasoning')).toBe(false);
+	});
+
+	it('keeps a long output of a replay to its head and tail, as a live one', () => {
+		const c = new ChatState();
+		c.handle(replay('x'.repeat(200_000)));
+		expect(tool(c).output.length).toBeLessThan(70_000);
+	});
+
+	it('keeps a few subagent transcripts besides the one shown', () => {
+		const c = new ChatState();
+		c.agentFocus = 'a0';
+		for (let i = 0; i < 8; i++)
+			c.handle({ type: 'subagent_transcript', agent_id: `a${i}`, items: [{ role: 'user', content: 'task' }, { role: 'assistant', content: 'ok' }] });
+		const ids = Object.keys(c.subagentTranscripts);
+		expect(ids).toContain('a0');
+		expect(ids).toContain('a7');
+		expect(ids.length).toBeLessThanOrEqual(4);
+	});
+});
