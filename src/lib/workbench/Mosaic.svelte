@@ -50,8 +50,8 @@
 		 *  bar already names it. It returns once there is a split or a second tab. */
 		hideSoloBar?: boolean;
 		onchange: (next: TileLayout) => void;
-		/** One tab's content. Every tab stays mounted; inactive ones are hidden
-		 *  (so e.g. terminals survive tab switches). */
+		/** One tab's content. Every tab stays mounted, through tab switches
+		 *  (inactive ones are hidden) and changes of the leaves around it. */
 		panel: Snippet<[TileTab]>;
 		label: (tab: TileTab) => string;
 		/** Panel kinds offered by each leaf's + menu. On the empty canvas a
@@ -184,6 +184,66 @@
 		window.addEventListener('pointerup', up);
 	}
 
+	// Each tab's content is rendered once, in the stash below, and moved into
+	// its leaf's pane. Splitting a leaf, closing its neighbour or dragging the
+	// tab to another leaf builds new leaves around it; the content moves
+	// instead of mounting again, so a terminal keeps its shell, a TUI its
+	// conversation (it used to be closed and reopened, and the reopen lost
+	// the race with the close) and a chat its scroll position.
+	const allTabs = $derived(leavesOf(layout.root).flatMap((leaf) => leaf.tabs));
+	type Host = { node: HTMLElement; cell: HTMLElement; scroll: Map<Element, [number, number]> };
+	const hosts = new Map<string, Host>();
+	const slots = new Map<string, HTMLElement>();
+
+	/** Puts a tab's content into its pane once both exist. A moved element
+	 *  forgets how far it was scrolled: that is put back. */
+	function place(id: string) {
+		const host = hosts.get(id);
+		const slot = slots.get(id);
+		if (!host || !slot || host.node.parentElement === slot) return;
+		slot.appendChild(host.node);
+		for (const [el, [top, left]] of host.scroll) {
+			if (!host.node.contains(el)) {
+				host.scroll.delete(el);
+				continue;
+			}
+			el.scrollTop = top;
+			el.scrollLeft = left;
+		}
+	}
+
+	/** A leaf's pane for one tab. When it goes, the content waits in its
+	 *  stash cell for the next pane (unless that one took it already). */
+	function paneSlot(node: HTMLElement, id: string) {
+		slots.set(id, node);
+		place(id);
+		return {
+			destroy() {
+				if (slots.get(id) === node) slots.delete(id);
+				const host = hosts.get(id);
+				if (host && host.node.parentElement === node) host.cell.appendChild(host.node);
+			}
+		};
+	}
+
+	function panelHost(node: HTMLElement, id: string) {
+		const host: Host = { node, cell: node.parentElement!, scroll: new Map() };
+		const onScroll = (e: Event) => {
+			if (e.target instanceof Element) host.scroll.set(e.target, [e.target.scrollTop, e.target.scrollLeft]);
+		};
+		node.addEventListener('scroll', onScroll, { capture: true, passive: true });
+		hosts.set(id, host);
+		place(id);
+		return {
+			destroy() {
+				node.removeEventListener('scroll', onScroll, { capture: true });
+				if (hosts.get(id) === host) hosts.delete(id);
+				// Its cell goes with the tab; the content may sit in a pane.
+				node.remove();
+			}
+		};
+	}
+
 	// Dblclick on the EMPTY bar (not buttons, not tabs) toggles maximize for
 	// the leaf — dblclick on a tab is the rename affordance instead.
 	function barDblClick(e: MouseEvent, leaf: LeafNode) {
@@ -221,6 +281,11 @@
 			</div>
 		</div>
 	{/if}
+	<div class="mo-stash" aria-hidden="true">
+		{#each allTabs as tab (tab.id)}
+			<div class="mo-cell"><div class="mo-host" use:panelHost={tab.id}>{@render panel(tab)}</div></div>
+		{/each}
+	</div>
 	{#if drag?.live}
 		<div
 			class="ghost"
@@ -333,7 +398,7 @@
 		{/if}
 		<div class="lbody">
 			{#each leaf.tabs as tab (tab.id)}
-				<div class="lpane" class:hidden={leaf.active !== tab.id}>{@render panel(tab)}</div>
+				<div class="lpane" class:hidden={leaf.active !== tab.id} use:paneSlot={tab.id}></div>
 			{/each}
 		</div>
 		{#if drag?.live && hover?.leafId === leaf.id}
@@ -555,6 +620,20 @@
 	}
 	.lpane.hidden {
 		display: none;
+	}
+	/* Where tab content waits for its pane, at the canvas's size (a terminal
+	   measures its grid when it mounts); never seen. */
+	.mo-stash {
+		position: absolute;
+		inset: 0;
+		visibility: hidden;
+		pointer-events: none;
+		overflow: hidden;
+	}
+	.mo-cell,
+	.mo-host {
+		position: absolute;
+		inset: 0;
 	}
 	/* Landing preview while dragging a tab over this leaf: a thin border and
 	   a faint fill outlining the exact area, plus a label saying what a drop

@@ -2292,6 +2292,10 @@ export class ChatState {
 					}
 					break;
 				}
+				// The conversation runs in its TUI: the daemon answers a panel's
+				// request (agents, turns, goal…) with this. Nothing failed; the
+				// panel fills in once the conversation is back here.
+				if (/^the conversation is open in its terminal/.test(str(ev.message))) break;
 				// An op this engine does not know yet (the daemon still runs the
 				// previous release): it refused one request, the turn goes on.
 				const unknownOp = /^unknown op: (\w+)$/.exec(str(ev.message));

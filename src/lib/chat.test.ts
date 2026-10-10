@@ -350,6 +350,14 @@ describe('ChatState.handle', () => {
 		expect(c.messages[1]).not.toHaveProperty('live');
 	});
 
+	it('a panel refused while the conversation runs in its TUI fails nothing', () => {
+		const c = new ChatState();
+		c.handle({ type: 'surface', surface: 'tui' });
+		c.handle({ type: 'error', message: 'the conversation is open in its terminal: exit the TUI to continue here' });
+		expect(c.lastError).toBeNull();
+		expect(c.messages).toEqual([]);
+	});
+
 	it('shows a retry as live state, not a log line, until output flows again', () => {
 		const c = new ChatState();
 		c.handle({ type: 'user_message', content: 'hi' });

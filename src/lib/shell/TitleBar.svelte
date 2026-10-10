@@ -147,8 +147,11 @@
 	   blurred when glass is on (app.css, prefs.svelte.ts). */
 	/* On a layer behind the bar: on the bar itself the blur would make it
 	   the box its menus' fixed click-away backdrops fill. */
+	/* The layer makes the bar a stacking context: on the popover level, or
+	   the canvas (later in the page) would paint over the bar's menus. */
 	:global(:root[data-canvas-bg]) .titlebar {
 		isolation: isolate;
+		z-index: 80;
 	}
 	:global(:root[data-canvas-bg]) .titlebar::before {
 		content: '';

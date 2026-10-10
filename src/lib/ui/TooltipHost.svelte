@@ -65,20 +65,35 @@
 	function onOut(e: PointerEvent) {
 		if (current && !current.contains(e.relatedTarget as Node | null)) hide();
 	}
+
+	/** A tip near the window's edge is moved back inside it: centred under
+	 *  an element at the left edge it used to run off the window. */
+	const EDGE = 8;
+	function keepInside(node: HTMLElement, _tip: unknown) {
+		const fit = () => {
+			node.style.translate = '';
+			const r = node.getBoundingClientRect();
+			const dx = r.left < EDGE ? EDGE - r.left : r.right > window.innerWidth - EDGE ? window.innerWidth - EDGE - r.right : 0;
+			const dy = r.top < EDGE ? EDGE - r.top : r.bottom > window.innerHeight - EDGE ? window.innerHeight - EDGE - r.bottom : 0;
+			if (dx || dy) node.style.translate = `${Math.round(dx)}px ${Math.round(dy)}px`;
+		};
+		fit();
+		return { update: fit };
+	}
 </script>
 
 <svelte:document onpointerover={onOver} onpointerout={onOut} />
 <svelte:window onpointerdown={hide} onkeydown={hide} onblur={hide} onwheel={hide} />
 
 {#if tip}
-	<div class="tip" class:above={tip.side === 'above'} class:right={tip.side === 'right'} role="tooltip" style:left="{tip.x}px" style:top="{tip.y}px">{tip.text}</div>
+	<div class="tip" class:above={tip.side === 'above'} class:right={tip.side === 'right'} role="tooltip" style:left="{tip.x}px" style:top="{tip.y}px" use:keepInside={tip}>{tip.text}</div>
 {/if}
 
 <style>
 	.tip {
 		position: fixed;
 		z-index: 400;
-		max-width: 320px;
+		max-width: min(320px, calc(100vw - 16px));
 		padding: 5px 9px;
 		border-radius: var(--r-sm);
 		background: var(--text);
