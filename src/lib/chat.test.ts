@@ -1043,6 +1043,36 @@ describe('letting go of tool outputs while hidden', () => {
 		expect(last?.kind === 'assistant' && last.turn).toBeFalsy();
 	});
 
+	it('shows the replay when the conversation was rewound with the same tool calls', () => {
+		const c = live();
+		c.releaseOutputs();
+		const rewound = replay('other body');
+		rewound.items[0] = { role: 'user', content: 'fix it differently' };
+		c.handle(rewound);
+		expect(c.messages.some((m) => m.kind === 'reasoning')).toBe(false);
+		expect(tool(c).output).toBe('other body');
+		expect(userTexts(c)).toEqual(['fix it differently']);
+		const changed = live();
+		changed.releaseOutputs();
+		const reply = replay();
+		reply.items[1] = { role: 'assistant', content: 'looking elsewhere' };
+		changed.handle(reply);
+		expect(changed.messages.some((m) => m.kind === 'reasoning')).toBe(false);
+	});
+
+	it('fills in a conversation whose message was sent while a turn ran', () => {
+		const c = live();
+		// Sent mid-turn: the bubble shows before the reply it waited behind.
+		c.messages.splice(1, 0, { kind: 'user', text: 'and then this' });
+		c.messages.push({ kind: 'assistant', text: 'user said: and then this' });
+		c.releaseOutputs();
+		const queued = replay();
+		queued.items.push({ role: 'user', content: 'and then this' }, { role: 'assistant', content: 'user said: and then this' });
+		c.handle(queued);
+		expect(tool(c).output).toBe('file body');
+		expect(c.messages.some((m) => m.kind === 'reasoning')).toBe(true);
+	});
+
 	it('replays as before when nothing was let go', () => {
 		const c = live();
 		c.handle(replay());

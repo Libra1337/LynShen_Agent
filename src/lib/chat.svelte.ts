@@ -1117,13 +1117,27 @@ export class ChatState {
 	}
 
 	/** The replayed transcript gives back the outputs `releaseOutputs` let go,
-	 *  when its tool calls are the ones this chat shows; false when they
-	 *  differ (the conversation moved on elsewhere), and the replay is shown
-	 *  as it is. */
+	 *  when it is the conversation this chat shows: the same messages, the
+	 *  same replies and the same tool calls, each in the same order. False
+	 *  when they differ (rewound or moved on elsewhere), and the replay is
+	 *  shown as it is. Each kind is compared on its own: a message sent while
+	 *  a turn ran shows where it was sent, and the engine records it where
+	 *  it ran. An automatic "continue" has no bubble here (`autoContinue`). */
 	#refill(items: Record<string, unknown>[]): boolean {
-		const tools = items.filter((it) => str(it.role) === 'tool');
-		const shown = this.messages.filter((m) => m.kind === 'tool' && !m.subagent);
-		if (tools.length !== shown.length || shown.some((m, i) => m.kind === 'tool' && m.name !== str(tools[i]!.name)))
+		const replayed = (role: string) =>
+			items.filter((it) => str(it.role) === role && !(role === 'user' && str(it.content) === AUTO_CONTINUE));
+		const tools = replayed('tool');
+		const same = (kind: 'user' | 'assistant' | 'tool', a: string[]) => {
+			const b = this.messages.flatMap((m) =>
+				m.kind !== kind || (m.kind === 'tool' && m.subagent) ? [] : [m.kind === 'tool' ? m.name : m.text.trim()]
+			);
+			return a.length === b.length && a.every((x, i) => x === b[i]);
+		};
+		if (
+			!same('tool', tools.map((it) => str(it.name))) ||
+			!same('user', replayed('user').map((it) => str(it.content).trim())) ||
+			!same('assistant', replayed('assistant').map((it) => str(it.content).trim()))
+		)
 			return false;
 		let i = 0;
 		this.messages = this.messages.map((m) => {
