@@ -4,7 +4,7 @@ import { createServer } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { chromium, expect } from '@playwright/test';
 
-const server = await createServer({ configFile: false, plugins: [svelte({compilerOptions:{runes:true}})], resolve: {alias:{$lib:resolve('src/lib')}}, server:{host:'127.0.0.1',port:1438,strictPort:true} });
+const server = await createServer({ configFile: false, plugins: [svelte({compilerOptions:{runes:true}})], resolve: {alias:{$lib:resolve('src/lib'), '$app/navigation':resolve('tests/browser/navigation.ts')}}, server:{host:'127.0.0.1',port:1438,strictPort:true} });
 await server.listen();
 const browser = await chromium.launch({executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH});
 try {
@@ -197,6 +197,89 @@ try {
   await expect(cutReply.locator('.md')).toHaveText('先这样回答一半');
   await expect(cutReply.locator('.foot')).toHaveText('已中断');
   await expect(page.locator('.answer').last().locator('.stream')).toHaveText('好，改用测试库', { timeout: 15000 });
+  // The web chat (app.lynshen.org) streams a long reasoning and reply at the
+  // cost of what each delta adds: the reasoning is open while the model
+  // thinks, its finished blocks render once as Markdown and the block being
+  // written streams as text; it folds once the answer starts; when the reply
+  // ends both render whole, the same Markdown as before. (Every delta
+  // rendered the whole text as Markdown again.)
+  await page.goto(base + '?webchat');
+  await page.waitForFunction(() => window.__web);
+  await page.evaluate(() => window.__web.start('请仔细想一想'));
+  const web = {
+    think: (n, seed) => page.evaluate(([n, seed]) => {
+      const words = ['我们', '先看', 'the cache', '**边界**', '然后', 'check ', '。', '\n', '\n\n', '- 一项\n'];
+      for (let i = 0; i < n; i++) {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        window.__web.deliver({ type: 'reasoning_delta', delta: words[seed % words.length] });
+      }
+    }, [n, seed]),
+    answer: (text) => page.evaluate((text) => { for (const delta of text.match(/[^]{1,6}/g)) window.__web.deliver({ type: 'assistant_delta', delta }); }, text),
+    reply: () => page.evaluate(() => { const m = window.__web.reply(); return { reasoning: m.reasoning, content: m.content, status: m.status }; }),
+    // A streaming tail as the one text it stands for (none: empty).
+    tail: (where) => page.evaluate((where) => [...(document.querySelector(`${where} .tail`)?.children ?? [])].map((b) => b.textContent).join('\n'), where)
+  };
+  const thinking = page.locator('.reasoning');
+  for (let i = 0; i < 12; i++) await web.think(800, i + 1);
+  await expect(thinking).toBeVisible();
+  // The tail is what follows the last blank line (no code fence here).
+  const tailOf = (text) => text.slice(text.lastIndexOf('\n\n') + 2);
+  await expect.poll(() => web.tail('.reasoning'), { timeout: 10000 }).toBe(tailOf((await web.reply()).reasoning));
+  await thinking.locator('.stream').evaluate((el) => {
+    window.__frozen = [...el.querySelectorAll(':scope > .done > .md')].slice(0, -1).map((b) => [b, b.innerHTML]);
+    window.__writes = [];
+    new MutationObserver((rs) => window.__writes.push(...rs.flatMap((r) => [r.target, ...r.removedNodes]))).observe(el, { subtree: true, characterData: true, childList: true });
+  });
+  for (let i = 0; i < 6; i++) await web.think(800, i + 40);
+  const reasoned = (await web.reply()).reasoning;
+  await expect.poll(() => web.tail('.reasoning'), { timeout: 10000 }).toBe(tailOf(reasoned));
+  const webBlocks = await thinking.locator('.stream').evaluate((el) => ({
+    count: el.querySelectorAll(':scope > .done > .md').length,
+    frozen: window.__frozen.length,
+    tail: el.querySelector('.tail')?.textContent.length ?? 0,
+    rewritten: window.__frozen.filter(([b, html]) => !b.isConnected || b.innerHTML !== html || window.__writes.some((t) => t === b || b.contains(t))).length
+  }));
+  assert.ok(webBlocks.frozen > 20, `web reasoning in ${webBlocks.frozen} finished blocks`);
+  assert.ok(webBlocks.tail < 2000, `the web reasoning's growing block holds ${webBlocks.tail} characters`);
+  assert.equal(webBlocks.rewritten, 0, 'a finished web reasoning block was rendered again');
+  // The answer starts: the reasoning folds; the answer's paragraphs render
+  // once each, a code fence stays in the tail until it closes, the cursor
+  // follows the tail.
+  const answerText = Array.from({ length: 30 }, (_, i) => `第 ${i} 段：the **cache** 边界。\n\n`).join('') + 'Code:\n```js\nlet a = 1;\n\nlet b';
+  await web.answer(answerText);
+  await expect(thinking).toHaveCount(0);
+  const answerBox = page.locator('.answer');
+  await expect.poll(() => web.tail('.answer'), { timeout: 10000 }).toBe('```js\nlet a = 1;\n\nlet b');
+  await expect(answerBox.locator('.md')).toHaveCount(31);
+  assert.equal(await answerBox.locator('.tail > :last-child').evaluate((el) => getComputedStyle(el, '::after').content), '""', 'no cursor after the streaming tail');
+  await answerBox.locator('.md').first().evaluate((el) => (el.dataset.seen = '1'));
+  await web.answer(' = 2;\n```\n\nDone.');
+  await expect.poll(() => web.tail('.answer'), { timeout: 10000 }).toBe('Done.');
+  await expect(answerBox.locator('.md')).toHaveCount(31);
+  assert.equal(await answerBox.locator('.md').first().getAttribute('data-seen'), '1', 'a finished web paragraph rendered again');
+  await expect(answerBox.locator('.md').last()).toContainText('let b = 2;');
+  // Between two paragraphs the cursor waits on the next one's line.
+  await web.answer('\n\n');
+  await expect(answerBox.locator('.md')).toHaveCount(32);
+  await expect.poll(() => web.tail('.answer'), { timeout: 10000 }).toBe('');
+  assert.equal(await answerBox.locator('.tail > :last-child').evaluate((el) => getComputedStyle(el, '::after').content), '""', 'no cursor between paragraphs');
+  // Ended: whole, the Markdown it always rendered; the reasoning opens as such.
+  await page.evaluate(() => window.__web.deliver({ type: 'status', message: 'ready' }));
+  await expect.poll(async () => (await web.reply()).status, { timeout: 10000 }).toBe('complete');
+  const done = await web.reply();
+  assert.equal(done.reasoning, reasoned);
+  await expect(answerBox.locator('.stream')).toHaveCount(0);
+  await expect(answerBox.locator('.md')).toHaveCount(1);
+  const rendered = (sel, text) => page.locator(sel).evaluate((el, text) => {
+    const clean = (html) => html.replace(/<!--[^]*?-->/g, '');
+    const want = document.createElement('div');
+    want.innerHTML = window.__web.html(text);
+    return clean(el.innerHTML) === clean(want.innerHTML);
+  }, text);
+  assert.ok(await rendered('.answer .md', done.content), 'the finished web answer is not the Markdown of its text');
+  await page.locator('button.thought').first().click();
+  await expect(thinking.locator('.md')).toHaveCount(1);
+  assert.ok(await rendered('.reasoning .md', done.reasoning), 'the finished web reasoning is not the Markdown of its text');
   assert.deepEqual(errors, []);
-  console.log('Browser regressions passed: reactive drafts, account authorization, logout, API key label, provider OAuth, mounted tabs, home model, title bar menu, skills, marketplace, plugins, sidebar fold and archive, long reasoning and reply, steered reply.');
+  console.log('Browser regressions passed: reactive drafts, account authorization, logout, API key label, provider OAuth, mounted tabs, home model, title bar menu, skills, marketplace, plugins, sidebar fold and archive, long reasoning and reply, steered reply, web chat streaming.');
 } finally { await browser.close(); await server.close(); }

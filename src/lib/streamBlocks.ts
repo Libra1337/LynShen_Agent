@@ -1,5 +1,6 @@
 // A streaming reply split into its finished part, as stable Markdown chunks,
-// and the tail still being written (MessageList).
+// and the tail still being written (MessageList; the web chat's
+// StreamMarkdown, for its reasoning too).
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const FENCE_RE = /^ {0,3}(`{3,}|~{3,})/gm;
@@ -105,13 +106,21 @@ export class ReplyStream {
 
 	/** Takes in the text up to `length`; `read(from, to)` reads part of it. */
 	update(length: number, read: (from: number, to: number) => string): { split: number; blocks: Block[]; tail: string } {
+		const { split, blocks } = this.parts(length, read);
+		return { split, blocks, tail: read(split, length) };
+	}
+
+	/** As `update`, without reading the tail: for a view that writes the tail
+	 *  from what each update adds to it (streamPlain). A tail with no blank
+	 *  line in it (reasoning written in single lines) is as long as the text. */
+	parts(length: number, read: (from: number, to: number) => string): { split: number; blocks: Block[] } {
 		if (length < this.#length) this.#reset();
 		if (length > this.#length) this.#scan(read(this.#length, length));
 		const lineFence = this.#lineStart < length && FENCE.test(this.#head);
 		const fences = this.#fences + (lineFence ? 1 : 0);
 		const split = fences % 2 ? (lineFence ? this.#lineStart : this.#lastFence) : this.#blank >= 0 ? this.#blank + 2 : 0;
 		if (split !== this.#split) this.#cut(split, read);
-		return { split, blocks: this.#blocks, tail: read(split, length) };
+		return { split, blocks: this.#blocks };
 	}
 
 	#reset() {

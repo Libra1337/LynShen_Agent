@@ -105,4 +105,36 @@ describe('ReplyStream', () => {
 		const long = readFor(40_000);
 		expect(long / short).toBeLessThan(1.3);
 	});
+
+	it('gives the split and blocks of update without reading the tail (parts)', () => {
+		for (let seed = 1; seed <= 40; seed++) {
+			const text = reply(300, seed);
+			const read = (from: number, to: number) => text.slice(from, to);
+			const whole = new ReplyStream();
+			const parts = new ReplyStream();
+			for (let at = 0; at < text.length; ) {
+				at = Math.min(text.length, at + (seed % 9) + 1);
+				const { split, blocks } = whole.update(at, read);
+				expect(parts.parts(at, read)).toEqual({ split, blocks });
+			}
+		}
+	});
+
+	it('reads each character about once from a text with no blank line (parts)', () => {
+		// The web chat's reasoning, often written in single lines: all of it
+		// is the tail, which update read whole on every delta.
+		const text = Array.from({ length: 4000 }, (_, i) => `第 ${i} 行：we check the cache.\n`).join('');
+		const r = new ReplyStream();
+		let read = 0;
+		for (let at = 0; at < text.length; ) {
+			at = Math.min(text.length, at + 4);
+			const { split, blocks } = r.parts(at, (from, to) => {
+				read += to - from;
+				return text.slice(from, to);
+			});
+			expect(split).toBe(0);
+			expect(blocks).toEqual([]);
+		}
+		expect(read).toBe(text.length);
+	});
 });

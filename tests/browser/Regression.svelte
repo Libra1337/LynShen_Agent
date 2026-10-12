@@ -8,6 +8,10 @@
   import Probe from './Probe.svelte';
   import MessageList from '../../src/lib/MessageList.svelte';
   import { ChatState } from '../../src/lib/chat.svelte';
+  import ChatView from '../../src/lib/web/ChatView.svelte';
+  import DOMPurify from 'dompurify';
+  import { renderMarkdown } from '../../src/lib/markdown';
+  import { stubWebChat } from './webChat';
   import { closeTab, leavesOf, moveTab, singleLeafLayout, splitLeaf, type TileLayout } from '../../src/lib/workbench/tiles';
   setLocale('zh');
   const mode = new URL(location.href).searchParams;
@@ -35,6 +39,9 @@
     const last = chat.messages.at(-1);
     return chat.busy && last?.kind === 'assistant' && !last.interrupted ? last : null;
   });
+  // The web chat against a stubbed API, its reply fed by the test
+  // (window.__web); `html`: what Markdown renders for a text.
+  if (mode.has('webchat')) Object.assign(window, { __web: { ...stubWebChat(), html: (text: string) => DOMPurify.sanitize(renderMarkdown(text)) } });
 </script>
 {#if mode.has('mosaic')}
   <button onclick={() => (tiles = splitLeaf(tiles, leavesOf(tiles.root)[0].id, 'right', { id: 't1', panel: 'b' }).layout)}>拆分</button>
@@ -49,6 +56,10 @@
   <main bind:this={scroller} style="height:600px;width:720px;overflow:auto">
     <MessageList messages={chat.messages} streamingMsg={answering} streamingReasoning={thinking} phase={chat.phase} {scroller} onEdit={() => {}} onRewind={() => {}} />
   </main>
+{:else if mode.has('webchat')}
+  <div style="height:600px;width:760px;display:flex;flex-direction:column">
+    <ChatView />
+  </div>
 {:else if mode.has('home')}
   <p data-testid="started">{started}</p>
   <div style="height:600px;position:relative">

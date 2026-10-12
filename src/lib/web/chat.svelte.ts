@@ -6,6 +6,8 @@
 // ChatEngine so both behave alike.
 
 import { t } from '$lib/i18n';
+import { LiveText } from '$lib/liveText';
+import type { PlainSource } from '$lib/streamPlain';
 import { ApiError, json, request } from './api';
 import { parseArgs, protoOf, requestBody, streamRound, wireMessage, withToolRound, type Proto, type ToolCall } from './protocol';
 import { models, type ChatModel } from './models.svelte';
@@ -212,6 +214,31 @@ const blank = (role: WebMsg['role'], model = ''): WebMsg => ({
 	research: null,
 	createdAt: new Date().toISOString()
 });
+
+// ── a reply streaming ──
+
+/** The deltas of the reply streaming now, per text, while it streams
+ *  (liveText.ts). `m.reasoning += t` is cheap (a rope), but reading any part
+ *  of the result copies all of it: the view reads the newest part from here. */
+const live = new WeakMap<WebMsg, Record<'reasoning' | 'content', LiveText>>();
+
+/** The deltas of a reply streaming now; undefined once it stopped. */
+export function streamDeltas(m: WebMsg): Record<'reasoning' | 'content', LiveText> | undefined {
+	return live.get(m);
+}
+
+/** A reply's reasoning or answer as its length and a reader for part of it:
+ *  from its deltas while they match the text (same length), else from the
+ *  text. Reading the text's length keeps a reactive caller subscribed to it
+ *  without copying it. */
+export function streamSource(m: WebMsg, field: 'reasoning' | 'content'): PlainSource {
+	const text = m[field];
+	const deltas = live.get(m)?.[field];
+	return {
+		length: text.length,
+		read: deltas && deltas.length === text.length ? (from, to) => deltas.slice(from, to) : (from, to) => text.slice(from, to)
+	};
+}
 
 // ── attachments ──
 const attachmentData = new Map<string, Promise<Blob>>();
@@ -514,8 +541,10 @@ class Chat {
 		this.busy = true;
 		const run = this.#run;
 		const costs = new Map<string, number>();
+		const deltas = { reasoning: new LiveText(), content: new LiveText() };
 		try {
 			if (opts.research) return await this.#startResearch(m, opts, convId);
+			live.set(m, deltas);
 			await this.#put(m, convId);
 			const system = systemPrompt(opts.search);
 			const proto = protoOf(opts.model);
@@ -530,10 +559,12 @@ class Chat {
 					onReasoning: (t) => {
 						if (!thinkingSince) thinkingSince = Date.now();
 						m.reasoning += t;
+						deltas.reasoning.append(t);
 					},
 					onContent: (t) => {
 						if (thinkingSince && !m.thoughtMs) m.thoughtMs = Date.now() - thinkingSince;
 						m.content += t;
+						deltas.content.append(t);
 					}
 				});
 				if (r.usage) {
@@ -570,6 +601,8 @@ class Chat {
 				m.error = e instanceof Error ? e.message : String(e);
 			}
 		} finally {
+			// No longer streaming: its text is read whole from now on.
+			live.delete(m);
 			if (!opts.research || m.status !== 'streaming') {
 				if (this.#run === run) this.busy = false;
 				if (this.#abort === abort) this.#abort = null;

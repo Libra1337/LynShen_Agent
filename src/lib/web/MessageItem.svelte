@@ -17,8 +17,9 @@
 	import Vendor from '$lib/Vendor.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import { imageViewer } from '$lib/ui/imageViewer.svelte';
-	import { attachmentURL, type WebMsg } from './chat.svelte';
+	import { attachmentURL, streamSource, type WebMsg } from './chat.svelte';
 	import { models } from './models.svelte';
+	import StreamMarkdown from './StreamMarkdown.svelte';
 
 	let {
 		m,
@@ -38,6 +39,8 @@
 	} = $props();
 
 	const streaming = $derived(m.status === 'streaming');
+	// Its text streaming in (a research's report comes whole).
+	const writing = $derived(streaming && m.kind === 'chat');
 	const thinkingNow = $derived(streaming && !!m.reasoning && !m.content);
 	let thoughtOpen = $state(false);
 	let sourcesOpen = $state(false);
@@ -152,7 +155,8 @@
 					<span class="caret" class:open={thoughtOpen || thinkingNow}><CaretRightIcon size={12} /></span>
 				</button>
 				{#if thoughtOpen || thinkingNow}
-					<div class="reasoning"><Markdown text={m.reasoning} /></div>
+					<!-- While it streams: what each delta adds (StreamMarkdown). -->
+					<div class="reasoning">{#if writing}<StreamMarkdown source={streamSource(m, 'reasoning')} />{:else}<Markdown text={m.reasoning} />{/if}</div>
 				{/if}
 			{/if}
 
@@ -190,7 +194,7 @@
 			{/if}
 
 			{#if m.content}
-				<div class="answer" class:streaming><Markdown text={m.content} /></div>
+				<div class="answer" class:streaming>{#if writing}<StreamMarkdown source={streamSource(m, 'content')} />{:else}<Markdown text={m.content} />{/if}</div>
 			{:else if streaming && !m.reasoning && !m.searches.length && m.kind === 'chat'}
 				<div class="pending"><span></span><span></span><span></span></div>
 			{/if}
@@ -398,7 +402,9 @@
 		font-size: var(--fs-md);
 		line-height: 1.7;
 	}
-	.answer.streaming :global(.md > :last-child)::after {
+	/* The cursor: after the text still being written, on the next block's
+	   line while it has not started (StreamMarkdown). */
+	.answer.streaming :global(.tail > :last-child)::after {
 		content: '';
 		display: inline-block;
 		width: 0.5em;
@@ -529,7 +535,7 @@
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.answer.streaming :global(.md > :last-child)::after,
+		.answer.streaming :global(.tail > :last-child)::after,
 		.pending span {
 			animation: none;
 		}
