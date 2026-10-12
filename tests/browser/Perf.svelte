@@ -21,7 +21,9 @@
         chat.handle(ev as never);
         api?.scrollToEnd();
       },
-      chat: () => session!.chat
+      chat: () => session!.chat,
+      /** Characters of the message streaming now. */
+      length: () => (session!.chat.messages.at(-1) as { text?: string } | undefined)?.text?.length ?? 0
     }
   });
 </script>
