@@ -63,7 +63,7 @@
 	import { parseToolOutput, toolTarget, toolVerb } from '$lib/toolSummary';
 	import { costText } from '$lib/sessionCost';
 	import { prefs } from '$lib/prefs.svelte';
-	import { followTop, shortOfEnd } from '$lib/chatFollow';
+	import { ReaderInput, followAfterScroll, followTop, shortOfEnd } from '$lib/chatFollow';
 
 	let {
 		session,
@@ -174,14 +174,27 @@
 	// The position last pinned to the end, and the last one seen.
 	let pinnedTop = -1;
 	let lastTop = 0;
+	// The reader scrolling by hand (a pointer or a finger held in the list, a
+	// scroll key): only then does a move up stop following.
+	const reader = new ReaderInput(() => scroller);
+	// The content's and the view's size at the last scroll event or pin: a
+	// move up without a change since is the reader's.
+	let seen = [0, 0];
 	function onScroll() {
 		if (!scroller) return;
 		const top = scroller.scrollTop;
-		// The scroll event of our own pin says nothing about the reader.
-		// Otherwise follow again once they scroll down near the end, never
-		// while they scroll up.
-		if (top !== pinnedTop) atBottom = top >= lastTop && scroller.scrollHeight - top - scroller.clientHeight < 60;
+		const resized = scroller.scrollHeight !== seen[0] || scroller.clientHeight !== seen[1];
+		// The scroll event of our own pin says nothing about the reader. A
+		// move up with a size change and no hand on the list is the layout's:
+		// it leaves following as it was, and pins the end again while
+		// following (chatFollow followAfterScroll).
+		if (top !== pinnedTop) {
+			const follows = followAfterScroll(scroller, top, lastTop, reader.active, resized);
+			if (follows !== null) atBottom = follows;
+			else if (atBottom) requestAnimationFrame(follow);
+		}
 		lastTop = top;
+		seen = [scroller.scrollHeight, scroller.clientHeight];
 	}
 	// Scrolling up leaves the end. Caught at the input (wheel up, a finger
 	// dragging down): WebKit applies the scroll later, and while a reply
@@ -197,16 +210,20 @@
 	}
 	$effect(() => {
 		if (!contentEl || !scroller) return;
-		const ro = new ResizeObserver(() => {
-			if (!atBottom || !scroller || !contentEl) return;
-			const top = followTop(scroller, contentEl, chat.busy);
-			scroller.scrollTop = top;
-			pinnedTop = scroller.scrollTop;
-			if (shortOfEnd(scroller, top)) atBottom = false;
-		});
+		const ro = new ResizeObserver(follow);
+		// The view too: a card under it that closes makes it taller (ChatPane).
 		ro.observe(contentEl);
+		ro.observe(scroller);
 		return () => ro.disconnect();
 	});
+	function follow() {
+		if (!atBottom || !scroller || !contentEl) return;
+		const top = followTop(scroller, contentEl, chat.busy);
+		scroller.scrollTop = top;
+		pinnedTop = scroller.scrollTop;
+		seen = [scroller.scrollHeight, scroller.clientHeight];
+		if (shortOfEnd(scroller, top)) atBottom = false;
+	}
 	function jumpToBottom() {
 		atBottom = true;
 		scroller?.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
@@ -651,6 +668,8 @@
 	const opening = $derived(!draft && !connected && !exited);
 </script>
 
+<svelte:window onkeydowncapture={reader.key} onpointerup={reader.up} onpointercancel={reader.up} onblur={reader.up} />
+
 <div class="session">
 	<header>
 		{#if onBack}<button class="back" onclick={onBack} aria-label={t('shell.remote.back')}><ArrowLeftIcon size={18} /></button>{/if}
@@ -689,6 +708,7 @@
 		bind:this={scroller}
 		onscroll={onScroll}
 		onwheel={onWheel}
+		onpointerdown={reader.down}
 		ontouchstart={(e) => (touchY = e.touches[0]?.clientY ?? 0)}
 		ontouchmove={onTouchMove}
 	>
